@@ -3603,6 +3603,8 @@ const char* AmPm[] = {"AM", "PM"};
 const char* sefstarsName = "sefstars.txt";
 const char* tHouseSystem[] = { "","Placidus", "Koch", "Equal(Asc)", "Campanus", "Meridian", "Regiomontanus", "Porphyry", "Morinus", "Topocentric", "Alcabitius", "Equal(MC)", "Neo-Porphyry", "Whole", "Vedic", "Null", "Shripati" };
 const char* tColor[] = {"Color  1", "Color 11", "Color 12", "Color 14", "Color 13", "Color 15", "Color 16", "Color 10", "Color  9", "Color  3", "Color  4", "Color  6", "Color  7", "Color  5", "Color  8", "Color  2"};
+const char* sNoAspects = "No Aspects in list!";
+const char* sTotalPower = "Total Power: %.2f - Average Power: %.2f\n";
 //==================================================================================================
 
 //==================================================================================================
@@ -9732,7 +9734,7 @@ void PlanetPPower() //  for ppower1[]
 }
 
 wchar_t retA[255];
-wchar_t *addspace(wchar_t *str, int num)
+wchar_t *addspace(const wchar_t *str, int num)
 {
 	wcscpy(retA, str);
 	int len = wcslen(str) * 2;
@@ -11140,6 +11142,317 @@ void ComputeInfluence() // for power1,power2
   }
 }
 
+const char* tAspectConfig[] = {"Stellium", "Grand Trine", "T-Square", "Yod", "Grand Cross", "Cradle", "Mystic Rect", "Kite"};
+const char* sWith2  = "with";
+const char* sfrom = "from";
+const char* sand3 = "and";
+const char* sto2 = "to ";
+const char* sTo = " to ";
+const char* sNoMajor = "No major configurations in aspect grid.\n";
+/* This is a subprocedure of DisplayGrands(). Here we print out one aspect */
+/* configuration found by the parent procedure.                            */
+void PrintGrand(byte ac, int i1, int i2, int i3, int i4)
+{
+	wchar_t sz[cchSzDef];
+	int asp;
+
+	switch (ac)
+	{
+	case acS:
+		asp = aCon;
+		break;
+	case acGT:
+		asp = aTri;
+		break;
+	case acTS:
+		asp = aOpp;
+		break;
+	case acY:
+		asp = aInc;
+		break;
+	case acGC:
+		asp = aSqu;
+		break;
+	case acC:
+		asp = aSex;
+		break;
+	case acMR:
+		asp = aSex;
+		break;
+	case acK:
+		asp = aTri;
+		break;
+	default:;
+	}
+
+	//AnsiColor(kAspA[asp]);
+
+	if (!wi.chs)
+	{
+		swprintf(sz, sizeof(sz) / sizeof(wchar_t), L"%-11ls", char_to_wchar(tAspectConfig[ac]).c_str());
+		PrintSzW(sz);
+	}
+	else
+		PrintSzW(addspace(char_to_wchar(tAspectConfig[ac]).c_str(), 11));
+
+
+	//AnsiColor(kDefault);
+
+	swprintf(sz, sizeof(sz) / sizeof(wchar_t), L" %ls ", ac == acS || ac == acGT || ac == acGC || ac == acMR || ac == acK ? char_to_wchar(sWith2).c_str() : char_to_wchar(sfrom).c_str());//  swith sfrom  
+
+	PrintSzW(sz);
+	wchar_t szTmp[60];
+	memset(szTmp,0,sizeof(szTmp));
+	swprintf(szTmp,sizeof(szTmp)/sizeof(wchar_t),L"%ls", char_to_wchar(tObjShortName[i1]).c_str());
+	//AnsiColor(kObjA[i1]);
+	if (wi.chs)
+		swprintf(sz, sizeof(sz) / sizeof(wchar_t), L"%lc%lc: ", szTmp[0], szTmp[1]);
+	else
+		swprintf(sz, sizeof(sz) / sizeof(wchar_t), L"%lc%lc%lc: ", szTmp[0], szTmp[1],szTmp[2]);
+
+	PrintSzW(sz);
+	PrintSzW(SzZodiac(cp0.longitude[i1]));
+
+	swprintf(sz, sizeof(sz) / sizeof(wchar_t), L" %ls ", ac == acS || ac == acGT || ac == acK ? char_to_wchar(sand3).c_str() : char_to_wchar(sto2).c_str());
+
+	PrintSzW(sz);
+	//AnsiColor(kObjA[i2]);
+	memset(szTmp, 0, sizeof(szTmp));
+	swprintf(szTmp, sizeof(szTmp) / sizeof(wchar_t), L"%ls", char_to_wchar(tObjShortName[i2]).c_str());
+	if (wi.chs)
+		swprintf(sz, sizeof(sz) / sizeof(wchar_t), L"%lc%lc: ", szTmp[0], szTmp[1]);
+	else
+		swprintf(sz, sizeof(sz) / sizeof(wchar_t), L"%lc%lc%lc: ", szTmp[0], szTmp[1], szTmp[2]);
+
+	PrintSzW(sz);
+	PrintSzW(SzZodiac(cp0.longitude[i2]));
+
+	swprintf(sz, sizeof(sz) / sizeof(wchar_t), L" %ls ", ac == acGC || ac == acC || ac == acMR ? char_to_wchar(sto2).c_str() : char_to_wchar(sand3).c_str());
+
+	PrintSzW(sz);
+	//AnsiColor(kObjA[i3]);
+	memset(szTmp, 0, sizeof(szTmp));
+	swprintf(szTmp, sizeof(szTmp) / sizeof(wchar_t), L"%ls", char_to_wchar(tObjShortName[i3]).c_str());
+	if (wi.chs)
+		swprintf(sz, sizeof(sz) / sizeof(wchar_t), L"%lc%lc: ", szTmp[0], szTmp[1]);
+	else
+		swprintf(sz, sizeof(sz) / sizeof(wchar_t), L"%lc%lc%lc: ", szTmp[0], szTmp[1], szTmp[2]);
+
+	PrintSzW(sz);
+	PrintSzW(SzZodiac(cp0.longitude[i3]));
+
+	if (ac == acGC || ac == acC || ac == acMR || ac == acK)
+	{
+		//AnsiColor(kObjA[i4]);
+		memset(szTmp, 0, sizeof(szTmp));
+		swprintf(szTmp, sizeof(szTmp) / sizeof(wchar_t), L"%ls", char_to_wchar(tObjShortName[i4]).c_str());
+		if (wi.chs)
+			swprintf(sz, sizeof(sz) / sizeof(wchar_t), L"%lc%lc: ", szTmp[0], szTmp[1]);
+		else
+			swprintf(sz, sizeof(sz) / sizeof(wchar_t), L"%lc%lc%lc: ", szTmp[0], szTmp[1], szTmp[2]);
+
+		PrintSzW(sz);
+		PrintSzW(SzZodiac(cp0.longitude[i4]));
+	}
+	//PrintL();
+	wprintf(L"\n");
+}
+
+/* Scan the aspect grid of a chart and print out any major configurations, */
+/* as specified with the -g0 switch.                                       */
+void DisplayGrands()
+{
+	int cac = 0, i, j, k, l;
+
+	for (i = 0; i <= cObj; i++)
+	{
+		if (!FIgnore(i))
+		{
+			for (j = 0; j <= cObj; j++)
+			{
+				if (j != i && !FIgnore(j))
+				{
+					for (k = 0; k <= cObj; k++)
+					{
+						if (k != i && k != j && !FIgnore(k))
+						{
+							/* Is there a Stellium among the current three planets? */
+
+							if (i < j && j < k && grid->n[i][j] == aCon && grid->n[i][k] == aCon && grid->n[j][k] == aCon)
+							{
+								cac++;
+								PrintGrand(acS, i, j, k, l);
+								/* Is there a Grand Trine? */
+
+							}
+							else if (i < j && j < k && grid->n[i][j] == aTri && grid->n[i][k] == aTri && grid->n[j][k] == aTri)
+							{
+								cac++;
+								PrintGrand(acGT, i, j, k, l);
+								/* Grand Trine is there, may be there is a Kite too ? */
+								/* We look, if some cp0.longitude is in sextiles with some   */
+								/* pair of planets of Grand Trine, then it's surely   */
+								/* opposed with third one.                            */
+
+								for (l = 0; l <= cObj; l++)
+								{
+									if (!FIgnore(l))
+									{
+										if (grid->n[Min(i, l)][Max(i, l)] ==
+											aSex && grid->n[Min(j, l)][Max(j, l)] == aSex)
+										{
+											cac++;
+											PrintGrand(acK, i, j, k, l);
+										}
+										if (grid->n[Min(j, l)][Max(j, l)] ==
+											aSex && grid->n[Min(k, l)][Max(k, l)] == aSex)
+										{
+											cac++;
+											PrintGrand(acK, i, j, k, l);
+										}
+										if (grid->n[Min(i, l)][Max(i, l)] ==
+											aSex && grid->n[Min(k, l)][Max(k, l)] == aSex)
+										{
+											cac++;
+											PrintGrand(acK, i, j, k, l);
+										}
+									}
+								}
+								/* Is there a T-Square? */
+
+							}
+							else if (j < k && grid->n[j][k] == aOpp && grid->n[Min(i, j)][Max(i, j)] == aSqu && grid->n[Min(i, k)][Max(i, k)] == aSqu)
+							{
+								cac++;
+								PrintGrand(acTS, i, j, k, l);
+								/* Is there a Yod? */
+							}
+							else if (j < k && grid->n[j][k] == aSex && grid->n[Min(i, j)][Max(i, j)] == aInc && grid->n[Min(i, k)][Max(i, k)] == aInc)
+							{
+								cac++;
+								PrintGrand(acY, i, j, k, l);
+							}
+							for (l = 0; l <= cObj; l++)
+							{
+								if (!FIgnore(l))
+								{
+
+									/* Is there a Grand Cross among the current four planets? */
+
+									if (i < j && i < k && i < l && j < l
+										&& grid->n[i][j] == aSqu
+										&& grid->n[Min(j, k)][Max(j, k)] ==
+										aSqu
+										&& grid->n[Min(k, l)][Max(k, l)] ==
+										aSqu && grid->n[i][l] == aSqu
+										&& MinDistance(cp0.longitude[i],
+											cp0.longitude[k]) > 150.0 && MinDistance(cp0.longitude[j], cp0.longitude[l]) > 150.0)
+									{
+										cac++;
+										PrintGrand(acGC, i, j, k, l);
+
+										/* Is there a Cradle? */
+
+									}
+									else if (i < l
+										&& grid->n[Min(i, j)][Max(i, j)] == aSex
+										&& grid->n[Min(j, k)][Max(j, k)] == aSex
+										&& grid->n[Min(k, l)][Max(k, l)] == aSex
+										&& MinDistance(cp0.longitude[i], cp0.longitude[l]) > 150.0)
+									{
+										cac++;
+										PrintGrand(acC, i, j, k, l);
+
+										/* Is there a Mystic Rectangle? */
+
+									}
+									else if (i < j && i < k && i < l &&
+										grid->n[Min(i, j)][Max(i, j)] == aOpp
+										&& grid->n[Min(k, l)][Max(k, l)] == aOpp
+										&& grid->n[Min(i, k)][Max(i, k)] == aTri && grid->n[Min(j, l)][Max(j, l)] == aTri)
+									{
+										cac++;
+										PrintGrand(acMR, i, j, k, l);
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if (!cac)
+		PrintSzW(char_to_wchar(sNoMajor).c_str());
+}
+
+
+/* This is a subprocedure of ChartAspect() and ChartAspectRelation().       */
+/* Display summary information about the aspect list, i.e. the total number */
+/* of aspects of each type, and the number of aspects to each object, as    */
+/* done when the -a0 aspect summary setting is set.                         */
+void PrintAspectSummary(int* ca, int* co, int count, double rPowSum)
+{
+	wchar_t sz[cchSzDef];
+
+	int i, j, k;
+
+	if (count == 0)
+	{
+		PrintSzW(char_to_wchar(sNoAspects).c_str());
+		return;
+	}
+	PrintL();
+	swprintf(sz, sizeof(sz) / sizeof(wchar_t), char_to_wchar(sTotalPower).c_str(), rPowSum, rPowSum / (double)count);
+	PrintSzW(sz);
+	wprintf(L"\n");
+	k = us.fParallel ? aOpp : cAspect;
+
+	for (j = 0, i = 1; i <= k; i++)
+	{
+		if (!ignoreA[i])
+		{
+			if (!(j & 7))
+			{
+				if (j)
+					PrintL();
+			}
+			else
+				PrintSzW(L"   ");
+			//AnsiColor(kAspA[i]);
+			swprintf(sz, sizeof(sz) / sizeof(wchar_t), L"%ls:%3d", char_to_wchar(tAspectAbbrev[i]).c_str(), ca[i]);
+			PrintSzW(sz);
+			j++;
+		}
+	}
+	wprintf(L"\n");
+	//PrintL();
+	for (j = 0, i = 0; i <= cObj; i++)
+	{
+		if (!FIgnore(i))
+		{
+			if (!(j & 7))
+			{
+				if (j)
+					PrintL();
+			}
+			else
+				PrintSzW(L"   ");
+			//AnsiColor(kObjA[i]);
+			if (wi.chs)
+				swprintf(sz, sizeof(sz) / sizeof(wchar_t), L"%c%c:%3d", chObj3C(i), co[i]);
+			else
+				swprintf(sz, sizeof(sz) / sizeof(wchar_t), L"%c%c%c:%3d", chObj3(i), co[i]);
+
+			PrintSzW(sz);
+			j++;
+		}
+	}
+	//PrintL();
+	wprintf(L"\n");
+}
+
 
 /* Display all aspects between objects in the chart, one per line, in       */
 /* sorted order based on the total "power" of the aspect, as specified with */
@@ -11257,9 +11570,9 @@ void ChartAspect()
 
 	if (us.fAspSummary)
 	{
-		//PrintAspectSummary(ca, co, count, rPowSum);
+		PrintAspectSummary(ca, co, count, rPowSum);
 		PrintL2();
-		//DisplayGrands();
+		DisplayGrands();
 	}
 }
 
@@ -12221,6 +12534,8 @@ void GetChartResult(CI& ciInput,bool useInput = true)
 
 	us.fAspList = TRUE;
 	FCreateGrid(FALSE);
+
+	us.fAspSummary = 1;
 	ChartAspect();
 	//ListAspect();
 }
