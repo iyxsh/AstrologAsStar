@@ -23,8 +23,10 @@ windows下编译为 vs2022 工程然后使用
 cd out/build
 cmake ../../ -G "Visual Studio 17 2022" -A Win32
 
-找到astrolog32 运行
+
+用vs2022打开工程编译后找到astrolog32.exe 运行
  .\astrolog32.exe 3 22 2025 "12:30:00" "No" "-8:00:00" "116:23'50E" "39:54'27N" 39.00 "此时此刻" "北京, 中国" 
+如果无法运行，把Astrolog\astrolog32\swe\lib\windows 下的动态库拷贝到运行目录下(astrolog32.exe 所在目录) 然后重新运行即可
 
 linux 下 
 cd out/build

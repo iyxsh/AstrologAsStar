@@ -40,6 +40,7 @@ endif()
 set(SOURCES
     ./astrolog32/astrolog.cpp
     ./astrolog32/TransU/TransU.cpp
+    ./astrolog32/useswe/useswe.cpp
 )
 
 # 头文件
@@ -48,6 +49,7 @@ set(HEADERS
     ./astrolog32/version.h
     ./astrolog32/swe/inc/swedll.h
     ./astrolog32/TransU/TransU.h
+    ./astrolog32/useswe/useswe.h
 )
 
 # 创建可执行文件

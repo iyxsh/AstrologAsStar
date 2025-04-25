@@ -550,20 +550,15 @@ public:
 };
 #endif
 
+#include "useswe/useswe.h"
+UseSwe useswe;
+
 #if defined(_WIN32)
-	#include "windows.h"
-	#include "swe/inc/swedll.h"
     #define STR_CMPI _stricmp
 	#define MEM_CCPY _memccpy
 	#define STR_DUP _strdup
 	#define X_MEMSET x_memset_Intel
 #else
-	#include "swe/inc/swephexp.h"
-	#include "swe/inc/sweph.h"
-	#include "swe/inc/swephlib.h"
-	#include "swe/inc/swehouse.h"
-	#include "swe/inc/sweodef.h"
-
 	#include <string.h>
 	#define STR_CMPI strcasecmp
 	#define MEM_CCPY memccpy

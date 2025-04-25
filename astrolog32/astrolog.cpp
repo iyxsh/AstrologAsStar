@@ -315,8 +315,7 @@ BOOL UseUserValue = FALSE;
 //#define szTtyCore  "tty"
 #define cchSzDef   200
 #define cchSzMax   510
-#define yeaJ2G     1582
-#define monJ2G     mOct
+
 #define dayJ2G1    4
 #define dayJ2G2    15
 #define chNull     L'\0'
@@ -560,23 +559,6 @@ typedef enum
 	ChandraLagna,
 	SuryaLagna
 } partchart;
-
-/* Month index values */
-typedef enum
-{
-	mJan = 1,
-	mFeb,
-	mMar,
-	mApr,
-	mMay,
-	mJun,
-	mJul,
-	mAug,
-	mSep,
-	mOct,
-	mNov,
-	mDec
-} month_t;
 
 /* Elements */
 typedef enum
@@ -5209,38 +5191,20 @@ void PrintTab(char ch, int cch)
 		PrintSzW(sz);
 }
 
-/* Given a month, day, and year, convert it into a single Julian day value, */
-/* i.e. the number of days passed since a fixed reference date.             */
-long MdyToJulian(int mon, int day, int yea) {
-	int fGreg = TRUE;
-	if (yea < yeaJ2G || (yea == yeaJ2G && (mon < monJ2G || (mon == monJ2G && day < 15))))
-		fGreg = FALSE;
-	//	long t = floor(swe_julday(yea, mon, day, 12.0, fGreg) + 0.5);
-	//	long t1 = floor(swe_julday(yea, mon, day, 12.0, TRUE) + 0.5);
-	return (long)floor(swe_julday(yea, mon, day, 12.0, fGreg) + 0.5);
-}
+
 
 /* Like above but return a fractional Julian time given the extra info. */
 double MdytszToJulian(int mon, int day, int yea, double tim, double dst, double zon)
 {
-	return (double)MdyToJulian(mon, day, yea) + (DegMin2DecDeg(tim) + DegMin2DecDeg(zon) - DegMin2DecDeg(dst)) / 24.0;
+	return useswe.getMdyToJulian() + (DegMin2DecDeg(tim) + DegMin2DecDeg(zon) - DegMin2DecDeg(dst)) / 24.0;
 }
-
-/* Take a Julian day value, and convert it back into the corresponding */
-/* month, day, and year.                                               */
-void JulianToMdy(double JD, int *mon, int *day, int *yea)
-{
-	double tim;
-	swe_revjul(JD, JD >= 2299171.0 /* October 15, 1582 */, yea, mon, day, &tim);
-}
-
 
 /* Return the day of the week (Sunday is 0) of the specified given date. */
 int DayOfWeek(int month, int day, int year)
 {
 	int d;
 
-	d = (int)((MdyToJulian(month, day, year) + 1) % 7);
+	d = (int)(((long)useswe.getMdyToJulian() + 1) % 7);
 	return d < 0 ? d + 7 : d;
 }
 
@@ -5276,8 +5240,8 @@ wchar_t *SzZodiac(double deg)
 		else
 		{
 			wchar_t tstmp[MAX_STRING_NAME_LEN];
-			swprintf(tstmp,sizeof(tstmp)/sizeof(wchar_t), L" %ls",char_to_wchar(tSignName[sign+1]).c_str());
-			swprintf(szZod, sizeof(szZod) / sizeof(wchar_t), L"%2d%lc%lc%lc%02d", d, tstmp[0], tstmp[1], tstmp[2] , m);
+			swprintf(tstmp,sizeof(tstmp)/sizeof(wchar_t), L"%ls",char_to_wchar(tSignName[sign+1]).c_str());
+			swprintf(szZod, sizeof(szZod) / sizeof(wchar_t), L" %2d%lc%lc%lc%02d", d, tstmp[0], tstmp[1], tstmp[2] , m);
 		}
 
 		if (is.fSeconds)
@@ -7231,7 +7195,7 @@ void ChartListing()
 			{
 				PrintSzW(L"  -  ");
 				//AnsiColor(kSignA(obj_right));
-				swprintf(sz, sizeof(sz) / sizeof(wchar_t), L"%ls %2d: ", L"House cusp", obj_right);
+				swprintf(sz, sizeof(sz) / sizeof(wchar_t), L"%ls %2d:", L"House cusp", obj_right);
 				PrintSzW(sz);
 				if (IsPDsChartWithoutTable && UsePDsInChart)
 					PrintSzW(SzZodiac(cpPDs.cusp_pos[obj_right]));
@@ -7409,7 +7373,7 @@ double ProcessInput(BOOL fDate)
 
 	if (fDate)
 	{
-		is.JD = (double)MdyToJulian(ciCore.mon, ciCore.day, ciCore.yea);
+		is.JD = useswe.getMdyToJulian();
 		if (!us.fProgressUS || us.fSolarArc)
 		{
 			is.T = (is.JD + ciCore.tim / 24.0 - 2415020.5) / 36525.0;
@@ -7431,10 +7395,14 @@ double ProcessInput(BOOL fDate)
 	//jut = ciCorejhour + jmin / 60.0 + jsec / 3600.0;
 
 	if (us.fSidereal)
-		swe_set_sid_mode(us.nSiderealMode, 0, 0);  // for swe_get_ayanamsa()
+	{
+		useswe.setMod(us.nSiderealMode);
+	}
 
-	eph_time = jd + swe_deltat(jd);
-	ayanamsa = swe_get_ayanamsa(eph_time);
+	useswe.setDeltat(jd);
+	eph_time = jd + useswe.getDeltat();
+	useswe.setAyanamsa(eph_time);
+	ayanamsa = useswe.getAyanamsa();
 
 	if (ayanamsa > 180.0)
 	{
@@ -7447,8 +7415,7 @@ double ProcessInput(BOOL fDate)
 	Off = -ayanamsa;
 
 	// Compute angle that the ecliptic is inclined to the Celestial Equator 计算黄道向天赤道倾斜的角度 eph_time=2435033.5142473509
-	swe_calc(eph_time, SE_ECL_NUT, 1, x, serr);
-
+	useswe.sweCalc(eph_time, SE_ECL_NUT, 1, x, serr);
 
 	if (us.fSidereal)
 	{
@@ -7462,7 +7429,6 @@ double ProcessInput(BOOL fDate)
 	us.Nutation = x[2];
 
 	is.rSid = us.fSidereal ? Off + us.rSiderealCorrection : 0.0;
-	//Todo... 此处临时注释，如流程有问题可以查看是否需要改造此处
 	if (options.AddNutation == TRUE && us.fSidereal)
 		is.rSid = is.rSid + us.Nutation;
 
@@ -7822,7 +7788,7 @@ BOOL CalculatePlanetSE(int ind, double jde, BOOL heliocentric, double SE_coordin
 	if (us.fSidereal) // 已经包含了岁差
 	{
 		flag |= SEFLG_SIDEREAL;
-		swe_set_sid_mode(us.nSiderealMode, 0, 0);
+		useswe.setMod(us.nSiderealMode);
 	}
 	flag |= SEFLG_SPEED;
 
@@ -12500,21 +12466,21 @@ void GetChartResult(CI& ciInput,bool useInput = true)
 
 		if (us.fPrimDirs)
 		{
-			BOOL valid = TRUE;
-			int y, m, d, ho, mi, se;
-			double t, da;
-			BOOL direct;
-			//calc2(pds[CurrentRec].mundane, &valid, &y, &m, &d, &ho, &mi, &se, &t, &direct, &da);
-
-			pds[CurrentRec].arc = da;
-
-			BOOL cal_type = (
-				ciTwin.yea < 1582 ||
-				(ciTwin.yea == 1582 && (ciTwin.mon < 10 || ciTwin.mon == 10 && ciTwin.day < 15)
-					)) ? 0 : 1;
-
-			double jd = swe_julday(y, m, d, t, cal_type);
-			pds[CurrentRec].time = jd;
+			//BOOL valid = TRUE;
+			//int y, m, d, ho, mi, se;
+			//double t, da;
+			//BOOL direct;
+			////calc2(pds[CurrentRec].mundane, &valid, &y, &m, &d, &ho, &mi, &se, &t, &direct, &da);
+//
+			//pds[CurrentRec].arc = da;
+//
+			//BOOL cal_type = (
+			//	ciTwin.yea < 1582 ||
+			//	(ciTwin.yea == 1582 && (ciTwin.mon < 10 || ciTwin.mon == 10 && ciTwin.day < 15)
+			//		)) ? 0 : 1;
+//
+			//double jd = swe_julday(y, m, d, t, cal_type);
+			//pds[CurrentRec].time = jd;
 		}
 		break;
 	case 3:
@@ -12528,6 +12494,10 @@ void GetChartResult(CI& ciInput,bool useInput = true)
 
 	wi.fCast = TRUE;
 	us.fEuroDate = 1;
+
+
+	useswe.setMYD(ciCore.mon, ciCore.day, ciCore.yea);
+	useswe.setMdyToJulian();
 	double res = CastChart(1);
 	//wprintf(L"%lf\n", res);
 	ChartListing();
@@ -12548,8 +12518,6 @@ int main(int argc,char* argv[])
 	////设置控制台为宽字符输出模式
 	//int seno = _setmode(_fileno(stdout), _O_U16TEXT);  // 关键步骤！
 	wchar_t szWindowName[1024];
-	char svers[260]={0};
-	char * ver = swe_version(svers);
 
 	// 程序中使用的相位数量
 	us.nAsp = cAspect;
@@ -12561,7 +12529,7 @@ int main(int argc,char* argv[])
 
 	swprintf(szWindowName,sizeof(szWindowName)/sizeof(wchar_t),
 	 L"%ls version %ls for Current System with Ephemeris: JPL DE406 / Swiss V%ls\n", 
-	 char_to_wchar(szAppNameCore).c_str(), char_to_wchar(szVersionCore).c_str(), char_to_wchar(ver).c_str());
+	 char_to_wchar(szAppNameCore).c_str(), char_to_wchar(szVersionCore).c_str(), char_to_wchar(useswe.getSweVersion()).c_str());
 	wprintf(szWindowName);
 
 	int i;
