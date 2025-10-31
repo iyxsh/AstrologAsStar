@@ -61,7 +61,7 @@ void demonstrateNatalChart() {
     
     wcout << L"\n行星位置:" << endl;
     for (size_t i = 0; i < planets.size() && i < 10; i++) {
-        wcout << setw(4) << left << planetNames[i] << L": " 
+        wcout << setw(4) << left << planetNamesEn[i] << L": " 
               << PlanetCalculator::formatPlanetPosition(planets[i], 0) << endl;
     }
     
@@ -91,8 +91,8 @@ void demonstrateNatalChart() {
     for (const auto& aspect : aspects) {
         // 只显示主要相位（重要性较高的相位）
         if (aspect.aspectType <= 5 && aspectCount < 15) {
-            wcout << planetNames[aspect.planet1] << L" 与 " 
-                  << planetNames[aspect.planet2] << L" 形成 "
+            wcout << planetNamesEn[aspect.planet1] << L" 与 " 
+                  << planetNamesEn[aspect.planet2] << L" 形成 "
                   << AspectCalculator::formatAspect(aspect.aspectType)
                   << L"，偏离: " << Formatter::formatAngle(aspect.orb, 2) << L"度" << endl;
             aspectCount++;
@@ -132,7 +132,7 @@ void demonstrateProgressions() {
     
     wcout << L"33年后的次限推进行星位置:" << endl;
     for (size_t i = 0; i < progressedPlanets.size() && i < 10; i++) {
-        wcout << setw(4) << left << planetNames[i] << L": " 
+        wcout << setw(4) << left << planetNamesEn[i] << L": " 
               << PlanetCalculator::formatPlanetPosition(progressedPlanets[i], 0) << endl;
     }
     
@@ -164,8 +164,8 @@ void demonstrateTransits() {
     for (const auto& event : transitEvents) {
         if (eventCount++ >= 10) break;
         if (event.orb < 2.0) { // 只显示接近精确的相位
-            wcout << planetNames[event.transitingPlanet] << L" 与本命"
-                  << planetNames[event.natalPlanet] << L"形成"
+            wcout << planetNamesEn[event.transitingPlanet] << L" 与本命"
+                  << planetNamesEn[event.natalPlanet] << L"形成"
                   << AspectCalculator::formatAspect(event.aspectType)
                   << L"，偏离: " << Formatter::formatAngle(event.orb, 2) << L"度" << endl;
         }
@@ -285,8 +285,8 @@ void demonstrateSynastry() {
         if (aspectCount++ >= 8) break;
         if (aspect.importance >= IMPORTANCE_SIGNIFICANT) {
             wcout << SynastryAnalyzer::formatSynastryAspect(aspect, 
-                                                          vector<wstring>(planetNames, planetNames + 10),
-                                                          vector<wstring>(planetNames, planetNames + 10))
+                                                          vector<wstring>(planetNamesEn, planetNamesEn + 10),
+                                                          vector<wstring>(planetNamesEn, planetNamesEn + 10))
                   << endl;
         }
     }

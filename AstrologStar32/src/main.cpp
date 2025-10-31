@@ -12,7 +12,6 @@
 #include "../include/utils/formatter.h"
 #include "../include/models/chart_data.h"
 #include "../include/data/signs.h"
-#include "../include/core/planet.h"
 #include <iostream>
 #include <vector>
 #include <string>
@@ -159,7 +158,7 @@ void displayPlanets(const vector<PlanetData>& planets) {
     
     wcout << L"行星    位置" << endl;
     for (size_t i = 0; i < planets.size() && i < 10; i++) {
-        wcout << setw(8) << left << planetNames[i] << L": " 
+        wcout << setw(8) << left << planetNamesEn[i] << L": " 
               << PlanetCalculator::formatPlanetPosition(planets[i], 0).c_str() << endl;
     }
     wcout.flush();
