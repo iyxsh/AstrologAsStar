@@ -1,5 +1,4 @@
 ﻿/*
-
 char
 About 30 deg strip:
 https://passion-astrologue.com/regle-30-degres-astuce-interpretation/
@@ -76,12 +75,14 @@ warning 4701: local variable 't_plac' may be used without
 warning 4100: 'lParam' : unreferenced formal parameter
 2010
 */
-#define _CRT_SECURE_NO_DEPRECATE 1
-#define _CRT_SECURE_NO_WARNINGS 1
+#define _CRT_SECURE_NO_DEPRECATE
+#define _CRT_SECURE_NO_WARNINGS
 #define _WIN32_WINNT 0x0500 
 #define WIN32_LEAN_AND_MEAN 1
+#ifdef _MSC_VER
 #pragma comment ( linker,"/ALIGN:4096" )
 #pragma warning( disable : 4706 4057 4131 4244 4701 4100 4005 4996)
+#endif
 
 /*
 ******************************************************************************
@@ -93,8 +94,6 @@ warning 4100: 'lParam' : unreferenced formal parameter
 
 //#define TESTNEW
 #define WIN
-
-#define _CRT_SECURE_NO_DEPRECATE
 
 #define PS			/* Comment out this #define if you don't want the ability to */
 					/* generate charts in the PostScript graphics format.        */
@@ -2363,7 +2362,7 @@ const double  rStarData[cStar * 6] = {
 GS gs = {
 	FALSE, FALSE, FALSE, TRUE, TRUE, FALSE, TRUE, FALSE, FALSE,
 	TRUE, TRUE, FALSE, TRUE, FALSE, FALSE, FALSE,
-	DEFAULTX, DEFAULTY, ANIMATION_FACTOR_HOURS, 200, 0, 0, 0, 0.0,
+	static_cast<int>(DEFAULTX), static_cast<int>(DEFAULTY), static_cast<int>(ANIMATION_FACTOR_HOURS), 200, 0, 0, 0, 0.0,
 	BITMAPMODE, 1, 14.0, 11.0, NULL, oCore, 1111,
 	0 // ANSI_CHARSET
 };
@@ -4342,7 +4341,7 @@ public:
 		memcpy(speculums, speculums1, sizeof(speculums1));
 
 		intime = FALSE;
-		intime;
+		(void)intime;
 		uranus = TRUE;
 		pluto = 0;
 		signs = TRUE;
@@ -5276,7 +5275,7 @@ wchar_t *SzZodiac(double deg)
 		else
 		{
 			wchar_t tstmp[MAX_STRING_NAME_LEN];
-			swprintf(tstmp,sizeof(tstmp)/sizeof(wchar_t), L" %ls",char_to_wchar(tSignName[sign+1]).c_str());
+			swprintf(tstmp,sizeof(tstmp)/sizeof(wchar_t), L"%ls",char_to_wchar(tSignName[sign+1]).c_str());
 			swprintf(szZod, sizeof(szZod) / sizeof(wchar_t), L"%2d%lc%lc%lc%02d", d, tstmp[0], tstmp[1], tstmp[2] , m);
 		}
 
@@ -6112,26 +6111,33 @@ wchar_t Dignify(int obj, int sign)
 	// 
 	if (obj > cLastMoving)
 		return L' ';
-	if (ruler1[obj] == sign || ruler2[obj] == sign)
+	if (ruler1[obj] == sign || ruler2[obj] == sign) {
 		if (wi.chs)
 			return L'庙';
 		else
 			return L'R';
-	if (ruler1[obj] == Mod12(sign + 6) || ruler2[obj] == Mod12(sign + 6))
+	}
+	if (ruler1[obj] == Mod12(sign + 6) || ruler2[obj] == Mod12(sign + 6)) {
 		if (wi.chs)
 			return L'旺';
-		else
+		else {
 			return L'F';
-	if (exalt[obj] == sign)
+		}
+	}
+	if (exalt[obj] == sign) {
 		if (wi.chs)
 			return L'陷';
-		else
+		else {
 			return L'e';
-	if (exalt[obj] == Mod12(sign + 6))
+		}
+	}
+	if (exalt[obj] == Mod12(sign + 6)) {
 		if (wi.chs)
 			return L'落';
-		else
+		else {
 			return L'd';
+		}
+	}
 
 	if (!wi.chs)
 		return L'-';
@@ -8093,7 +8099,7 @@ void ComputeWithSwissEphemeris(double t)
 			}
 
 			cp0.vel_latitude[i] = Deg2Rad(speed_latitude);
-			cp0.vel_distance[i] = SE_coordinates[6];
+			cp0.vel_distance[i] = SE_coordinates[5];
 
 			SphToRec(SE_coordinates[2], cp0.longitude[i], cp0.latitude[i],
 				&cp0.pt[i].x, &cp0.pt[i].y, &cp0.pt[i].z);
@@ -11509,7 +11515,7 @@ void ChartAspect()
 				{
 					if (!FIgnore(j))
 					{
-						if (k = tempgrid.n[j][i])
+						if ((k = tempgrid.n[j][i]) != 0)
 						{
 							ip = i <= cLastMoving ? ppower1[i] : 2.5;
 							jp = j <= cLastMoving ? ppower1[j] : 2.5;
@@ -12030,7 +12036,7 @@ int NParseSzW(wchar_t* szEntry, int pm)
 	int returnflag = 0;
 
 	/* First strip off any leading or trailing spaces. */
-	for (cch = 0; szLocal[cch] = szEntry[cch]; cch++)
+	for (cch = 0; (szLocal[cch] = szEntry[cch]) != 0; cch++)
 		;
 	szLocal[cch] = chNull;
 	while (cch && (byte)szLocal[cch - 1] <= ' ')
@@ -12190,7 +12196,7 @@ double RParseSz(const char* szEntry, int pm)
 	double r, rMinutes, rSeconds;
 
 	/* First strip off any leading or trailing spaces. */
-	for (cch = 0; szLocal[cch] = szEntry[cch]; cch++)
+	for (cch = 0; (szLocal[cch] = szEntry[cch]) != 0; cch++)
 		;
 	while (cch && szLocal[cch - 1] == ' ')
 		szLocal[--cch] = chNull;
