@@ -88,8 +88,16 @@ bool AspectCalculator::checkAspect(double lon1, double lon2, int aspectType,
         diff = 360.0 - diff;
     }
     
+    // 更精确的相位检查
     if (diff <= orbLimit) {
         *orb = diff;
+        return true;
+    }
+    
+    // 检查反向角度差
+    double reverseDiff = fabs((360.0 - angle) - aspectAngle);
+    if (reverseDiff <= orbLimit) {
+        *orb = reverseDiff;
         return true;
     }
     
@@ -99,6 +107,7 @@ bool AspectCalculator::checkAspect(double lon1, double lon2, int aspectType,
 // 计算相位角度
 double AspectCalculator::calculateAspectAngle(double lon1, double lon2) {
     double diff = fabs(lon1 - lon2);
+    // 确保差值不超过180度
     if (diff > 180.0) {
         diff = 360.0 - diff;
     }
@@ -121,8 +130,24 @@ bool AspectCalculator::isAspectApplying(double lon1, double lon2, double speed1,
     // 如果相对速度为0，则无法判断
     if (relativeSpeed == 0) return false;
     
-    // 简化判断：如果相对速度为正，则为入相，否则为出相
-    return relativeSpeed > 0;
+    // 计算当前角度和下一个角度
+    double currentAngle = calculateAspectAngle(lon1, lon2);
+    double nextLon1 = lon1 + speed1;
+    double nextLon2 = lon2 + speed2;
+    double nextAngle = calculateAspectAngle(nextLon1, nextLon2);
+    
+    // 获取目标相位角度
+    double targetAngle = getAspectAngle(aspectType);
+    
+    // 计算当前和下一个与目标角度的差值
+    double currentDiff = fabs(currentAngle - targetAngle);
+    if (currentDiff > 180.0) currentDiff = 360.0 - currentDiff;
+    
+    double nextDiff = fabs(nextAngle - targetAngle);
+    if (nextDiff > 180.0) nextDiff = 360.0 - nextDiff;
+    
+    // 如果下一个差值更小，则为入相，否则为出相
+    return nextDiff < currentDiff;
 }
 
 // 格式化相位显示

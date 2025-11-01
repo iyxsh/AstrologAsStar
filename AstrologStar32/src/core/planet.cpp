@@ -28,8 +28,9 @@ int PlanetCalculator::calculatePlanetPosition(double jd, int planet, PlanetData*
     double position[6];
     char err[256];
     
-    // 计算行星位置
-    int ret = swe_calc_ut(jd, planet, SEFLG_SWIEPH | SEFLG_SPEED, position, err);
+    // 计算行星位置，使用与老项目一致的标志确保计算精度
+    int flags = SEFLG_SWIEPH | SEFLG_SPEED;
+    int ret = swe_calc_ut(jd, planet, flags, position, err);
     if (ret < 0) {
         std::cerr << "Error calculating planet " << planet << " position: " << err << std::endl;
         return ret;
@@ -92,11 +93,12 @@ std::wstring PlanetCalculator::formatPlanetPosition(const PlanetData& data, int 
     case 0:
         // 常规格式化：度数、星座、分
         {
-            double deg = fmod(data.longitude + 0.5 / 60.0, 360.0);
+            // 确保经度在0-360度范围内
+            double deg = fmod(data.longitude, 360.0);
             if (deg < 0) deg += 360.0;
-            int sign = (int)(deg / 30);
-            int d = (int)deg - sign * 30;
-            int m = (int)(fmod(deg, 1.0) * 60.0);
+            int sign = (int)(deg / 30.0);
+            int d = (int)(deg - sign * 30);
+            int m = (int)((deg - sign * 30 - d) * 60);
             
             // 修正：确保使用正确的星座名称索引（signNames索引从1开始）
             // 将char*转换为wchar_t*

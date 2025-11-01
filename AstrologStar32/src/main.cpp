@@ -21,6 +21,9 @@
 #include <iomanip>
 #include <cstdlib>
 
+// 添加swephexp.h以使用swe_julday函数
+#include "../include/swe/inc/swephexp.h"
+
 using namespace std;
 
 // 显示程序信息
@@ -241,12 +244,12 @@ int main(int argc, char* argv[]) {
     
     displayBirthData(birthData);
     
-    // 计算儒略日
+    // 计算儒略日 - 使用与老项目一致的算法
     wcout << L"正在计算儒略日..." << endl;
     wcout.flush();
-    double jd = EphemerisCalculator::calculateJulianDay(
-        birthData.year, birthData.month, birthData.day, 
-        birthData.time - birthData.timezone + birthData.dst);
+    // 与老项目astrolog32保持一致的计算方式
+    double jd = swe_julday(birthData.year, birthData.month, birthData.day, 
+        birthData.time - birthData.timezone + birthData.dst, SE_GREG_CAL);
     
     wcout << L"儒略日: " << jd << endl;
     wcout.flush();
@@ -265,6 +268,7 @@ int main(int argc, char* argv[]) {
     wcout << L"\n正在计算宫位..." << endl;
     wcout.flush();
     HouseData houses = {0};
+    // 使用 Placidus 宫位系统（与老项目默认一致）
     int houseResult = HouseCalculator::calculateHouses(jd, birthData.latitude, birthData.longitude, 0, &houses);
     
     if (houseResult == 0) {

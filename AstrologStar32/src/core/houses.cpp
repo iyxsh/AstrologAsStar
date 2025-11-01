@@ -77,18 +77,18 @@ int HouseCalculator::getPlanetHouse(double planetLongitude, const HouseData& hou
 // 转换宫位系统
 char HouseCalculator::convertHouseSystem(int system) {
     switch (system) {
-        case 0: return HOUSE_SYSTEM_PLACIDUS;
-        case 1: return HOUSE_SYSTEM_KOCH;
-        case 2: return HOUSE_SYSTEM_CAMPANUS;
-        case 3: return HOUSE_SYSTEM_EQUAL;
-        case 4: return HOUSE_SYSTEM_VEHLOW;
-        case 5: return HOUSE_SYSTEM_MERIDIAN;
-        case 6: return HOUSE_SYSTEM_AZIMUTHAL;
-        case 7: return HOUSE_SYSTEM_POLICH;
-        case 8: return HOUSE_SYSTEM_ALCABITIUS;
-        case 9: return HOUSE_SYSTEM_MORINUS;
-        case 10: return HOUSE_SYSTEM_PORPHYRY;
-        case 11: return HOUSE_SYSTEM_REGIOMONTANUS;
+        case 0: return HOUSE_SYSTEM_PLACIDUS;      // 'P'
+        case 1: return HOUSE_SYSTEM_KOCH;          // 'K'
+        case 2: return HOUSE_SYSTEM_CAMPANUS;      // 'C'
+        case 3: return HOUSE_SYSTEM_EQUAL;         // 'E'
+        case 4: return HOUSE_SYSTEM_VEHLOW;        // 'V'
+        case 5: return HOUSE_SYSTEM_MERIDIAN;      // 'X'
+        case 6: return HOUSE_SYSTEM_AZIMUTHAL;     // 'H'
+        case 7: return HOUSE_SYSTEM_POLICH;        // 'T'
+        case 8: return HOUSE_SYSTEM_ALCABITIUS;    // 'B'
+        case 9: return HOUSE_SYSTEM_MORINUS;       // 'M'
+        case 10: return HOUSE_SYSTEM_PORPHYRY;     // 'O'
+        case 11: return HOUSE_SYSTEM_REGIOMONTANUS; // 'R'
         default: return HOUSE_SYSTEM_PLACIDUS;
     }
 }
@@ -101,11 +101,12 @@ std::wstring HouseCalculator::formatHouseCusp(double cuspLongitude, int format) 
     case 0:
         // 常规格式化：度数、星座、分
         {
-            double deg = fmod(cuspLongitude + 0.5 / 60.0, 360.0);
+            // 确保经度在0-360度范围内
+            double deg = fmod(cuspLongitude, 360.0);
             if (deg < 0) deg += 360.0;
-            int sign = (int)(deg / 30);  // 修正：确保正确计算星座索引
-            int d = (int)deg - sign * 30;
-            int m = (int)(fmod(deg, 1.0) * 60.0);
+            int sign = (int)(deg / 30.0);  // 修正：确保正确计算星座索引
+            int d = (int)(deg - sign * 30);
+            int m = (int)((deg - sign * 30 - d) * 60);
             
             // 修正：确保使用正确的星座名称索引（signNames索引从1开始）
             // 将char*转换为wchar_t*
