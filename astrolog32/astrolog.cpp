@@ -77,7 +77,9 @@ warning 4100: 'lParam' : unreferenced formal parameter
 */
 #define _CRT_SECURE_NO_DEPRECATE
 #define _CRT_SECURE_NO_WARNINGS
+#ifndef _WIN32_WINNT
 #define _WIN32_WINNT 0x0500 
+#endif
 #define WIN32_LEAN_AND_MEAN 1
 #ifdef _MSC_VER
 #pragma comment ( linker,"/ALIGN:4096" )
@@ -108,9 +110,6 @@ warning 4100: 'lParam' : unreferenced formal parameter
 
 #define ARABIC		/* Comment out this #define if you don't want any chart     */
 					/* lists that include Arabic parts included in the program. */
-
-#define CONSTEL		/* Comment out this #define if you don't want any of the */
-					/* astronomical constellation charts in the program.     */
 
 #define BIORHYTHM	/* Comment out this #define if you don't want the    */
 					/* non-astrological biorhythm charts in the program. */
@@ -173,10 +172,6 @@ Ascii text file. 'B' means write as Windows bitmap (.bmp) file. */
 ** values in the section below unless you know what you're doing.
 */
 
-#define BITMAPX    2730			/* Maximum window size allowed */
-#define BITMAPY    2730
-#define BITMAPX1    180			/* Minimum window size allowed */
-#define BITMAPY1    180
 #define DEFAULTY    740
 #define DEFAULTX    DEFAULTY+SIDESIZE-43		/* Default window size */
 
@@ -367,43 +362,19 @@ double  SIDESIZE = 220;			/* Size of wheel chart information sidebar.    */
 bool IsDoublePanel = false;
 
 int CountryID = 1;
-bool aspos = false;
 char ret[6] = { -1,-1,-1,-1,-1,-1 };
-int firstchoice3 = 0;
-int firstchoice = 0;
-int firstchoice2 = 0;
-BOOL IsLahiri = FALSE;
-BOOL IsNorth = FALSE;
-BOOL IsEast = FALSE;
-BOOL IsSouth = FALSE;
-BOOL inmacro = FALSE;
 BOOL IsAgeHarm = FALSE;
 BOOL IsAgeHarmAndNatal = FALSE;
 int eepp = -1;
-char sMenu[16][120];
-int nStatusParts = 0;
-#define ID_STATUS         10002
-BOOL IsZhengshi = FALSE;
-BOOL IsF74 = FALSE;
-BOOL disReception = FALSE;
-BOOL disBazi = FALSE;
-BOOL IsPDsData = FALSE;
-BOOL OnPrint = FALSE;
-int DataType = 1;
 
 char ignoreS[118];          // for fixed star
-char ignoreS1[118];
 char ignoreSO[118];
 
 int dir = 0;
-std::wstring wstrLine;
-wchar_t menutitle[128];
 int where = -1;
 int flag = 1;
-int timeout = 0;
 //CHOOSEFONTA cf;
 char myBuff[64] = "Arial";
-int sizea = 14;
 int cWeight = 400;
 unsigned long  bItalic = 0;
 
@@ -456,8 +427,8 @@ BOOL IsPDsChartWithoutTable2 = FALSE;  // PDs and natal
 
 BOOL IsProfections = FALSE;
 BOOL IsProfectionsDouble = FALSE;
-BOOL IsDraconic = FALSE;
 BOOL IsSyzygy = FALSE;
+BOOL IsDraconic = FALSE;
 BOOL Is12Part = FALSE;
 
 BOOL IsNewComparison2 = FALSE;
@@ -1679,30 +1650,18 @@ IS is = {
 // Longitude and latitude in ciCore may be in degrees or radians, depending on location!
 // In CastChart ciCore value is saved and later restored, but in the mean time, in 
 // ProcessInput value is changed to radians! Mad!
-CI ciCore = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"","" ,L"" };
-CI ciMain = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"","" ,L"","" };
-CI ciTwin = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"","" ,L"","" };
-CI ciThre = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"","" ,L"","" };
-CI ciFour = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"","" ,L"","" };
-CI ciTran = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"","" ,L"","" };
-CI ciSave = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"","" ,L"","" };
+CI ciCore = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"",{0} ,L"",{0},0.0, 0.0, 0.0,0.0,0,0.0,0,L"",L"",L"",0.0,0.0,0.0,{0},{0} };
+CI ciMain = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"",{0} ,L"",{0},0.0, 0.0, 0.0,0.0,0,0.0,0,L"",L"",L"",0.0,0.0,0.0,{0},{0} };
+CI ciTwin = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"",{0} ,L"",{0},0.0, 0.0, 0.0,0.0,0,0.0,0,L"",L"",L"",0.0,0.0,0.0,{0},{0} };
+CI ciThre = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"",{0} ,L"",{0},0.0, 0.0, 0.0,0.0,0,0.0,0,L"",L"",L"",0.0,0.0,0.0,{0},{0} };
+CI ciFour = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"",{0} ,L"",{0},0.0, 0.0, 0.0,0.0,0,0.0,0,L"",L"",L"",0.0,0.0,0.0,{0},{0} };
+CI ciTran = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"",{0} ,L"",{0},0.0, 0.0, 0.0,0.0,0,0.0,0,L"",L"",L"",0.0,0.0,0.0,{0},{0} };
+CI ciSave = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"",{0} ,L"",{0},0.0, 0.0, 0.0,0.0,0,0.0,0,L"",L"",L"",0.0,0.0,0.0,{0},{0} };
 
-CI ciSave2 = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"","" ,L"","" };
-CI ciSave3 = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"","" ,L"","" };
-CI ciSolarReturn = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"","" ,L"","" };
-CI ciLunarReturn0 = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"","" ,L"","" };
-CI ciLunarReturn = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"","" ,L"","" };
-CI ciBak = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"","" ,L"","" };
-CI ciBak2 = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"","" ,L"","" };
-CI ciPDs = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"","" ,L"","" };
-CI ciNatal = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"","" ,L"","" };
-CI ciNatal2 = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"","" ,L"","" };
-CI ciHereAndNow = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"","" ,L"","" };
-CI ciSyzygy = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"","" ,L"","" };
-CI ciFound = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"","" ,L"","" };
-CI ciAspos = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"","" ,L"","" };
+CI ciNatal = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"",{0} ,L"",{0},0.0, 0.0, 0.0,0.0,0,0.0,0,L"",L"",L"",0.0,0.0,0.0,{0},{0} };
+CI ciNatal2 = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"",{0} ,L"",{0},0.0, 0.0, 0.0,0.0,0,0.0,0,L"",L"",L"",0.0,0.0,0.0,{0},{0} };
 // planet positions
-CP cp0, cp1, cp2, cp3, cp4, cpPDs, cpBak, cpIng, cpSave;
+CP cp0, cp1, cp2, cp3, cp4, cpPDs, cpBak;
 BOOL UseFirstReturn = FALSE;
 BOOL IsDoubleReturn = FALSE; // 一个月中有两次月亮返照
 int fCP3 = 0; // this variable appears to be related to the usage of cp3, but how?
@@ -1721,9 +1680,9 @@ double spacez[cLastMoving + 1], force[NUMBER_OBJECTS];
 GridInfo *grid = NULL;
 int starname[cStar + 1], kObjA[NUMBER_OBJECTS];
 char *szMacro[NUMBER_OF_MACROS] = { 0 };
-wchar_t szMacroCaptionW[NUMBER_OF_MACROS][256] = { 0 };
-char szMacroCaption[NUMBER_OF_MACROS][256] = { 0 };
-char szMacroMenuType[NUMBER_OF_MACROS][256] = { 0 };
+wchar_t szMacroCaptionW[NUMBER_OF_MACROS][256] = { {0} };
+char szMacroCaption[NUMBER_OF_MACROS][256] = { {0} };
+char szMacroMenuType[NUMBER_OF_MACROS][256] = { {0} };
 
 int kObjA1[cLastMoving + 1] = { 0,
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,		/* Planets  */
@@ -2045,36 +2004,10 @@ double rTransitInf2[cLastMoving + 3] = { 10,
 	50, 50, 50, 50, 50, 50, 50, 50, 50
 };
 
-const double rObjDist[oVesta + 1] = { 149.59787, 0.0, 0.3844,
-	57.91, 108.2, 227.94, 778.33, 1426.98, 2870.99, 4497.07, 5913.52,
-	13.670 * 149.59787, 2.767 * 149.59787, 2.770 * 149.59787,
-	2.669 * 149.59787,
-	2.361 * 149.59787
-};
-const double rObjYear[oVesta + 1] = { 1, 0, 27.32166 / 365.25,
-	87.969 / 365.25, 224.701 / 365.25, 686.98 / 365.25, 11.8623,
-	29.458, 84.01, 164.79, 248.54,
-	51.0, 4.60, 4.61, 4.36, 3.63
-};
 const double rObjDiam[oVesta + 1] = { 12756.0, 1392000.0, 3476.0,
 	4878.0, 12102.0, 6786.0, 142984.0, 120536.0, 51118.0, 49528.0, 2300.0,
 	320.0, 955.0, 538.0, 226.0, 503.0
 };
-const double rObjDay[oPlu + 1] = { 24.0, 30.0 * 24.0, 27.322 * 24.0,
-	58.65 * 24.0, 243.01 * 24.0, 24.6229, 9.841, 10.233, 17.9, 19.2,
-	6.3872 * 24.0
-};
-const double rObjMass[oPlu + 1] = { 1.0, 322946.0, 0.0123,
-	0.0553, 0.8149, 0.1074, 317.938, 95.181, 14.531, 17.135, 0.0022
-};
-const double rObjAxis[oPlu + 1] = { 23.5, 0.0, 6.7,
-	2.0, 2.7, 25.19, 3.12, 26.73, 82.14, 29.6, 57.54
-};
-const byte cSatellite[oPlu + 1] = { 1, 9, 0,
-	0, 0, 2, 16, 18, 15, 8, 1
-};
-
-
 const char *szStarConName[cStar + 1] = { "",
 	"alEri\0   ", "alUMi\0   ", "zeRet\0   ", "etTau\0   ", "alTau\0   ","alAur\0   ",
 	"beOri\0   ", "gaOri\0   ", "beTau\0   ", "epOri\0   ", "alOri\0   ","beAur\0   ",
@@ -2102,7 +2035,7 @@ double CoeffTens = 1.0;
 double PowerPar = 0.25;
 double SolidAspect = 8.0;
 double SConjunct = 0.0;
-double SHarmon = 0.0;
+double SHarmarmon = 0.0;
 double STension = 0.0;
 double SSumma = 0.0;
 double SChart = 0.0;
@@ -2129,73 +2062,6 @@ int CornerDecorationSize = 60;
 int CornerDecorationNumberLines = 80;	// used only for spider web
 
 CI *LastChartShown = NULL;
-
-// This must be in English, do not translate!!
-const char *szMonthEnglish[NUMBER_OF_MONTHS + 1] = { "",
-	"January", "February", "March", "April", "May", "June",
-	"July", "August", "September", "October", "November", "December"
-};
-
-const char* szSignAbbrevEnglish[NUMBER_OF_SIGNS + 1] = { "",
-	"Ari", "Tau", "Gem", "Can", "Leo", "Vir", "Lib", "Sco",
-	"Sag","Cap", "Aqu", "Pis"
-};
-
-const char *szObjShortNameEnglish[NUMBER_OBJECTS] = {
-	"Earth", "Sun ", "Moon", "Mercury", "Venus", "Mars",	/* Planets   */
-	"Jupiter", "Saturn", "Uranus", "Neptune", "Pluto",
-	"Chiron", "Ceres", "Pallas", "Juno", "Vesta",	/* Asteroids */
-	"NoNode", "SoNode", "Lilith", "Fortune", "Vertex", "EaPoint",	/* Others    */
-	// the extra space after IC is necessary for house wheels in text
-	// mode to be correctly displayed
-	"Ascendant", "2nd Cusp", "3rd Cusp", "IC ",	/* Cusps     */
-	"5th Cusp", "6th Cusp", "Descendant", "8th Cusp",
-	"9th Cusp", "Midheaven", "11th Cusp", "12th Cusp",
-	"Cupido", "Hades", "Zeus", "Kronos",	/* Uranians  */
-	"Apollon", "Admetos", "Vulkanus", "Poseidon", "Proserpina",
-
-	// Stars 
-
-	// Star names should not be translated, because they may be overwritten
-	// by names from the fixed stars catalogue, that are in English.
-
-	"Achernar\0    ", "Polaris\0     ", "Zeta Retic.\0 ", "Alcyone\0     ",
-	"Aldebaran\0   ", "Capella\0     ", "Rigel\0       ", "Bellatrix\0   ",
-	"Elnath\0      ", "Alnilam\0     ", "Betelgeuse\0  ", "Menkalinan\0  ",
-	"Mirzam\0      ", "Canopus\0     ", "Alhena\0      ", "Sirius\0      ",
-	"Adhara\0      ", "Wezen\0       ", "Castor\0      ", "Procyon\0     ",
-	"Pollux\0      ", "Suhail\0      ", "Avior\0       ", "Miaplacidus\0 ",
-	"Alphard\0     ", "Regulus\0     ", "Dubhe\0       ", "Acrux\0       ",
-	"Gacrux\0      ", "Mimosa\0      ", "Alioth\0      ", "Spica\0       ",
-	"Alkaid\0      ", "Agena\0       ", "Arcturus\0    ", "Toliman\0     ",
-	"Antares\0     ", "Shaula\0      ", "Sargas\0      ", "Kaus Austr.\0 ",
-	"Vega\0        ", "Altair\0      ", "Peacock\0     ", "Deneb\0       ",
-	"Alnair\0      ", "Fomalhaut\0   ", "Andromeda\0   ", "Alpheratz\0   ",
-	"Algenib\0     ", "Schedar\0     ", "Mirach\0      ", "Alrischa\0    ",
-	"Almac\0       ", "Algol\0       ", "Mintaka\0     ", "Wasat\0       ",
-	"Acubens\0     ", "Merak\0       ", "Vindemiatrix\0", "Mizar\0       ",
-	"Kochab\0      ", "Zuben Elgen.\0", "Zuben Escha.\0", "Alphecca\0    ",
-	"Unuk Alhai\0  ", "Ras Alhague\0 ", "Albireo\0     ", "Alderamin\0   ",
-	"Nashira\0     ", "Skat\0        ", "Scheat\0      ", "Markab\0      ",
-	"Gal.Center\0  ", "Apex\0        ", "Sadalmelik\0  "
-};
-
-const char *szSwitchName[] =
-{
-	"Glyph",
-	"CharSet",
-	"DegCharacter",
-	"UseInternationalAtlas",
-	"OmitWizard",
-	"OmitRegionalWizard",
-	"DebugFont",
-	"SimplifiedMode",
-	"AdvancedMode",
-	"DisableMacroShortcuts",
-	"DisableSave",
-	"EnableSave",
-	""
-};
 
 /*
 ******************************************************************************
@@ -2399,8 +2265,6 @@ WI wi = {
 	FALSE
 };
 
-
-
 // calculations
 #define EclToEqu(Z, L)  CoorXform(Z, L, is.rObliquity)
 #define EclToEqu2(Z, L) CoorXform2(Z, L, Rad2Deg(is.rObliquity) )
@@ -2465,53 +2329,6 @@ WI wi = {
 #define FThing(obj)   ((obj) <= cThing || (obj) >= uranLo)
 #define FHelio(obj)   (FNorm(obj) && FObject(obj) && (obj) != oMoo)
 
-#define FSector(s)    FBetween(s, 1, cSector)
-#define ChDst1(dst)    (dst == 0.0 ? Lang(sST) : (dst == 1.0 ? Lang(sDT) : L"AT"))
-#define ChDashF(f)    (f ? '=' : '_')
-#define SzNumF(f)     (f ? "1 " : "0 ")
-#define DayInYearHi(yea) (365-28+DayInMonth(2, yea))
-#define FChSwitch(ch) \
-  ((ch) == '-' || (ch) == '/' || (ch) == '_' || (ch) == '=' || (ch) == ':')
-
-#define FValidMon(mon) FBetween(mon, 1, 12)
-#define FValidDay(day, mon, yea) ((day) >= 1 && (day) <= DayInMonth(mon, yea))
-#define FValidYea(yea) FBetween(yea, -20000, 20000)
-#define FValidTim(tim) ((tim) > -2.0 && (tim) < 24.0 && \
-  RFract(fabs(tim)) < 0.60)
-#define FValidDst(dst) FValidZon(dst)
-#define FValidZon(zon) FBetween(zon, -24.0, 24.0)
-#define FValidLon(lon) FBetween(lon, -180.0, 180.0)
-#define FValidLat(lat) FBetween(lat, -90.0, 90.0)
-#define FValidAspect(asp) FBetween(asp, 0, cAspect)
-#define FValidSystem(n) FBetween(n, 0, NUMBER_OF_HOUSE_SYSTEMS - 1)
-#define FValidDivision(n) FBetween(n, 1, 2880)
-#define FValidOffset(r) FBetween(r, -360.0, 360.0)
-#define FValidCenter(obj) \
-  (FBetween(obj, oEar, uranHi) && FObject(obj) && (obj) != oMoo)
-#define FValidHarmonic(n) FBetween(n, 0, 30000)
-#define FValidWheel(n) FBetween(n, 1, WHEELROWS)
-#define FValidAstrograph(n) (n > 0 && 160%n == 0)
-#define FValidPart(n) FBetween(n, 1, cPart)
-#define FValidBioday(n) FBetween(n, 1, 199)
-#define FValidScreen(n) FBetween(n, 20, 200)
-#define FValidMacro(n) FBetween(n, 1, NUMBER_OF_MACROS)
-#define FValidTextrows(n) ((n) == 25 || (n) == 43 || (n) == 50)
-#define FValidGlyphs(n) FBetween(n, 0, 2223)
-#define FValidGrid(n) FBetween(n, 1, cObj)
-#define FValidScale(n) (FBetween(n, 100, MAXSCALE) && (n)%100 == 0)
-#define FValidGraphx(x) (FBetween(x, BITMAPX1, BITMAPX) || (x) == 0)
-#define FValidGraphy(y) (FBetween(y, BITMAPY1, BITMAPY) || (y) == 0)
-#define FValidRotation(n) FBetween(n, 0, 360-1)
-#define FValidTilt(n) FBetween(n, -90.0, 90.0)
-#define FValidColor(n) FBetween(n, 0, cColor - 1)
-#define FValidBmpmode(ch) \
-  ((ch) == 'N' || (ch) == 'C' || (ch) == 'V' || (ch) == 'A' || (ch) == 'B')
-#define FValidTimer(n) FBetween(n, 1, 32000)
-#define FValidStarAspects(n) FBetween(n, 0, 18)
-#define FValidStarOrb(r) FBetween(r, 0.2, 4.0)
-#define FValidCoeffTens(r) FBetween(r, 0.2, 4.0)
-#define FValidCoeffComp(r) FBetween(r, rSmall, 1000.0)
-
 /* Compute Mollewide projection in pixel scale given latitude. */
 #define NMollewide(y) \
   ((int)(sqrt((double)(180L*nScl*180L*nScl - 4L*(y)*nScl*(y)*nScl))+0.5))
@@ -2550,44 +2367,6 @@ double Latit = 0.0;
 double ObjPrime[cLastMoving + 1];
 double StarPrime[cStar + 1];
 
-
-wchar_t szFileName[MAX_FILE_NAME + 1];
-wchar_t szFileTitle[MAX_FILE_NAME + 1];
-
-#if 0
-OPENFILENAMEW ofn = {
-	sizeof(OPENFILENAMEW), (HWND)NULL, (HINSTANCE)NULL, NULL, NULL, 0, 1,
-	szFileName,	MAX_FILE_NAME, szFileTitle, MAX_FILE_NAME, NULL, NULL,
-	OFN_OVERWRITEPROMPT, 0, 0, NULL, 0L, NULL, NULL
-};
-
-PRINTDLGA prd = {
-	sizeof(PRINTDLG),
-	(HWND)NULL,
-	(HGLOBAL)NULL,
-	(HGLOBAL)NULL,
-	hdcNil,
-	PD_NOPAGENUMS | PD_NOSELECTION | PD_RETURNDC | PD_USEDEVMODECOPIES,
-	1,
-	0xFFFF,
-	1,
-	0xFFFF,
-	1,
-	(HINSTANCE)NULL,
-	0L,
-	NULL,
-	NULL,
-	(char *)NULL,
-	(char *)NULL,
-	(HGLOBAL)NULL,
-	(HGLOBAL)NULL
-};
-#endif
-
-/* Color tables for Astrolog's graphics palette. */
-
-int ikPalette[cColor] = { -0, -1, 1, 4, 6, 3, -8, 5, -3, -2, -4, -5, -7, 2, 7, -6 };
-
 /* These are the actual color arrays and variables used by the program.      */
 /* Technically, Astrolog always assumes we are drawing on a color terminal; */
 /* for B/W graphics, all the values below are filled with black or white.    */
@@ -2605,685 +2384,8 @@ KI kMainB[9], kRainbowB[8], kElemB[4], kAspB[cAspect + 1], kObjB[NUMBER_OBJECTS]
 //const char szAspectFont[cAspect + 1] = "!\"#$'&%()+-       ";
 const char szObjectFont[] = ";QRSTUVWXYZ     <    a  c     b  >         ";
 const char szAspectFont[] = "!\"#$'&%()+-       ";
-#endif
+#endif							/* Contraparallel */
 
-//CharTables Glyph;
-const char * szDrawSign[NUMBER_OF_SIGNS + 2] = { "",
-	"ND4HU2HLGDFBR6EUHLGD2G",	/* Aries       */
-	"BL3D2F2R2E2U2H2NE2L2NH2G2",	/* Taurus      */
-	"BLU3LHBR7GLNL3D6NL3RFBL7ERU3",	/* Gemini      */
-	"BGNDHLGDFRNEFR2EREBU3NHDGLHUENRHL2GLG",	/* Cancer      */
-	"BF4H2UEU2H2L2G2D2FDGH",	/* Leo         */
-	"BF4BLHNGNHEU5G2ND3U2HGND6HGND6H",	/* Virgo       */
-	"BGNL3HUER2FDGR3BD2L8",		/* Libra       */
-	"BH4FND6EFND6EFD6FREU",		/* Scorpio     */
-	"BG4E3NH2NF2E5NL2D2",		/* Sagittarius */
-	"BH3BLED4FND2EU2ENF2UFERFDGLF2D2G",	/* Capricorn #1 */
-	"BG4EUEDFDEUEDFDEUEBU5GDGUHUGDGUHUGDG",	/* Aquarius    */
-	"NL4NR4BH4F2D4G2BR8H2U4E2",	/* Pisces      */
-	"BH4RFR2ER3G3D2GDFR2EU2HL3G2DG"	/* Capricorn #2 */
-};
-
-const char * szDrawSign2[NUMBER_OF_SIGNS + 2] = { "",
-	"BD8U7HU3HU2H2L2G2D2F2BR12E2U2H2L2G2D2GD3G",	/* Aries  */
-	"BH6BU2FDFRFNR4GLGDGD4FDFRFR4EREUEU4HUHLHEREUE",	/* Taurus */
-	"",							/* Gemini */
-	"BG5NRLH2U2E2R2F2D2G2F2R4ER2E3BH6NE2D2F2R2E2U2H2L2H2L4GL2G3",	/* Cancer */
-	"",							/* Leo   */
-	"",							/* Virgo */
-	"",							/* Libra */
-	"BH8F2ND12E2F2ND12E2F2D12F2RE2U3NGF",	/* Scorpio */
-	"",							/* Sagittarius  */
-	"",							/* Capricorn #1 */
-	"BG8EUE2UEDFD2FDEUE2UEDFD2FDEUE2UEBU10GDG2DGUHU2HUGDG2DGUHU2HUGDG2DG",
-	"NL8NR8BH8F3DFD6GDG3BR16H3UHU6EUE3",	/* Pisces */
-	""					/* Capricorn #2 */
-};
-
-const char * szDrawObject[cLastMoving + 5] = {
-	"ND4NL4NR4U4LGLDGD2FDRFR2ERUEU2HULHL",	/* Earth   */
-	"U0BL4UM+1-2M+2-1RRM+2+1M+1+2DDM-1+2M-2+1LLM-2-1M-1-2U",	/* Sun     */
-//	"U0BH3DGD2FDRFR2ERUEU2HULHL2GL",	/* Sun     */
-	"BG3E2U2H2ER2M+2+1M+1+2D2M-1+2M-2+1L2H",	/* Moon    */
-//	"BG3E2U2H2ER2FRDFD2GDLGL2H",	/* Moon    */
-	"BD4UNL2NR2U2REU2HNEL2NHGD2FR",	/* Mercury */
-	"LHU2ER2FD2GLD2NL2NR2D2",	/* Venus   */
-	"HLG2DF2RE2UHE4ND2L2",		/* Mars    */
-	"BH3RFDGDGDR5NDNR2U6E",		/* Jupiter */
-	"BH3R2NUNR2D3ND3RERFDGDF",	/* Saturn  */
-	"BD4NEHURBFULU3NUNR2L2NU2DGBU5NFBR6GD3F",	/* Uranus #1 */
-	"BD4U2NL2NR2U5NUNRLBL2NUNLDF2R2E2UNRU",	/* Neptune   */
-	"D2NL2NR2D2BU8GFEHBL3D2F2R2E2U2",	/* Pluto  #1 */
-
-	"BG2LDFEULU3NURFRFBU5GLGLU2",	/* Chiron          */
-	"BD4UNL3NR3U2RE2UH2L2G",	/* Ceres           */
-	"BD4UNL3NR3UE2HUHNUGDGF2",	/* Pallas Athena   */
-	"BD4UNL2NR2U4NL4NR4NE3NF3NG3NH3U3",	/* Juno            */
-	"BU4DBG3NLFDF2E2UERBH2GDGHUH",	/* Vesta           */
-
-	"BG2LGFEU2HU2E2R2F2D2GD2FEHL",	/* North Node      */
-	"BH2LHEFD2GD2F2R2E2U2HU2EFGL",	/* South Node */
-	"BG4E8BG2FD2G2L2H2U2E2R2F",	/* Lilith #1       */
-	"NE2NF2NG2H2GD2F2R2E2U2H2L2G",	/* Part of Fortune */
-	"U2NHNEBD4NGNFU2L2NHNGR4NEF",	/* Vertex          */
-	"BH4NR3D4NR2D4R3BR2U8R2FD2GL2",	/* East Point      */
-
-	"BG4U4NR2U3EFD7BR2NURU2HU2RDBR3ULD5RU",	/* Ascendant  */
-	"BH3ER4FD2GLGLG2DR6",		/* 2nd Cusp   */
-	"BH3ER4FD2GNL3FD2GL4H",		/* 3rd Cusp   */
-	"BH4R2NR2D8NL2R2BR4NUL2U8R2D",	/* Nadir      */
-	"BG3FR4EU2HL5U4R6",			/* 5th Cusp   */
-	"BE3HL4GD6FR4EU2HL4G",		/* 6th Cusp   */
-	"BH4D8REU6HLBF7DRU2HU2RDBG4NRU3NRU2R",	/* Descendant */
-	"BL2GD2FR4EU2HNL4EU2HL4GD2F",	/* 8th Cusp   */
-	"BG3FR4EU6HL4GD2FR4E",		/* 9th Cusp   */
-	"BG4U8F2ND6E2D8BR4NUL2U8R2D",	/* Midheaven  */
-	"BH3ED8NLRBR2RNRU8G",		/* 11th Cusp  */
-	"BG4RNRU8GBR4ER2FD2GLG2D2R4",	/* 12th Cusp  */
-
-	"BH4BRFDG2DR8BG3UNL2NR2U5LUEFDL",	/* Cupido    */
-	"BENUNL2NR2D3ND2NR2L2H2U2E2R4",	/* Hades     */
-	"BU4NG2NF2D7NDBLHLBR6LGL2GLBR6LHL",	/* Zeus      */
-	"BU2D3ND3NR2L2BH2UE2R4F2D",	/* Kronos    */
-	"U3NLR2NRD3NL2NR2D4NRL2NLU4L4UEUH",	/* Apollon   */
-	"BUNU2NL2NR2D2ND3LHU2ENHR2NEFD2GL",	/* Admetos   */
-	"G2DGR6HUH2U4NG2F2",		/* Vulcanus  */
-	"ND4U4BL3DF2R2E2UBD8UH2L2G2D",	/* Poseidon  */
-	"BE3L2D6R2BH3H0BH3R2D6L2",	/* Proserpina */
-
-	// extra glyphs
-
-	"BD2D0BU6NG2NF2D4LGD2FR2EU2HL",	/* Uranus #2 */
-	"BL3R5EU2HL5D8R5",			/* Pluto  #2 */
-	"UERHL2G2D2F2R2ELHU",		/* Lilith #2 no cross, hollow */
-	"NUNGD5BH2R4BU2BLNL2NH4NUELNGNL3HNGNH2NL3UNL3NG2NH2UNG2NL3NHNU2ENL3NHNURHNG4LNG3LNFND6GND4GDNF3DF2", /* Lilith #3, filled-in, big cross */
-};
-
-// "NUNGD4BHR2BU2NL2NH4NUELNGNL3HNGNH2NL3UNL3NG2NH2UNG2NL3NHNU2ENL3NHNURHNG4LNG3LNFND6GND4GDNF3DF2", /* Lilith, filled-in, small cross */
-
-const char * szDrawObject2[cLastMoving + 5] = {
-	"ND8NL8NR8U8L2GLG3DGD4FDF3RFR4ERE3UEU4HUH3LHL2",	/* Earth */
-	"U0BU8L2GLG3DGD4FDF3RFR4ERE3UEU4HUH3LHL2",	/* Sun   */
-	"BG6E3UEU2HUH3E2R4FRF3DFD4GDG3LGL4H2",	/* Moon  */
-	"",							/* Mercury */
-	"",							/* Venus   */
-	"BELHL4G3D4F3R4E3U4HUE7ND5L5",	/* Mars    */
-	"BH6BRRF2D2GDGDGDGDR10ND2NR4U12E2",	/* Jupiter */
-	"",							/* Saturn  */
-	"BD4LGD2FR2EU2HLU6NU2NR4L4NU4D2G2BU10NF2BR12G2D6F2",	/* Uranus #1 */
-	"BD8U4NL4NR4U10NU2NR2L2BL3LNU2NLD2FDFRFR4EREUEU2NLNRU2",	/* Neptune   */
-	"D4NL4NR4D4BU16LGD2FR2EU2HLBL6D4FDFRFR4EREUEU4",	/* Pluto  #1 */
-	"BG4LGD2FR2EU2HLU7RF2RF2RFBU10GLG2LG2BLU5",	/* Chiron        */
-	"BD8U2NL6NR6U4R3E3U4H3L4G2",	/* Ceres         */
-	"BD8U2NL6NR6U2E4HUHUHUHNUGDGDGDGF4",	/* Pallas Athena */
-	"BD8U2NL4NR4U8NL7NR7NE5NF5NG5NH5U6",	/* Juno          */
-	"BU8D3BG5NL3DF2DF2DFEUE2UE2UR3BH4GDG2DGHUH2UH",	/* Vesta         */
-	"",							/* North Node      */
-	"",							/* South Node      */
-	"",							/* Lilith #1       */
-	"",							/* Part of Fortune */
-	"",							/* Vertex          */
-	"",							/* East Point      */
-	"BG8U8NR4U6E2F2D14BR4NHREU3HLHU3ERFBR6HLGD8FRE",	/* Ascendant */
-	"",							/* 2nd Cusp   */
-	"",							/* 3rd Cusp   */
-	"BH8R4NR4D16NL4R4BR8BUNUGL3HU14ER3FD",	/* Nadir */
-	"",							/* 5th Cusp   */
-	"",							/* 6th Cusp   */
-	"BH8D16R2E2U12H2L2BF14BGFREU3HLHU3ERFBG9NR3U5NR3U5R3",	/* Descendant */
-	"",							/* 8th Cusp   */
-	"",							/* 9th Cusp   */
-	"BG8U16F4ND12E4D16BR8BUNUGL3HU14ER3FD",	/* Midheaven */
-	"",							/* 11th Cusp  */
-	"",							/* 12th Cusp  */
-	"",							/* Cupido    */
-	"",							/* Hades     */
-	"",							/* Zeus      */
-	"",							/* Kronos    */
-	"",							/* Apollon   */
-	"",							/* Admetos   */
-	"",							/* Vulcanus  */
-	"",							/* Proserpina */
-	"",							/* Poseidon  */
-	"",							/* Uranus #2 */
-	"",							/* Pluto  #2 */
-	"",							/* Lilith #2 */
-	""							/* Lilith #3 */
-};
-
-const char * szDrawHouse[NUMBER_OF_SIGNS + 1] = { "",
-	"BD2NLNRU4L", "BHBUR2D2L2D2R2", "BHBUR2D2NL2D2L2",
-	"BHBUD2R2NU2D2", "BEBUL2D2R2D2L2", "NLRD2L2U4R2",
-	"BHBUR2DG2D", "NRLU2R2D4L2U2", "NRLU2R2D4L2",
-	"BH2NLD4NLRBR2U4R2D4L2", "BH2NLD4NLRBR2RNRU4L", "BH2NLD4NLRBR2NR2U2R2U2L2"
-};
-
-const char * szDrawHouse2[NUMBER_OF_SIGNS + 1] = { "",
-	"BD4NL2NR2U8G2", "BH2BUER2FD2G4DR4", "BH2BUER2FD2GNLFD2GL2H",
-	"BH2BU2D4R3NU4NRD4", "BE2BU2L4D4R3FD2GL2H", "NL2RFD2GL2HU6ER2F",
-	"", "NRLHU2ER2FD2GFD2GL2HU2E", "NR2LHU2ER2FD6GL2H",
-	"BH4NG2D8NL2R2BR5HU6ER2FD6GL2", "BH4NG2D8NL2R2BR4R2NR2U8G2",
-	"BH4NG2D8NL2R2BR4NR4UE4U2HL2G"
-};
-
-const char * szDrawAspect[cAspect + 3] = { "",
-	"HLG2DF2RE2UHE4",			/* Conjunction      */
-	"BGL2GDFREU2E2U2ERFDGL2",	/* Opposition       */
-	"BH4R8D8L8U8",				/* Square           */
-	"BU4M-4+8R5R3M-4-8",	/* Trine            */
-	//"BU4GDGDGDGDR8UHUHUHUH",	/* Trine            */
-	"BLNH3NG3RNU4ND4RNE3F3",	/* Sextile          */
-	"BG4EUEUEUEUNL4NR4BDFDFDFDF",	/* Inconjunct       */
-	"BH4FDFDFDFDNL4NR4BUEUEUEUE",	/* Semisextile      */
-	"BE4G8R8",					/* Semisquare       */
-	"BD2L3U6R6D6L3D2R2",		/* Sesquiquadrature */
-	"F4BU3U2HULHL2GLDGD2FDRFR2E3",	/* Quintile         */
-	"BD2U3NR3NU3L3BD5R6",		/* Biquintile       */
-	"BU2D3NR3ND3L3BU5R6",		/* Semiquintile     */
-	"BH3R6G6",					/* Septile      */
-	"BR3L5HUER4FD4GL4H",		/* Novile       */
-	"BF2UHL2GFR3DGL3BE6LNLU2NRLBL4LNLD2NLR",	/* Binovile     */
-	"BL2R4G4BE6LNLU2NRLBL4LNLD2NLR",	/* Biseptile    */
-	"BL2R4G4BE6L7NLU2NLR3ND2R3ND2R",	/* Triseptile   */
-	"BF2UHL2GFR3DGL3BU6LNLU2NLRBR2F2E2",	/* Quatronovile */
-	"BU4BLD8BR2U8",				/* Parallel       */
-	"BU4BLD8BR2U8BF3BLL6BD2R6"
-};								/* Contraparallel */
-
-const char * szDrawAspect2[cAspect + 3] = { "",
-	"BELHL4G3D4F3R4E3U4HUE7",	/* Conjunction */
-	"BG3HL2G2D2F2R2E2U2HE6HU2E2R2F2D2G2L2H",	/* Opposition  */
-	"",							/* Square           */
-//	"BU8GDGDGDGDGDGDGDGDR16UHUHUHUHUHUHUHUH",	/* Trine       */
-	"BU8M+4+8M+4+8L8L8M+4-8M+4-8",	/* Trine       */
-	"BU8D16BL8BU2E3RE3R2E3RE3BL16F3RF3R2F3RF3",	/* Sextile     */
-	"BG8EUEUEUEUEUEUEUEUNL8NR8BDFDFDFDFDFDFDFDF",	/* Inconjunct  */
-	"BH8FDFDFDFDFDFDFDFDNL8NR8BUEUEUEUEUEUEUEUE",	/* Semisextile */
-	"",							/* Semisquare       */
-	"",							/* Sesquiquadrature */
-	"BFF7BU6U4HUH3LHL4GLG3DGD4FDF3RFR4E6",	/* Quintile */
-	"",							/* Biquintile       */
-	"",							/* Semiquintile     */
-	"",							/* Septile      */
-	"",							/* Novile       */
-	"",							/* Binovile     */
-	"",							/* Biseptile    */
-	"",							/* Triseptile   */
-	"",							/* Quatronovile */
-	"",							/* Parallel        */
-	""
-};								/* Contraparallel */
-
-const char * szWorldData[62 * 3] = {
-	"-031+70",
-	"LLRRHLLLLDULLGLLLDULGLLLGLRREDEGGLGGLGLGLLGDRLDRLFFRRERFDFRRREUEEHLUERERUERR\
-FGLGLDDFRRRRREFRLGLLLLLGEFDLHGDDLGHLGLLHGLHURDLRRELLLRHUGLDFDLGLLFHGGLGLLLDLL\
-LDRRFFDDGLLLLLLGDFGDDRRFRERREEUEREUEFRRERRFFFRFRDDLLLLRFRUREURULHLHHHEF",
-	"5EUROPE",
-	"+006+50", "RRERRRRUELLUHHLLREULLELLDGHDUFDEGRDRRLFDLLRGRRGGL",
-	"5ENGLAND",
-	"+008+55", "GLFGRRREUULL", "5IRELAND",
-	"+023+64", "RRFRERRREHLLLLLGHLLRFLLRFL", "5ICELAND",
-	"-011+80", "DDURFRERLGRRLLFRRREEFRRRLHGELLLHRRFRRRRERLLLLLLLLLLLDHGULLL",
-	"5SVALBARD",
-	"-014+45",
-	"FRFRFDDFRDRRLLFRURFHHUERRRRRHUUEERRRRGRDERRLHLRRERRGGRFRFFGLLLLHLLLLGLLDLLLF\
-GRFFRERFRERDDDGDGLLDFFEUDDFFDFFDDFFFDFDDDRRERRERRRUERRERURUEEHHLHUGGLLLUUGUHU\
-HURRFFRFRRRDRRFRRRRRRRF",
-	"5MIDDLE EAST",
-	"-009+41", "DDRUULEUGD", "5SARDINIA",
-	"-024+35", "RRLL", "5CRETE",
-	"-032+35", "RRLL", "5CYPRUS",
-	"-052+37", "LLHUURHUHUHERERRRDDLLLFFDDURFLLDFDDL", "0CASPAIN SEA",
-	"-060+44", "LLUEERDFLDL", "0ARAL SEA",
-	"-068+24",
-	"FRGFRREDDDDDFDFDDFDDFERUEUUUUEEEEEREURRREFDFRDDDDRREFDDFDDGDDRFDDFDFFRUHUUHH\
-HULUEUUURDRFDFRDEEREUUUHHHUUEERRDDEURRERREREEEUEULLREUHUHLEERRHLGLULUREERDLDR\
-ERRFGRFDGRRREUHHUREUE",
-	"6ASIA S",
-	"-140+36",
-	"DEUUEUHURREREEGLLHHDDGLDRGDDGGLGLLLGGLDLRDFEUHRRGEERDLLRGLRERRERRE",
-	"6JAPAN",
-	"-121+25", "GDFUEUL", "6TAIWAN",
-	"-080+10", "DDDDREUHH", "6SRI LANKA",
-	"-121+18", "LDDDRDDRHRRFFDDDLLEHDULRHDFDDGERDDREUUULUUHHLHEUUL",
-	"2PHILIPPINES",
-	"-131+43",
-	"EFREEREEEUUUEUHLLUDLULEERERERRRRRRERRFLRRRRLUERERRRDRERURRGDLGLGLGLGGDDFDFEU\
-RRUERUURULEEREDERRFRERERRRERRHLHLRRRREURDRRFRFRUURRHLLLDHHLLHLLHLLLLLLLDLLHRL\
-LLLLLLGHULLLLLLLLLLULLLGL",
-	"6SIBERIA",
-	"-145+71",
-	"RELLRHLLLLGDHGHLLLLGLLHUHLLLLLDLLLLHLLLLLDULUDLGLLLLRRERERRRELHLLLLLLLELLLLG\
-DLLLLLUDLLLLLGLLLDLLLLLLLDFRDDHELLLLLLDRRLLHUDLGFGRRRRFRLHLLDGLGLLHRRREUHUUUL\
-LGGLDRFGHLLLHLLLLRFGHLGLLLULGLLLGLLHRHLDDDLLLLDLLLFLLHUHLRRFRRRREHLLHLLLHLLL",
-	"6RUSSIA",
-	"-143+54", "GDDDDDDDEDUUURUUHUU", "6SAKHALIN",
-	"-180+72", "GRRRRULLL", "6WRANGEL I.",
-	"-137+76", "DRRRRRRRELLLLLLLL", "6SIBERIAN I.",
-	"-091+80", "FERDRRRRRRULLLLLRRULLLLGL", "6SEVERNAYA",
-	"-101+79", "GRRRRELLLL", "6ZEMLYA",
-	"-068+77", "LLGLLLLLLGLLGGLGLRFRRRRLHERERERRRERRRREL", "6NOVAYA",
-	"+123+49",
-	"FGULLFDDDGFDDDFFDFRFRFDFFFDLFFRDFFEHHHHUHHUFRDFFFRDFFFDFGFRFRFRRFRRRRFFRRFRF\
-FDRFFRFEUUGLHHUUEUHLLLLLEUUEULLLGDLLGLHHUHUUUEHEERERRFRRHRREFRRFDFDFEUUHUUUEE\
-RERUUUHFDEUHFEURRRELUERRE",
-	"4NORTH AMERICA S",
-	"+113+42", "FH", "0SALT LAKE",
-	"+156+20", "DRULHLHL", "4HAWAII",
-	"+085+22", "RERFRRFRGRRRRHLHLHLLLLLG", "4CUBA",
-	"+070+18", "RRHHLLLFLLLFRRRRRR", "4HAITI",
-	"+078+18", "RRHLLF", "4JAMAICA",
-	"+066+18", "ELLDR", "4PUERTO RICO",
-	"+078+24", "UD", "4NASSAU",
-	"+067+45",
-	"REFLGDERERREHDLLLHUELLLGLGLREEERRRRRRREERRGGDGRRRFEFUUHLLLEUUHHGLRELLHHUHHHD\
-GLGHHULLHLLLLLDFGFDDGLLFDDGHHUULLLLHLLHLLLUHUUEREEREERRRREUUHLLLDDGHULLLHLUHL\
-GDRFGGULLLLLLLLLHLLGFLHLLLLLRHLLLLLHLLLLLLHGLLLLGUGLLLHLL",
-	"4CANADA",
-	"+088+49",
-	"LGLGRRRRRRRFLLLGRGDDREUURUFRGRFGFERERREEREERLGGLGLLLGRLLGLEUERHLLLHULHL",
-	"0GREAT LAKES",
-	"+117+61", "REHRFRRERGLGLLLL", "0SLAVE LAKE",
-	"+125+66", "RRERRRGREDLFHGLLLERLLLL", "0BEAR LAKE",
-	"+097+50", "UULHURFDFG", "0LAKE WINNIPEG",
-	"+090+72",
-	"FRRLLFRRRRRRRRRRFRRGLLGRREEFRFLGLFLLLLFRERFRFRRFRRHLHFRRRUHLHRRFRURELLHLLLHR\
-RHLHLHGHLHLLGLLEHFRRRHLLLLLLGLDFHLUELLGG",
-	"4BAFFIN I.",
-	"+125+72",
-	"RFRREERRRLLGFFRRRRRLLLLLFRRRRRRRREFRRRRHRRLHLHHLRRULGLFLHLDLLULLLLHLLLLLLLDG",
-	"4VICTORIA I.",
-	"+141+70",
-	"LLLLLLLLHGLHLLLHGLLGLLGLLDRRFRRDLLLULGLLFRRRRRRDLGLLGFDRRRDRRRRRGGGLLGLLGGLL\
-RRERERRRERREERRELEERRRLLGDRERRURRFRRRRRFRRFUDRUDDHFDURDURLURDDLFRULURDHFFRGFE\
-GRFFRFRFLHLHLFFRFE",
-	"4ALASKA",
-	"+045+60",
-	"REUEREUERRRRERERRRERRRRERLLLLLLHRRRGERHFRRRRHLUDLLHLRERFRERLEUHRRHLEERLLURRR\
-RRRRRELLLLLLLLLLGLLLRERHGLRELLLLLLLELLLLLLLLLLGLLLLLLGLLLLLLGLULLLLLLLFRLLLLL\
-GLRRRGLLLLLLLGRRRRRRRGLLLLRRFRRRRRRRRRRFDFDLFREFRDLLLDERRFGLLGFFDRFFFRRRF",
-	"4GREENLAND",
-	"+080+10",
-	"DRFDFDDGGGDDGRDGDDFFDFDFFDFFRFFFDDDDDDGDDDDGDDDDGDGFGDDDEUDDDGUDDLDRGDDDFDFR\
-FRRFERRLHLUHUURUEELHEREURULURREURREREUHUUDFRREEEEEUEUUEERERRREUEUEUUUUUEEEEUU\
-UHLHLHLLLLHLHLGEHLGEUHUUHLHLLLHHLHULEDLLELLGHLLHLGDDHUELLGLGDGHHL",
-	"3SOUTH AMERICA",
-	"+060-51", "LDRRELL", "3FALKLAND ISLANDS",
-	"+092+00", "FUL", "3GALAPAGOS I.",
-	"-032+32",
-	"LLGLHLLLLHLGDGHLLHHLLHLEUULLLLLLLLLGLGLLLLHDGLGDGDGGLDGGGDGDFDDDDGDDFFFFDFRF\
-FRRRRRRRRERERRFFRRFFDDDGDFFFDFDDDFDGDGDDDFDFDFDDDFDFDFDDFFERRRRREEEEEEEUUEREU\
-UHUEEEREEUUUUHUUUHUEUEEEEEREEUEUEEUUULLLLGLLHUHHLHUHHUUHHUUHUHHUU",
-	"1AFRICA",
-	"-049-12", "DGGGLGDDDDGDDFFREUEUEUUUEUUUUH", "1MADAGASCAR",
-	"-032+00", "DDDREUELLL", "0LAKE VICTORIA",
-	"-014+14", "LRFLU", "0LAKE CHAD",
-	"-124-16",
-	"LGDGGLGLLGLDDDGFDDFDFDGFRRRERRRRURERRRRRRRFFFEEDDRFDFRFREFRERRUUEUEEUUUUUUUH\
-HHHHHHUUHHHUULDDDDGDGHLHLHEUELLLHLFLLULDRGDDLLHLGG",
-	"2AUSTRALIA",
-	"-173-35", "FFDGFDREURULHHHL", "2NEW ZEALAND N",
-	"-174-41", "LLDGLGLGGRFREEUREEU", "2NEW ZEALAND S",
-	"-145-41", "DFRRUUUDLLL", "2TASMANIA",
-	"-178-17", "GRRURUGDH", "2FIJI",
-	"-130+00", "FRFRLGFEFRFRFDGRRFRRUERFFFRRRLHHHHRHLHHLHLLHGGLHUHLGH",
-	"2NEW GUINEA",
-	"-115-04", "RUUEEURHUUEHHGGGGLLDDHLDDFDDRRDERF", "2BORNEO",
-	"-095+06", "DFFFFFFDFFFFRUUUHFRHLHLUHHHHHLLH", "2SUMATRA",
-	"-106-06", "GRFRRRRRRFRRHLHLLLLLHL", "2JAVA",
-	"-120+00", "DGDDRDFHUEDFRHUHREFHLGHURRRRELLLLG", "2CELEBES",
-	"+000-70",
-	"ULDLLLLLLLLGLLGLLLGLLGLLLLGLGLLGLLLLGLLLLLHLGLLLLLHLLLLLHLLLLHLLUERLEUUUUUUE\
-ERRRULLGLLLLGLGGLLLDRUDRDLGHLLGLLFGRRFLLLLLLLDHLLLLHLLLLLGLLLLHLLLLLLLGRFDLLL\
-ULLLGHLLLLLLLLLLHGHLLGLLLLLLLGLLLLLLLLLLLGLLLGLLLLLLLLGLLLLLLLLLLLLLLLLLLLLL",
-	"7ANTARCTICA W",
-	"+180-78",
-	"LLLLLLLHLLGHLLGHLUEERRERREHLLLLHLLLLLLHLLLLLLLLLLLHLHLLLLLHLLULDLLLLLDLLHLLL\
-LGHFLLLLLHLLLLLLGLHLLHLGLLLLHLGLLGLLLULLLGLLHDFLLLGLGLLLELLLLHLLLLLLLLLLHLLLH\
-LLLLGGHGHGLLLGLDLLLLHLLGHGLLLLLLLLLLLLLLHLGLLLLLLLLLLLLLL",
-	"7ANTARCTICA E",
-	"", "", ""
-};
-
-#ifdef CONSTEL
-const char * szDrawConstel[cCnstl + 1] = { "",
-	"550210+51DDd3r8d2Rr7d2Rr3Dd5l2d3r10uru6rUu2Rr2ur4u2RrUUu3Ll7d2l3DdLl5d2Lu2l4\
-Uul8Dd2Ll3Uul7",				/* Andromeda */
-	"660913-25d2Ll5Dl5d2l4d4LlDRRr8Uu5l6",	/* Antila */
-	"561804-68DDd3RRRRRr2Uu9LLLLl3Uu2Ll4",	/* Apus */
-	"362213+02Dd3Ll14DDd5RRrUUur7Dd4Rr6UUu2Ll9ul3dLl13",	/* Aquarius */
-	"562003+16Ddl3d7l3Dd9r7Dd2RRUu6r5Uu2l4u4r3Uu2l3u7Lld2l13dLl3",	/* Aquila */
-	"641803-45Dd7Rr5Dd8Ru3rur2u3r3UUu5LLl3",	/* Ara */
-	"560307+31DDrd9RRr3Uu6Llu2l7UuLl7",	/* Aries */
-	"650604+56d2l6Dl4d6Ll7Dd5Rr5Dd2RuRr2Ur4u6l3UUu3Ll3u3Ll4",	/* Auriga */
-	"431504+55d2l8DDdr4d7r4Dd5rDDd2RRr6UUu8LlUlUUu5Ll4",	/* Bootes */
-	"560501-27DDd3Rr2d3r5d3r4Uu3l5Ul2u3Ll",	/* Caelum */
-	"751407+86DdRr6d3RRr6u3Rr2UuRr9Dd7Rr12DDRr12u2Rr11Dd4Rr12d3RRr8u2r2u2rUu8l6Uu\
-7lULLl6u5LLLl5uLLLLLLl7",		/* Camelopardalis */
-	"550906+33DDDd3Rr14URrULu8l2Uu3Ll6",	/* Cancer */
-	"551309+52Dd2Ll2DDrd2Rr9UuRr8u2r5Uu4lUu2Ll9",	/* Canes Venatici */
-	"550707-11DDd3Rr12UUu9Ll7",	/* Canis Major */
-	"660714+13DLld3l2DRr10ur3Uu2l7ul5",	/* Canis Minor */
-	"562114-09DDd5r7d2Rr13UUul7Dd4Ll7Uul7",	/* Capricornus */
-	"360804-51d2l4d2l5d2LLLl5DDd5RRRUu6RRr2Uu2r4u3r6u2r2u2LLl4",	/* Carina */
-	"440310+77Dd2r6Dd3Rr6u2Rdr3d3r4d4r4DdRd2r10u2Rr5Uur3u2RrULl4u4l6u3Ll6Uu7LLLl1\
-0",								/* Cassiopeia */
-	"551501-30Dd3Rr11Dd5l6Dd4RRrUu5RrDd4r9Uu3r4UUu4Ll5u2l5ULLLl",	/* Centaurus */
-	"850805+88d3RRRr9DRRr4d3RRRr9Dd3Rr5d3r6DRrd3r7dr3d3r3u2RRr5UurdRu2l7u5l3Uu5r9\
-Uul12u5LLl14u2LLLLLLLLLLl5",	/* Cepheus */
-	"560306+11DDdRr4DDd4Rr4dRRrUUu4Ll7Uu3LLl2UuLl6",	/* Cetus */
-	"561313-75Dd3RRRRRRr6Uu5LLLLLLl13",	/* Chamaeleon */
-	"341507-55Ddr2d3r3d4RrDdRr2Uu5r2uLl10Uu5Ll7",	/* Circinus */
-	"660603-27Dd3l7Dd3Rr14UUu3Ll3",	/* Columba */
-	"561207+33d2Ll6Dd2l3Dd6RrdRUu8l2Uu3l5",	/* Coma Berenices */
-	"561905-37Dd5RRUu3Ll5",		/* Corona Australis */
-	"451606+39Dd4r2dRr11Uu2l4u7Ll6",	/* Corona Borealis */
-	"551214-12Dd3r4d2RrUu8Ll14",	/* Corvus */
-	"551114-07DDd5RrUrUu3Ll14",	/* Crater */
-	"561214-55Dd4RrUu5Ll14",	/* Crux */
-	"552010+61Dd5LLlDd5RdrDd4r2Dd2RuRr4d2r6Ulu7lUu4r4u4rUu6l5u2l5ULl9ul",
-	/* Cygnus */
-		"542010+21DLl2d8RrDd4rd4r7u7r3Uu6l2Uul5",	/* Delphinus */
-		"570408-49Dd4Lld3l7DdLd3l8DRRr6Uur3u3r5u3Rr2u2Ll2Uul6",	/* Dorado */
-		"352013+86d5r12Dd5l9Dd3r3d5RDr3d2r5d2r5Dd2Rr10UuRr14uRRr3ur8u2Rr8Uu2Rr7uRr14u\
-3Rr8Uu3RRr9UuLl13DdLl9d3LLlDdLd4Ll10ULl8u5Ll7Ul7u6LLLl13",	/* Draco */
-	"562107+13Dd8Rr2u4lUu2Ll3ul4",	/* Equuleus */
-	"430411+00d4Ll3DdRd3rDd7r3Dr2d7r5DRrd4r7d2r6d3Rr4Ddr4d3r4d4Rr8u5l3u2l4Uu2Ll6U\
-Llul7u4l4Uu6Rr4UUu9Ll10ULl11",	/* Eridanus */
-	"550312-24Dd5r4d4r7DRRr4Uu6LLl12",	/* Fornax */
-	"560713+35d2Ll2Dd2RDrd7r5dr7Dru2Rr9u6rUu2Ru6l10Uu5Ll13",	/* Gemini */
-	"442307-36DDd6Rr13UuRr8Uu4LLl7",	/* Grus */
-	"551805+51Dd2rDDl3d4l7Dd8r8u2Rr9dRr2Dd6r10Uu6RUu2l2u3l2ul2Uu9Rr3UUu2LLldLl5",
-	/* Hercules */
-		"770404-40d9r2DdRr2d2r5d4r4Dd7Rr12Uu6l4u3l4UuLlu3l6u2l7ULl4",	/* Horologium */
-		"760910+07DDd2Ll13Dld5LLl10u2LLl6d2LlDRRRr5d4r5d2RRru4r4Ur5u3Rr2u2r10URr5u2r3\
-u7r4UUu7Ll10",					/* Hydra */
-	"560203-58Dd7LLl9Dd5Rr8Dd2RRRr14Uu6l12dLl6UUu2Ll3",	/* Hydrus */
-	"742107-45d4Ll2DDd7Ll7Dd4RRr8UURr8Uu5Ll7",	/* Indus */
-	"562214+57DDd5r13uRrUu4LulUu3l3u3l3ul7",	/* Lacerta */
-	"551200+28DDr6Dd7Rr2Uu7Rr9UUUu3LDd2l9d5l4u2Ll2u3L",	/* Leo */
-	"451004+41Ddl9d6Ll2Dd5Rr2d2r4u5RUu3r9u6l5UuLl4",	/* Leo Minor */
-	"550603-11Dd7RRrUu6Lu3Ll3",	/* Lepus */
-	"551600-04DDdr3Dr11u5Rr9UUu2l6u7Ll3d3L",	/* Libra */
-	"331602-30Dd2Rr3d6r5Dd4r4dRr11Uu7LlUULl2",	/* Lupus */
-	"640703+62DLl9Dd4Ll5d5l6Ddr5d6RRr2u2r6Uu4RrUr4u4r6Uu2Ll3",	/* Lynx */
-	"551903+48d4l4Dd3rDrd5Rrur7Ur3Uu8Ll3",	/* Lyra */
-	"560608-70d5Ll9Dd5RRRRr8Uu5Ll9ULLl8",	/* Mensa */
-	"552107-27DDd5Rr8UUu3Ll7",	/* Microscopium */
-	"470701+12Dld9l3DLl3DdRRRrUu6Ll5UUlu2Ll",	/* Monoceros */
-	"561311-64dl2Dd5RRr10Uu6LLl11",	/* Musca */
-	"561609-42DDRr8u5r4ul4Uu2l5u6Ll9",	/* Norma */
-	"270000-74lDd2LLLl7d3LLLLl9u2LLLLLLLLLLLl4Uu6LLLLLL",	/* Octans */
-	"641806+14d2l5Dd4r5d2l2dr2DRrd4LlDRr3d2rUr7d6l7DDRr2u5r7UlurUu2Ru4l6Uu4l7Uu3L\
-l6uLl6",						/* Ophiuchus */
-	"560600+23dl5Dd2lDrDd4RrDdr11Uu6Rr4UrUu5Llul5dl4d3l3u6rUu3L",	/* Orion */
-	"552007-57DLl7Dd4RRRr11Uu2Rr5Uu3LLLl7",	/* Pavo */
-	"552201+36dLl9d2l4dLl2Ddld6lDd7r2d2RrDd2Rr2d6Rr3ur3dr2Uu3r4drUl3u4l3u4l4Uu6Ll\
-",								/* Pegasus */
-	"460209+59d2Ll5d2l2d2Ll12DDd4r3d5RRr2u3r2u3rUUur7Dd2Rr3Uur4u4l4u3Lul9",
-	/* Perseus */
-		"650206-40d8RrDdr4d2r3d5RRr8UULLLl6",	/* Phoenix */
-		"640601-43Dd3l2d2l6d3l4Dd4Ru3r7Uu3r7u3Rr7Uu4l5u3LLl",	/* Pictor */
-		"450108+33Ddl4Dd9Ll2Dd7RRr8Dd6Rru3Rr2Uu8Ll14UuLl2u2l2Uu2l10u3r2Uu3Ll8",
-	/* Pisces */
-		"562302-25Dd6RRr8Uu5LLl2",	/* Piscis Austrinus */
-		"570807-11DDDd3r6DdRRr14Uu7l9Uu7Ll7UUu9Ll7",	/* Puppis */
-		"560810-18DLl3d5l4Dd7Rr8UUu2l3",	/* Pyxis */
-		"560401-53d3l5d3l3Dd7Rr11Uu3l4u4Ll",	/* Reticulum */
-		"452005+22Dd4Rrur13u2RrUu2Ll5Dl9u2Ll5",	/* Sagitta */
-		"552002-12Dd7l5DDd5Rr10Uu3RRUr4Uu4LLu4Ll2",	/* Sagittarius */
-		"471606-08Dd9lDrd5l7DLLDd5Rr6u3r7UURr3u9LUUu2l6",	/* Scorpius */
-		"560111-25DDRRr8u4r5Uu5LLl11",	/* Sculptor */
-		"551900-04Dd6r9Uu6L",		/* Scutum */
-		"861814+06d4r4Dd4r4Dd6Rr11Ul7d2lu2Llu6RrULl6u3l2ur2u2l8bRbRbRbUbUd4l3Dd6l3Dd4\
-Rr12UUUu5Ll2d3RD",				/* Serpens */
-	"551013+07DDd2Rr5UUu7Ll13",	/* Sextans */
-	"640600+29d6r3Dd2ld6r3u3r4ur5dRr5DDRr5dr4UUUlUuLl9Dl4dLL",	/* Taurus */
-	"552007-45Dd7RRr12Uu5LLl7",	/* Telescopium */
-	"560211+37d3l2d3r5Dd2r7d2Rr3u3r4Uu5Ll2u2l9",	/* Triangulum */
-	"561609-60dl3d3l2dLd3l3DdRRRrUu2Ll2u4l3u3l2ULl9",	/* Triangulum Australe */
-	"360106-58DDd5Rr2uRr8Uu3Rr13Uu4Ll7d2LLl6",	/* Tucana */
-	"641107+73Dd4Lld3Ll8dLl7Dd5r5Dd2Rr6Uu2Rr12Dd6rDDd2Rr13Uu3Rr2u6r9UuRr10u5Rr6UU\
-r6Uu3LLLl7",					/* Ursa Major */
-	"342200+86RRRRrDr7d5Rr7DRr5d5RRu4r14Uu6l8u3Ll7Uu6RRRRRRr10u2RRRRRRRRRRrd2R",
-	/* Ursa Minor */
-		"560907-37DLLlDd7RRRr2u2r5u2r4u2r3Uu7l6Uu3Ll7",	/* Vela */
-		"551309+14Dd2LLl3DdRr3d7r6DDd3RRrUu8RrUu3r5UULu3l14uLl9",	/* Virgo */
-		"560900-64Dd5RRr7Uu6LLL",	/* Volans */
-		"462100+29dl8d4r3DRr5ur5uRrDr9u2Rru3Ll5u2l6u2LL"
-};								/* Vulpecula */
-#endif /* CONSTEL */
-#if 0
-void InitTurtleFont()
-{
-	Glyph.ParseAdd(L"", L'|');
-	Glyph.AddString(0, L"BR2D4BD2D0");
-	Glyph.AddString(0, L"BRD2BR2U2");
-	Glyph.AddString(0, L"BD2R4BD2L4BFU4BR2D4");
-	Glyph.AddString(0, L"BR2D6BENL3EHL2HER3");
-	Glyph.AddString(0, L"RDLNUBR4G4BR4DLUR");
-	Glyph.AddString(0, L"BD2NF4UEFDG2DFRE2");
-	Glyph.AddString(0, L"BR2DG");
-	Glyph.AddString(0, L"BR3G2D2F2");
-	Glyph.AddString(0, L"BRF2D2G2");
-	Glyph.AddString(0, L"BD2FNGRNU2ND2RNEF");
-	Glyph.AddString(0, L"BD3R2NU2ND2R2");
-	Glyph.AddString(0, L"BD5BR2DG");
-	Glyph.AddString(0, L"BD3R4");
-	Glyph.AddString(0, L"BD6BRRULD");
-	Glyph.AddString(0, L"BD5E4");
-	Glyph.AddString(0, L"BDD4NE4FR2EU4HL2G");
-	Glyph.AddString(0, L"BFED6NLR");
-	Glyph.AddString(0, L"BDER2FDG4R4");
-	Glyph.AddString(0, L"BDER2FDGNLFDGL2H");
-	Glyph.AddString(0, L"D3R3NU3ND3R");
-	Glyph.AddString(0, L"NR4D3R3FDGL2H");
-	Glyph.AddString(0, L"BR3NFL2GD4FR2EUHL3");
-	Glyph.AddString(0, L"R4DG4D");
-	Glyph.AddString(0, L"BDDFNR2GDFR2EUHEUHL2G");
-	Glyph.AddString(0, L"BD5FR2EU4HL2GDFR3");
-	Glyph.AddString(0, L"BR2BD2D0BD2D0");
-	Glyph.AddString(0, L"BR2BD2D0BD2G");
-	Glyph.AddString(0, L"BR3G3F3");
-	Glyph.AddString(0, L"BD2R4BD2L4");
-	Glyph.AddString(0, L"BRF3G3");
-	Glyph.AddString(0, L"BDER2FDGLDBD2D0");
-	Glyph.AddString(0, L"BF2DFEU2HL2GD4FR2");
-	Glyph.AddString(0, L"BD6U4E2F2D2NL4D2");
-	Glyph.AddString(0, L"D6R3EUHNL3EUHL3");
-	Glyph.AddString(0, L"BR3NFL2GD4FR2E");
-	Glyph.AddString(0, L"D6R2E2U2H2L2");
-	Glyph.AddString(0, L"NR4D3NR3D3R4");
-	Glyph.AddString(0, L"NR4D3NR3D3");
-	Glyph.AddString(0, L"BR3NFL2GD4FR2EU2L2");
-	Glyph.AddString(0, L"D3ND3R4NU3D3");
-	Glyph.AddString(0, L"BRRNRD6NLR");
-	Glyph.AddString(0, L"BD4DFR2EU5");
-	Glyph.AddString(0, L"D3ND3RNE3F3");
-	Glyph.AddString(0, L"D6R4");
-	Glyph.AddString(0, L"ND6F2NDE2D6");
-	Glyph.AddString(0, L"ND6F4ND2U4");
-	Glyph.AddString(0, L"BDD4FR2EU4HL2G");
-	Glyph.AddString(0, L"R3FDGL3NU3D3");
-	Glyph.AddString(0, L"BDD4FRENHNFEU3HL2G");
-	Glyph.AddString(0, L"ND6R3FDGL2NLF3");
-	Glyph.AddString(0, L"BR3NFL2GDFR2FDGL2H");
-	Glyph.AddString(0, L"R2NR2D6");
-	Glyph.AddString(0, L"D5FR2EU5");
-	Glyph.AddString(0, L"D2FDFNDEUEU2");
-	Glyph.AddString(0, L"D6E2NUF2U6");
-	Glyph.AddString(0, L"DF4DBL4UE4U");
-	Glyph.AddString(0, L"D2FRND3REU2");
-	Glyph.AddString(0, L"R4DG4DR4");
-	Glyph.AddString(0, L"BR3L2D6R2");
-	Glyph.AddString(0, L"BDF4");
-	Glyph.AddString(0, L"BRR2D6L2");
-	Glyph.AddString(0, L"BD2E2F2");
-	Glyph.AddString(0, L"BD6R4");
-	Glyph.AddString(0, L"BR2DF");
-	Glyph.AddString(0, L"BF4G2LHU2ER2FD3");
-	Glyph.AddString(0, L"D5NDFR2EU2HL2G");
-	Glyph.AddString(0, L"BF4BUHL2GD2FR2E");
-	Glyph.AddString(0, L"BR4D5NDGL2HU2ER2F");
-	Glyph.AddString(0, L"BD4R4UHL2GD2FR3");
-	Glyph.AddString(0, L"BD3RNR3ND3U2ERF");
-	Glyph.AddString(0, L"BD8R3EU4HL2GD2FR2E");
-	Glyph.AddString(0, L"D3ND3ER2FD3");
-	Glyph.AddString(0, L"BR2D0BD2D4");
-	Glyph.AddString(0, L"BR2D0BD2D5GLH");
-	Glyph.AddString(0, L"D4ND2REREBD4HLH");
-	Glyph.AddString(0, L"BR2D6");
-	Glyph.AddString(0, L"BD2DND3EFNDEFD3");
-	Glyph.AddString(0, L"BD2DND3ER2FD3");
-	Glyph.AddString(0, L"BD3D2FR2EU2HL2G");
-	Glyph.AddString(0, L"BD2DND5ER2FD2GL2H");
-	Glyph.AddString(0, L"BR4BD8U5HL2GD2FR2E");
-	Glyph.AddString(0, L"BD2DND3ER2F");
-	Glyph.AddString(0, L"BD6R3EHL2HER3");
-	Glyph.AddString(0, L"BR2D2NL2NR2D4");
-	Glyph.AddString(0, L"BD2D3FRE2NU2D2");
-	Glyph.AddString(0, L"BD2DFDFEUEU");
-	Glyph.AddString(0, L"BD2D3FENUFEU3");
-	Glyph.AddString(0, L"BD2F2NG2NE2F2");
-	Glyph.AddString(0, L"BD2D3FR2ENU3D2GL3");
-	Glyph.AddString(0, L"BD2R4G4R4");
-	Glyph.AddString(0, L"BR3GDGFDF");
-	Glyph.AddString(0, L"BR2FGHE");  //Glyph.AddString(0, L"BR2D2BD2D2");
-	Glyph.AddString(0, L"BRFDFGDG");
-	Glyph.AddString(0, L"BFEFE");
-	Glyph.AddString(0, L"BD6R4");
-	Glyph.AddString(0, L"BR4BDHL2GD3FR2ED3L3");
-	Glyph.AddString(0, L"BD2D3FRE2NU2D2BH3BU3R0BR2R0");
-	Glyph.AddString(0, L"BD4R4UHL2GD2FR3BU6BL2E");
-	Glyph.AddString(0, L"BF4G2LHU2ER2FD3BU6BLHG");
-	Glyph.AddString(0, L"BF4G2LHU2ER2FD3BH3BU3R0BR2R0");
-	Glyph.AddString(0, L"BF4G2LHU2ER2FD3BU6BL2H");
-	Glyph.AddString(0, L"BF4G2LHU2ER2FD3BU6BLGHEF");
-	Glyph.AddString(0, L"BR4BD2L3GDFR2ED3L2");
-	Glyph.AddString(0, L"BD4R4UHL2GD2FR3BU6BLHG");
-	Glyph.AddString(0, L"BD4R4UHL2GD2FR3BU6BLL0BL2L0");
-	Glyph.AddString(0, L"BD4R4UHL2GD2FR3BU6BL2H");
-	Glyph.AddString(0, L"BRR0BR2R0BGBDD4");
-	Glyph.AddString(0, L"BREFBGBDD4");
-	Glyph.AddString(0, L"BEF2BGBDD4");
-	Glyph.AddString(0, L"BD6U3E2F2DNL4D2BU7BLL0BL2L0");
-	Glyph.AddString(0, L"BD6U3E2F2DNL4D2BU6BLGHEF");
-	Glyph.AddString(0, L"BFE2BFBD2L4D2NR4D2R4");
-	Glyph.AddString(0, L"BD2RD4LU2R4U2LD4R");
-	Glyph.AddString(0, L"BD6U4E2R2BD6LU3NRNL3U3");
-	Glyph.AddString(0, L"BREFBD2FD2GL2HU2ER2");
-	Glyph.AddString(0, L"BD3D2FR2EU2HL2GBU3BRR0BR2R0");
-	Glyph.AddString(0, L"BD3D2FR2EU2HL2NGBU3F");
-	Glyph.AddString(0, L"BD2D3FRE2ND2U2BU2BLHG");
-	Glyph.AddString(0, L"BD2D3FRE2ND2U2BU2BL2H");
-	Glyph.AddString(0, L"BD2D3FR2ENU3D2GL3BU8BRR0BR2R0");
-	Glyph.AddString(0, L"BD2D3FR2EU3HL2GBU3BRR0BR2R0");
-	Glyph.AddString(0, L"BDD4FR2EU4BUBHL0BL2L0");
-	Glyph.AddString(0, L"BD3D2FR2EU2HL2GBD3E4");
-	Glyph.AddString(0, L"BR4BDHLGD2NLNR2D2GR4");
-	Glyph.AddString(0, L"BDD4FR2EU4HL2GBD5EUE2UE");
-	Glyph.AddString(0, L"BD3BRF2BU2G2");
-	Glyph.AddString(0, L"BR3BFHGD2NLNRD2GH");
-	Glyph.AddString(0, L"BF4G2LHU2ER2FD3BU6BL2E");
-	Glyph.AddString(0, L"BEBR2G2BFD4");
-	Glyph.AddString(0, L"BD3D2FR2EU2HL2NGBUBEE");
-	Glyph.AddString(0, L"BD2D3FRE2ND2U2BH2E");
-	Glyph.AddString(0, L"BD2DND3ER2FD3BU7GHG");
-	Glyph.AddString(0, L"BDND5F4NDU4BU2GHG");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"BR2D0BD2DLGDFR2E");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"BR2BUD0BD2D5");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"BD6U3E2F2DNL4ND2BU4BL3E");
-	Glyph.AddString(0, L"BD6U3ER2FDNL4ND2BU4BLHG");
-	Glyph.AddString(0, L"BD6U3E2F2DNL4ND2BU4BLH");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"BF3BRHLNU2LGD2FRND2RE");
-	Glyph.AddString(0, L"F2NE2DNLNRD2NLNRD");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"BF4G2LHU2ER2FD3BU7GHG");
-	Glyph.AddString(0, L"BD6U3ER2FDNL4ND2BU5GHG");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"BDFR2NEFD2GNFL2NGHU2E");
-	Glyph.AddString(0, L"F4DGL2HUER2");
-	Glyph.AddString(0, L"R3FD4GL2NlU3NLNRU3");
-	Glyph.AddString(0, L"BREFBFBDL4D2NR4D2R4");
-	Glyph.AddString(0, L"BRR0BR2R0BFBDL4D2NR4D2R4");
-	Glyph.AddString(0, L"BEF2BFL4D2NR4D2R4");
-	Glyph.AddString(0, L"BD2BRRD4NLR");
-	Glyph.AddString(0, L"BR2EBD2LNLD5NLR");
-	Glyph.AddString(0, L"BREFBDLNLD5NLR");
-	Glyph.AddString(0, L"BER0BR2R0BD2LNLD5NLR");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"BR2D2BD2D2");
-	Glyph.AddString(0, L"BEFBDNLNRD5NLR");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"BD2D3FR2EU3HL2GBE2E");
-	Glyph.AddString(0, L"BD7U6ERFDGNL2F2DG");
-	Glyph.AddString(0, L"BD2D3FR2EU3HL2GBEBUEF");
-	Glyph.AddString(0, L"BD2D3FR2EU3HL2GBE2H");
-	Glyph.AddString(0, L"BD3D2FR2EU2HL2GBU2BREFE");
-	Glyph.AddString(0, L"BD2D3FR2EU3HL2GBU2BREFE");
-	Glyph.AddString(0, L"BFBDD3NFD2GBE2REU3");
-	Glyph.AddString(0, L"BRNRD7NLNRBU2R2EUHL2");
-	Glyph.AddString(0, L"BURNRD8NLNRBU2R2EU2HL2");
-	Glyph.AddString(0, L"BDD4FR2EU4BHBLE");
-	Glyph.AddString(0, L"BD2D3FR2EU3BUBHHG");
-	Glyph.AddString(0, L"BDD4FR2EU4BHBLH");
-	Glyph.AddString(0, L"BD2D3FR2ENU3D2GL3BU8BR2E");
-	Glyph.AddString(0, L"D2FRND3REU2BL2E");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"BF4BD2U6L2ND6LGDFR");
-	Glyph.AddString(0, L"BR4HLGF3G2H2E2BD4FGLH");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"BR2FGHE");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-	Glyph.AddString(0, L"");
-}
-
-#endif
 #define PrintL() is.szFileScreen? PrintSzW(L"\n"):PrintSzW(L"\n")
 
 extern void CoorXform(double* azi, double* alt, double tilt);
@@ -3529,11 +2631,6 @@ enum _eclipses {
 	etMax       = 6,
   };
 
-#define rSqr2      1.41421356237309504880
-#define rSqr3      1.73205080756887729353
-#define rPhi       1.61803398874989484820
-#define rLog10     2.30258509299404568402
-#define rLog101    4.61512051684125945088
 #define rPi        3.14159265358979323846
 #define rPi2       (rPi*2.0)
 #define rPiHalf    (rPi/2.0)
@@ -3542,16 +2639,12 @@ enum _eclipses {
 #define rDegQuad   90.0
 #define rDegRad    (rDegHalf/rPi)
 #define rEpoch2000 (-24.736467)
-#define rMiToKm    1.609344
-#define rFtToM     0.3048
-#define rInToCm    2.54
 #define rAUToKm    149597870.7
 #define rLYToAU    63241.07708427
 #define rPCToAU    206264.8062471
 #define rDayInYear 365.24219
 #define rEarthDist 149.59787
 #define rJD2000    2451545.0
-#define rAxis      23.44578889
 #define rSmall     (1.7453E-09)
 #define rLarge     10000.0
 #define rInvalid   (1.23456789E-09)
@@ -3569,8 +2662,6 @@ enum _eclipses {
   ((unsigned long)(0xff000000 | ((unsigned long)(r) << 16) | ((unsigned long)(g) << 8) | (unsigned long)(b)))
 
 int cSign = 12;
-char* szWheelX[4 + 1] = { NULL, NULL, NULL, NULL, NULL };
-const CP* rgpcp[5] = { &cp0, &cp1, &cp2, &cp3, &cp4 };
 //tSignName 原来位配置文件取 默认从 1 开始  改为数组后 下标从 0 开始，代码保持一致，定义数组时默认  0 位置不使用为空
 const char* tObjName[] = {"Earth", "Sun", "Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn", "Uranus", "Neptune", "Pluto", "Chiron", "Ceres", "Pallas Athena", "Juno", "Vesta", "North Node", "South Node", "Lilith", "Part Fortune", "Vertex", "East Point", "Ascendant", "2nd Cusp", "3rd Cusp", "IC ", "5th Cusp", "6th Cusp", "Descendant", "8th Cusp", "9th Cusp", "Midheaven", "11th Cusp", "12th Cusp", "Cupido", "Hades", "Zeus", "Kronos", "Apollon", "Admetos", "Vulkanus", "Poseidon", "Proserpina", "Achernar", "Polaris", "Zeta Retic.", "Alcyone", "Aldebaran", "Capella", "Rigel", "Bellatrix", "Elnath", "Alnilam", "Betelgeuse", "Menkalinan", "Mirzam", "Canopus", "Alhena", "Sirius", "Adhara", "Wezen", "Castor", "Procyon", "Pollux", "Suhail", "Avior", "Miaplacidus", "Alphard", "Regulus", "Dubhe", "Acrux", "Gacrux", "Mimosa", "Alioth", "Spica", "Alkaid", "Agena", "Arcturus", "Toliman", "Antares", "Shaula", "Sargas", "Kaus Austr.", "Vega", "Altair", "Peacock", "Deneb", "Alnair", "Fomalhaut", "Andromeda", "Alpheratz", "Algenib", "Schedar", "Mirach", "Alrischa", "Almac", "Algol", "Mintaka", "Wasat", "Acubens", "Merak", "Vindemiatrix", "Mizar", "Kochab", "Zuben Elgen.", "Zuben Escha.", "Alphecca", "Unuk Alhai", "Ras Alhague", "Albireo", "Alderamin", "Nashira", "Skat", "Scheat", "Markab", "Gal.Center", "Apex", "Sadalmelik" };
 const char* tObjShortName[]= {"Earth","Sun","Moon","Mercury","Venus","Mars","Jupiter","Saturn","Uranus","Neptune","Pluto","Chiron","Ceres","Pallas","Juno","Vesta","NoNode","SoNode","Lilith","Fortune","Vertex","EaPoint","Ascendant","2nd Cusp","3rd Cusp","IC ","5th Cusp","6th Cusp","Descendant","8th Cusp","9th Cusp","Midheaven","11th Cusp","12th Cusp","Cupido","Hades","Zeus","Kronos","Apollon","Admetos","Vulkanus","Poseidon","Proserpina","Achernar","Polaris","Zeta Retic.","Alcyone","Aldebaran","Capella","Rigel","Bellatrix","Elnath","Alnilam","Betelgeuse","Menkalinan","Mirzam","Canopus","Alhena","Sirius","Adhara","Wezen","Castor","Procyon","Pollux","Suhail","Avior","Miaplacidus","Alphard","Regulus","Dubhe","Acrux","Gacrux","Mimosa","Alioth","Spica","Alkaid","Agena","Arcturus","Toliman","Antares","Shaula","Sargas","Kaus Austr.","Vega","Altair","Peacock","Deneb","Alnair","Fomalhaut","Andromeda","Alpheratz","Algenib","Schedar","Mirach","Alrischa","Almac","Algol","Mintaka","Wasat","Acubens","Merak","Vindemiatrix","Mizar","Kochab","Zuben Elgen.","Zuben Escha.","Alphecca","Unuk Alhai","Ras Alhague","Albireo","Alderamin","Nashira","Skat","Scheat","Markab","4","7","10"};
@@ -3614,14 +2705,6 @@ const char* szHouseSystem[NUMBER_OF_HOUSE_SYSTEMS] = {
 	"Equal(MC)", "Neo-Porphyry", "Whole", "Vedic", "Null", "Shripati"
 };
 
-const char* szAspectName[cAspect + 1] = { "",
-	"Conjunct", "Opposite", "Square", "Trine", "Sextile",
-	"Inconjunct", "Semisextile", "Semisquare", "Sesquiquadrate",
-	"Quintile", "Biquintile",
-	"Semiquintile", "Septile", "Novile",
-	"Binovile", "Biseptile", "Triseptile", "Quatronovile"
-};
-
 wchar_t szAspectAbbrev[cAspect + 1][10] = { L"",
 	L"Con", L"Opp", L"Squ", L"Tri", L"Sex",
 	L"Inc", L"SSx", L"SSq", L"Ses", L"Qui", L"BQn",
@@ -3636,9 +2719,6 @@ wchar_t szAspectAbbrevC[cAspect + 1][10] = { L"",
 	L"十分", L"七分", L"九分",
 	L"九二", L"七二", L"三分", L"九四"
 };
-
-const char* szAspectAbbrevCon = "Con";
-const char* szAspectAbbrevOpp = "Opp";
 
 const char* szZon[cZone] = {
 	"HST", "HT", "H",
@@ -3700,28 +2780,6 @@ const char* szZonC[cZone] = {
 	"俄罗斯第一时区",
 	"新西兰时间", "ZT", "Z", "IDL",
 	"当地平均时", "LT", "L"
-};
-
-const char* ayanamsha_short_name[LAST_SIDEREAL_MODE + 1] =
-{
-	"Fagan/Bradley",
-	"Lahiri",
-	"De Luce",
-	"Raman",
-	"Ushashashi",
-	"Krishnamurti",
-	"Djwhal Khul",
-	"Yukteshwar",
-	"J. N. Bhasin",
-	"Babyl. (Kugler 1)",
-	"Babyl. (Kugler 2)",
-	"Babyl. (Kugler 3)",
-	"Babyl. (Huber)",
-	"Babyl. (Eta Piscium)",
-	"Babyl. (Ald. 15 Tau)",
-	"Hipparchos",
-	"Sassanian",
-	"Galac. Center 0 Sag",
 };
 
 // text that will be displayed in the About dialogue box
@@ -3910,144 +2968,16 @@ AI ai[cPart] = {
 };
 #endif /* ARABIC */
 
-
-
-
-typedef struct 
-{
-	char	t1[20];
-	char	t2[20];
-	char	t3[20];
-	double   zone;
-}timezoneArr ;
-
-timezoneArr ta[86]={
-{"AHST","AHT","",+10.00},
-{"AHDT","AHT/S","",+09.00},
-{"AHWT","AHT/S","",+09.00},
-{"AST","AST","",+04.00},
-{"ADT","ASTS/S","",+03.00},
-//{"AWT","AST/D","",+03.00},
-//{"ACST","ACST","",-9.50},
-{"ACDT","ACST/S","",-10.50},
-//{"AEST","AEST","",-10.00},
-{"AEDT","AEST/S","",-11.00},
-//{"ASST","ASST","",-10.50},
-//{"ASDT","ASST/S","",-11.50},
-{"AWST","AWST","",-08.00},
-{"AWDT","AWST/S","",-09.00},
-{"AZT","AZT","",+02.00},
-{"AZDT","AZT/S","",+01.00},
-{"AZWT","AZT/S","",+01.00},
-{"BGT","BGT","",-03.00},
-{"BGDT","BGT/S","",-04.00},
-{"BZT","BZT","",+03.00},
-{"BZDT","BZT/S","",+02.00},
-//{"CST","CST","",+06.00},
-//{"CDT","CST/S","",+05.00},
-{"CWT","CST/S","",+05.00},
-{"EET","EET'","",-02.00},
-{"EEDT","EET/S","",-03.00},
-{"EEWT","EET/S","",-03.00},
-{"EST","EST","",+05.00},
-{"EDT","EST/S","",+04.00},
-{"EWT","EST/S","",+04.00},
-{"GMT/UT","WET/UT","",+00.00},
-{"GDT","WET/S","",-01.00},
-{"GDT","WET/S","",-01.00},
-{"GDWT","WET/DS","",-02.00},
-//{"HST","HST","",+10.50},
-{"HDT","HST/S","",+09.50},
-{"HWT","HST/S","",+09.50},
-//{"IST","IST","",-5.50},
-//{"IDT","IST/S","",-6.50},
-{"IWT","IST/S","",-6.50},
-{"IDLE","IDLE'","",-12.00},
-{"IDLW","IDLW","",+12.00},
-{"IRT","IRT","",-3.50},
-{"IRDT","IRT/S","",-4.50},
-{"JST","JST","",-09.00},
-{"JDT","JST/S","",-10.00},
-{"JWT","JST/S","",-10.00},
-{"JVT","JVT","",-7.50},
-{"JVDT","JVT/S","",-8.50},
-//{"KET","KET","",-03.00},
-//{"MET","MET","",-01.00},
-{"MEDT","MET/S","",-02.00},
-{"MEWT","MET/S","",-02.00},
-{"MDST","MET/DS","",-03.00},
-{"MST","MST","",+07.00},
-//{"MDT","MST/S","",+06.00},
-{"MWT","MST/S","",+06.00},
-{"NZT","NZT","",-12.00},
-{"NZDT","NZT/S","",-13.00},
-{"NFT","NFT","",+03.50},
-{"NFDT","NFT/S","",+02.50},
-{"NFWT","NFT/S","",+02.50},
-{"NAT","NAT","",+11.00},
-//{"NST","NST","",-6.50},
-{"NSDT","NST/S","",-7.50},
-{"ONZT","OZT","",-11.50},
-{"ONZD","OZT/S","",-12.50},
-//{"PST","PST","",+08.00},
-{"PDT","PST/S","",+07.00},
-{"PWT","PST/S","",+07.00},
-{"R3T","R3T","",-04.00},
-{"R3DT","R3T/S","",-05.00},
-{"R3WT","R3T/S","",-05.00},
-{"R4T","R4T","",-05.00},
-{"R4DT","R4T/S","",-06.00},
-{"R4WT","R4T/S","",-06.00},
-{"R5T","R5T","",-06.00},
-{"R5DT","R5T/S","",-07.00},
-{"R5WT","R5T/S","",-07.00},
-{"R11S","Z11","",-11.00},
-{"R11D","Z11/S","",-12.00},
-{"R11W","Z11/S","",-12.00},
-{"SST","SST","",-07.00},
-{"SSDT","SST/S","",-08.00},
-//{"WAT","WAT","",+01.00},
-//{"WADT","WAT/S","",+01.00},
-{"YST","YST","",+09.00},
-{"YDT","YST/S","",+08.00},
-{"YWT","YST/S","",+08.00},
-//{"CST","MET","MET",-01.00},
-//{"CDT","MEDT","MET/S",-02.00},
-{"CWT","MEWT","MET/S",-02.00},
-{"CCT","AWST","CCT",-08.00},
-{"CCDT","AWDT","CCT/S",-09.00},
-{"GMST","AEST","",-10.00},
-{"RZ1","EET","EET",-02.00},
-{"RZ2","BGT","BGT",-03.00},
-{"RZ6","SST","SST",-07.00},
-//{"SAT","ACST","ACST",-9.50},
-{"SDT","ACDT","ACDT",-10.50},
-{"WET","GMT","WET",00.00},
-{"WEDT","GDT","WET/S",-01.00},
-{"WEWT","GWT","WET/S",-01.00},
-{"WDST","GDWT","WET/DS",-02.00},
-{"NZST","","",-12.00}
-};
-
 //#include "shlobj.h"		// for SHBrowseForFolder
 BOOL FCreateGridA(BOOL fFlip);
 void ComputeInfluence();
 double GetOrbA(int obj1, int obj2, int asp);
 void PrintInDayEvent(int source, int aspect, int dest, int nVoid);
 
-int rgobjList[118];
 #define RObjInf(i) rObjInf[Min(i, cLastMoving)]
 #define RObjInfA(i) rObjInfA[Min(i, cLastMoving)]
 #define FCmSwissAny() (us.fEphemFiles && !us.fPlacalcPla)
 double power1[118], power2[118];
-
-enum _displayformat {
-  dfZod = 0,  // Zodiac Position
-  dfHM  = 1,  // Hours & Minutes
-  df360 = 2,  // 360 Degrees
-  dfNak = 3,  // 27 Nakshatras
-};
-
 
 class Options
 {
@@ -4656,14 +3586,6 @@ public:
 
 Options options;
 
-//==================================================================================================
-
-/*
-******************************************************************************
-** Other Calculations.
-******************************************************************************
-*/
-
 void initElemTable(ET* pet)
 {
 	pet->coSum = 0;					/* Total objects considered.          */
@@ -4965,20 +3887,6 @@ int FSphereMeridian(double azi, double alt, const CIRC *pcr, int *xp, int *yp)
   return FSphereLocal(azi, alt, pcr, xp, yp);
 }
 
-int FSphereZodiac(double lon, double lat, const CIRC *pcr, int *xp, int *yp)
-{
-  double lonT, latT;
-
-  lonT = Tropical(lon); latT = lat;
-  EclToEqu2(&lonT, &latT);
-  lonT = Mod(is.lonMC - lonT + rDegQuad);
-  EquToLocal2(&lonT, &latT, rDegQuad - is.latMC);
-  return FSphereLocal(lonT + rDegQuad, -latT, pcr, xp, yp);
-}
-
-
-//==================================================================================================
-
 
 double rOne = 0.999999999;
 double rFractal = 0.0;
@@ -5232,8 +4140,6 @@ void JulianToMdy(double JD, int *mon, int *day, int *yea)
 	double tim;
 	swe_revjul(JD, JD >= 2299171.0 /* October 15, 1582 */, yea, mon, day, &tim);
 }
-
-
 /* Return the day of the week (Sunday is 0) of the specified given date. */
 int DayOfWeek(int month, int day, int year)
 {
@@ -5241,14 +4147,6 @@ int DayOfWeek(int month, int day, int year)
 
 	d = (int)((MdyToJulian(month, day, year) + 1) % 7);
 	return d < 0 ? d + 7 : d;
-}
-
-wchar_t* chSig3CW(int A)
-{
-	static wchar_t ret[2];
-	ret[0] = tSignName[A][0];
-	ret[1] = tSignName[A][1];
-	return ret;
 }
 
 wchar_t szZod[12];
@@ -5543,7 +4441,7 @@ char *SzTim(double tim)
 {
 	/* Corrected by Michael Rideout on February 15, 2004: */
 	int d, m, s;
-	int hr, min, sec;
+	int hr = 0, min = 0, sec = 0;
 	double rMin;
 
 	hr = NFloor(tim);
@@ -5553,7 +4451,7 @@ char *SzTim(double tim)
 	if (rFractal > rOne)
 		rFractal = rSmall;
 	sec = (int)(60.0 * rFractal + 0.5);
-
+	
 	decToDeg(DegMin2DecDeg(tim) + 0.50 / 3600.0, &d, &m, &s);
 	return SzTime(d, m, s);
 }
@@ -5562,7 +4460,7 @@ wchar_t *SzTimW(double tim)
 {
 	/* Corrected by Michael Rideout on February 15, 2004: */
 	int d, m, s;
-	int hr, min, sec;
+	int hr = 0, min = 0, sec = 0;
 	double rMin;
 
 	hr = NFloor(tim);
@@ -5582,7 +4480,7 @@ wchar_t *SzTimW(double tim)
 wchar_t *SzTim2(double tim)
 {
 	/* Corrected by Michael Rideout on February 15, 2004: */
-	int hr, min, sec;
+	int hr = 0, min = 0, sec = 0;
 	int d, m, s;
 	double rMin;
 
@@ -6020,67 +4918,6 @@ void SetHereAndNow(CI* ci)
 	SetToNow(ci);
 }
 
-void SetCI(CI* ci, int mon, int day, int yea, double tim, double dst, double zon, double lon,
-	double lat, wchar_t* loc)
-{
-	ci->mon = mon;
-	ci->day = day;
-	ci->yea = yea;
-	ci->tim = tim;
-	ci->dst = dst;
-	ci->zon = zon;
-	ci->lon = lon;
-	ci->lat = lat;
-	wcscpy(ci->loc, loc);
-}
-
-
-#if 0
-/* Given a string representing the complete pathname to a file, strip off    */
-/* all the path information leaving just the filename itself. This is called */
-/* by the main program to determine the name of the Astrolog executable.     */
-char *ProcessProgname(char* szPath)
-{
-	char *b, *c, *e;
-
-	b = c = szPath;
-	while (*c)
-	{
-		*c = ChUncap(*c);		/* Because DOS filenames are case insensitive. */
-		c++;
-	}
-	e = c;
-	while (c > b && *c != '.')
-		c--;
-	if (c > b)
-		*c = 0;
-	else
-		c = e;
-	while (c > b && *c != chDirSep)
-		c--;
-	if (c > b)
-		szPath = c + 1;
-	return szPath;
-}
-
-/* This is Astrolog's memory allocation routine, returning a pointer given  */
-/* a size, and if the allocation fails prints a warning, including the user */
-/* passed as parameter.														*/
-void *allocate(long length, char *user)
-{
-	void *p;
-
-	p = malloc(length);
-
-	if (p == NULL && user)
-	{
-		PrintWarning("Can't allocate memory for %ls (%d bytes)", user, length);
-	}
-
-	return p;
-}
-#endif
-
 /* Given a zodiac degree, transform it into its Decan sign, where each	  */
 /* sign is trisected into the three signs of its element. For example,	  */
 /* 1 Aries -> 3 Aries, 10 Leo -> 0 Sagittarius, 25 Sagittarius -> 15 Leo. */
@@ -6146,325 +4983,6 @@ wchar_t Dignify(int obj, int sign)
 }
 
 #define PrintAltitude(deg) PrintSzW(SzAltitude(deg))
-
-
-
-#if 0
-/* Another important procedure: Display any of the types of (text) charts    */
-/* that the user specified they wanted, by calling the appropriate routines. */
-void PrintChart(BOOL fProg)
-{
-	int fCall = FALSE;
-
-	X_MEMSET(bigstr, 0, 302400 * 2);
-	if (options.hasToolbar && !us.fPrimDirs)
-	{
-		PrintL();
-	}
-
-	if (us.fListing)
-	{
-		if (is.fMult)
-			PrintL2();
-		if (us.nRel < rcDifference)
-		{
-			ChartListing();
-		}
-		else if (us.nRel == rcDifference)
-		{
-			DisplayTimeDifference();
-		}
-		else
-		{
-			DisplayBiorhythm();
-		}
-		is.fMult = TRUE;
-	}
-	if (us.fWheel)
-	{
-		if (is.fMult)
-			PrintL2();
-		ChartWheel();
-		is.fMult = TRUE;
-	}
-	if (us.fGrid)
-	{
-		if (is.fMult)
-			PrintL2();
-		if (us.nRel > rcDual)
-		{
-			fCall = us.fSmartAspects;
-			us.fSmartAspects = FALSE;
-			if (!FCreateGrid(FALSE))
-				return;
-			us.fSmartAspects = fCall;
-			not(fCall);
-			ChartGrid();
-			if (us.fGridConfig)
-			{					/* If -g0 switch in effect, then  */
-				PrintL();		/* display aspect configurations. */
-				if (!fCall)
-					FCreateGrid(FALSE);
-				DisplayGrands();
-			}
-		}
-		else
-		{
-
-			/* Do a relationship aspect grid between two charts if -r0 in effect. */
-			fCall = us.fSmartAspects;
-			us.fSmartAspects = FALSE;
-			if (!FCreateGridRelation(us.fGridConfig))
-				return;
-			us.fSmartAspects = fCall;
-			ChartGridRelation();
-		}
-		is.fMult = TRUE;
-	}
-	if (us.fAspList)
-	{
-		if (is.fMult)
-			PrintL2();
-		if (us.nRel > rcDual)
-		{
-			/*
-			  rcNone       = 0,
-			  rcSynastry   = 1,
-			  rcComposite  = 2,
-			  rcMidpoint   = 3,
-			  rcDifference = 4,
-			  rcBiorhythm  = 5,
-			  rcDual       = -1
-			*/
-			if (!fCall)
-			{
-				fCall = TRUE;
-#ifdef TESTNEW
-				if (!FCreateGridA(FALSE))
-#else
-				if (!FCreateGrid(FALSE))
-#endif
-					return;
-			}
-#ifdef TESTNEW
-			ChartAspectA();
-#else
-			ChartAspect();
-#endif
-		}
-		else
-		{
-			/*
-  rcNone       = 0,
-  rcSynastry   = 1,
-  rcComposite  = 2,
-  rcMidpoint   = 3,
-  rcDifference = 4,
-  rcBiorhythm  = 5,
-  rcDual       = -1,
-  rcTriWheel   = -2,
-  rcQuadWheel  = -3,
-  rcQuinWheel  = -4,
-  rcHexaWheel  = -5,
-  rcTransit    = -6,
-  rcProgress   = -7,
-		*/
-			if (!FCreateGridRelation(FALSE))
-				return;
-			ChartAspectRelation();
-		}
-		is.fMult = TRUE;
-	}
-
-	if (us.fJyotish)
-	{
-		DisplayJyotish();
-		return;
-	}
-
-	if (us.fAlmtsPoint)
-	{
-		DisplayAlmutensP();
-		return;
-	}
-	if (us.fAlmtsChart)
-	{
-		DisplayAlmutensC();
-		return;
-	}
-	if (us.fPrimDirs)
-	{
-		DisplayPrimDirs();
-		return;
-	}
-	if (us.fPrimDirs2)
-	{
-		PrintPDsInChart();
-		return;
-	}
-
-	if (us.fMidpoint)
-	{
-		if (is.fMult)
-			PrintL2();
-		if (us.nRel > rcDual)
-		{
-			if (!fCall)
-			{
-				if (!FCreateGrid(FALSE))
-					return;
-			}
-			ChartMidpoint();
-		}
-		else
-		{
-			if (!FCreateGridRelation(TRUE))
-				return;
-			ChartMidpointRelation();
-		}
-		is.fMult = TRUE;
-	}
-	if (us.fHorizon)
-	{
-		if (is.fMult)
-			PrintL2();
-		if (us.fHorizonSearch)
-		{
-			ChartInDayHorizon();
-		}
-		else
-			ChartHorizon();
-		is.fMult = TRUE;
-	}
-	if (us.fOrbit)
-	{
-		if (is.fMult)
-			PrintL2();
-		ChartOrbit();
-		is.fMult = TRUE;
-	}
-	if (us.fSector)
-	{
-		if (is.fMult)
-			PrintL2();
-		else
-			PrintHeader();		/* Print chart header if it hasn't been done yet. */
-		ChartSector();
-		is.fMult = TRUE;
-	}
-	if (us.fInfluence)
-	{
-		if (is.fMult)
-			PrintL2();
-#ifdef TESTNEW
-		ChartInfluenceA();
-#else
-		ChartInfluence();
-#endif
-		is.fMult = TRUE;
-	}
-	if (us.fAstroGraph)
-	{
-		if (is.fMult)
-			PrintL2();
-		ChartAstroGraph();
-		is.fMult = TRUE;
-	}
-	if (us.fCalendar)
-	{
-		if (is.fMult)
-			PrintL2();
-		if (us.fCalendarYear)
-			ChartCalendarYear();
-		else
-			ChartCalendarMonth();
-		is.fMult = TRUE;
-	}
-	if (us.fInDay)
-	{
-		if (is.fMult)
-			PrintL2();
-		ChartInDaySearch(fProg);
-		is.fMult = TRUE;
-	}
-	if (us.fInDayInf)
-	{
-		if (is.fMult)
-			PrintL2();
-		ChartInDayInfluence();
-		is.fMult = TRUE;
-	}
-	if (us.fEphemeris)
-	{
-		if (is.fMult)
-			PrintL2();
-		ChartEphemeris();
-		is.fMult = TRUE;
-	}
-	if (us.fTransit)
-	{
-		if (is.fMult)
-			PrintL2();
-		ChartTransitSearch(fProg);
-		is.fMult = TRUE;
-	}
-	if (us.fTransitInf)
-	{
-		if (is.fMult)
-			PrintL2();
-		ChartTransitInfluence(fProg);
-		is.fMult = TRUE;
-	}
-#ifdef ARABIC
-	if (us.nArabic)
-	{
-		if (is.fMult)
-			PrintL2();
-		DisplayArabic();
-		is.fMult = TRUE;
-	}
-#endif
-	if (us.fFirdaria)
-	{
-		ChartFirdaria();
-		is.fMult = TRUE;
-	}
-	if (us.fZodRel)
-	{
-		ChartZodRel();
-		is.fMult = TRUE;
-	}
-	if (us.fDecennials)
-	{
-		ChartDecennials();
-		is.fMult = TRUE;
-	}
-
-	if (us.fHouseLord)
-	{
-		ChartHouseLord();
-		is.fMult = TRUE;
-	}
-	if (us.fEmptyASP)
-	{
-		ChartEmptyASP();
-		is.fMult = TRUE;
-	}
-
-	if (us.fPlanetaryHours)
-	{
-		ChartPlanetaryHours();
-		is.fMult = TRUE;
-	}
-
-	if (!is.fMult)
-	{							/* Assume the -v chart if user */
-		us.fListing = TRUE;	/* didn't indicate anything.   */
-		PrintChart(fProg);
-		is.fMult = TRUE;
-	}
-}
-#endif
 
 /* Print header info showing time and date of the chart being displayed.   */
 /* This is used by ChartListing() and the -l sector chart in PrintChart(). */
@@ -6851,184 +5369,6 @@ void ChartListing()
 
 	PrintHeader();
 	wprintf(L"\n");
-
-#if 0
-	if (IsSyzygy)
-	{
-		Syzygy syzygy;
-		ignore16 = ignore1[16];
-		ignore17 = ignore1[17];
-		ignore1[16] = 0;
-		ignore1[17] = 0;
-		isSolarReturn = FALSE;
-		isLunarReturn = FALSE;
-		us.nRel = 0;
-		wi.fCast = TRUE;
-		memcpy(&ciSyzygy, &ciCore, sizeof(CI));
-		ciSyzygy.yea = syzygy.time.year;
-		ciSyzygy.mon = syzygy.time.month;
-		ciSyzygy.day = syzygy.time.day;
-		double t1 = syzygy.time.hour + syzygy.time.minute / 60.0 + syzygy.time.second / 3600.0 - ciCore.zon + ciCore.dst;
-		ciSyzygy.tim = DecDeg2DegMin(t1);
-		CI ciT = ciCore;
-		ciCore = ciSyzygy;
-		CastChart(TRUE);
-		ciCore = ciT;
-	}
-
-	if (Is12Part /*us.f12parts*/)
-	{
-		Is12Part = FALSE;
-		CastChart(TRUE);
-		for (i = 0; i <= cObj; i++)
-		{
-			cp0.longitude[i] = calcDodecatemoria(cp0.longitude[i]);
-		}
-	}
-
-	if (us.fNavamsas2)
-	{
-		for (i = 0; i <= cObj; i++)
-		{
-			cp0.longitude[i] = Navamsa(cp1.longitude[i]);
-			cp0.latitude[i] = 0.0;
-		}
-	}
-
-	if (us.fAnti) // 映点计算
-	{
-		Place place;
-		double jut = DegMin2DecDeg(ciCore.tim) + 0.5 / 3600;
-		int jhour = (int)jut;
-		int jmin = (int)fmod(jut * 60, 60);
-		int jsec = (int)fmod(jut * 3600, 60);
-		timeP.time(ciCore.yea, ciCore.mon, ciCore.day, jhour, jmin, jsec, 0, FALSE, ciCore.zon, ciCore.dst, place);
-
-		double d = swe_deltat(timeP.jd);
-		double obl[6];
-		char serr[256];
-
-		swe_calc(timeP.jd + d, SE_ECL_NUT, 0, obl, serr);
-
-		for (i = 0; i <= cObj; i++)
-		{
-			if (ignore1[i])
-				continue;
-
-			double ant, cant;
-			calc(cp1.longitude[i], &ant, &cant);
-			cp0.longitude[i] = ant;
-			cp0.latitude[i] = 0.0;
-		}
-	}
-
-	if (us.fAnti2) // 反映点计算
-	{
-		Place place;
-		double jut = DegMin2DecDeg(ciCore.tim) + 0.5 / 3600;
-		int jhour = (int)jut;
-		int jmin = (int)fmod(jut * 60, 60);
-		int jsec = (int)fmod(jut * 3600, 60);
-		timeP.time(ciCore.yea, ciCore.mon, ciCore.day, jhour, jmin, jsec, 0, FALSE, ciCore.zon, ciCore.dst, place);
-		double d = swe_deltat(timeP.jd);
-		double obl[6];
-		char serr[256];
-
-		swe_calc(timeP.jd + d, SE_ECL_NUT, 0, obl, serr);
-
-		for (i = 0; i <= cObj; i++)
-		{
-			if (ignore1[i])
-				continue;
-
-			double ant, cant;
-			calc(cp1.longitude[i], &ant, &cant);
-			cp0.longitude[i] = cant;
-			cp0.latitude[i] = 0.0;
-		}
-	}
-
-	memcpy(&ignoreT, &ignore1, NUMBER_OBJECTS);
-	if (us.nRel == rcProgTran)
-	{
-		memcpy(&ignore1, &ignore3, NUMBER_OBJECTS);
-		ignore1[18] = 1;
-		ignore1[20] = 1;
-		ignore1[22] = 0;
-		ignore1[23] = 1;
-		ignore1[24] = 1;
-		ignore1[25] = 1;
-		ignore1[26] = 1;
-		ignore1[27] = 1;
-		ignore1[28] = 1;
-		ignore1[29] = 1;
-		ignore1[30] = 1;
-		ignore1[31] = 0;
-		ignore1[32] = 1;
-		ignore1[33] = 1;
-	}
-	CreateElemTable(&et);
-	PrintHeader();				/* Show time and date of the chart being displayed. */
-
-#ifdef INTERPRET
-	if (us.fInterpret)
-	{							/* Print an interpretation if -I in effect. */
-		if (us.nRel == rcSynastry)
-		{
-			InterpretSynastry();	/* Print synastry interpretaion for -r -I.  */
-		}
-		else
-		{
-#ifdef INTERPRETALT
-			//if (InterpretAlt && (!us.nRel || us.nRel == rcTransit))
-			//{
-			//	if (is.fMult)
-			//		PrintL2();
-//
-//				if (us.nRel == rcTransit)
-//					TransitInterpret();
-//				else
-//					NatalInterpret();
-//
-//				is.fMult = TRUE;
-//			}
-//			else
-//			{
-			if (InterpretAlt && (!us.nRel || us.nRel == rcTransit || isSolarReturn || isLunarReturn || rcProgress || us.nRel == rcProgTran))
-			{
-				if (is.fMult)
-					PrintL2();
-
-				if (us.nRel == rcProgress || us.nRel == rcProgTran)
-				{
-					IsPDsData = TRUE;
-					ProgressInterpret();
-					IsPDsData = FALSE;
-				}
-				else if (us.nRel == rcTransit || isSolarReturn || isLunarReturn)
-				{
-					TransitInterpret();
-				}
-				else
-				{
-					NatalInterpret();
-				}
-
-				is.fMult = TRUE;
-			}
-			else
-			{
-
-#endif
-				InterpretLocation();	/* Do normal interpretation for just -v -I. */
-#ifdef INTERPRETALT
-			}
-#endif
-		}
-		return;
-	}
-#endif
-#endif
 	
 	if (us.fSeconds)
 	{
@@ -7517,42 +5857,6 @@ double RecToSph(double B, double L, double O) {
 	G = A;
 	return G;					/* We only ever care about and return one of the coordinates. */
 }
-
-
-
-/* This is another subprocedure of CastChart(). Calculate a few variables */
-/* corresponding to the chart parameters that are used later on. The      */
-/* astrological vertex (object number nineteen) is also calculated here.  */
-void ComputeVariables(double* vtx)
-{
-	double R, R2, B, L, O, G, X, Y, A;
-
-	is.RAa = Deg2Rad(Mod((6.6460656 + 2400.0513 * is.T + 2.58E-5 * is.T * is.T + ciCore.tim) * 15.0 - ciCore.lon));
-	R2 = is.RAa;
-	O = -is.rObliquity;
-	B = ciCore.lat;
-	A = R2;
-	R = 1.0;
-	PolToRec(A, R, &X, &Y);
-	X *= cos(O);
-	RecToPol(X, Y, &A, &R);
-	is.MC = Mod(is.rSid + Rad2Deg(A));	/* Midheaven */
-
-	L = R2 + rPi;
-	B = rPiHalf - fabs(B);
-	if (ciCore.lat < 0.0)
-		B = -B;
-	G = RecToSph(B, L, O) + rPiHalf;
-
-	// keep the vertex always on the western hemisphere in tropical latitudes 
-	if (fabs(ciCore.lat) <= is.rObliquity && ModRad(A - G) > rPi)
-	{
-		G += rPi;
-	}
-
-	*vtx = Mod(is.rSid + Rad2Deg(G));	/* Vertex */
-}
-
 
 /*
 ******************************************************************************
@@ -8143,57 +6447,6 @@ void ComputeWithSwissEphemeris(double t)
 
 	spacex[us.objCenter] = spacey[us.objCenter] = spacez[us.objCenter] = 0.0;
 	cp0.longitude[us.objCenter] = cp0.latitude[us.objCenter] = cp0.vel_longitude[us.objCenter] = 0.0;
-}
-
-/* Calculate the position and declination of the Moon, and the Moon's North  */
-/* Node. This has to be done separately from the other planets, because they */
-/* all orbit the Sun, while the Moon orbits the Earth.                       */
-void ComputeLunar(double* moonlo, double* moonla, double* nodelo, double* nodela)
-{
-	double LL, G, N, G1, D, L, ML, L1, MB, T1, Y, M = 3600.0, T2;
-
-	T2 = is.T * is.T;
-	LL = 973563.0 + 1732564379.0 * is.T - 4.0 * T2;	/* Compute mean lunar longitude    */
-	G = 1012395.0 + 6189.0 * is.T;					/* Sun's mean longitude of perigee */
-	N = 933060.0 - 6962911.0 * is.T + 7.5 * T2;		/* Compute mean lunar node         */
-	G1 = 1203586.0 + 14648523.0 * is.T - 37.0 * T2;	/* Mean longitude of lunar perigee */
-	D = 1262655.0 + 1602961611.0 * is.T - 5.0 * T2;	/* Mean elongation of Moo from Sun */
-	L = (LL - G1) / M;
-	L1 = ((LL - D) - G) / M;						/* Some auxiliary angles           */
-	T1 = (LL - N) / M;
-	D = D / M;
-	Y = 2.0 * D;
-
-	/* Compute Moon's perturbations. */
-
-	ML = 22639.6 * RSinD(L) - 4586.4 * RSinD(L - Y) + 2369.9 * RSinD(Y) +
-		769.0 * RSinD(2.0 * L) - 669.0 * RSinD(L1) -
-		411.6 * RSinD(2.0 * T1) - 212.0 * RSinD(2.0 * L - Y) - 206.0 * RSinD(L + L1 - Y);
-	ML +=
-		192.0 * RSinD(L + Y) - 165.0 * RSinD(L1 - Y) + 148.0 * RSinD(L - L1) -
-		125.0 * RSinD(D) - 110.0 * RSinD(L + L1) - 55.0 * RSinD(2.0 * T1 - Y) -
-		45.0 * RSinD(L + 2.0 * T1) + 40.0 * RSinD(L - 2.0 * T1);
-
-	*moonlo = G = Mod((LL + ML) / M + is.rSid);	/* Lunar longitude */
-
-	/* Compute lunar latitude. */
-
-	MB = 18461.5 * RSinD(T1) + 1010.0 * RSinD(L + T1) - 999.0 * RSinD(T1 - L) -
-		624.0 * RSinD(T1 - Y) + 199.0 * RSinD(T1 + Y - L) - 167.0 * RSinD(L + T1 - Y);
-	MB +=
-		117.0 * RSinD(T1 + Y) + 62.0 * RSinD(2.0 * L + T1) -
-		33.0 * RSinD(T1 - Y - L) - 32.0 * RSinD(T1 - 2.0 * L) - 30.0 * RSinD(L1 + T1 - Y);
-	*moonla = MB = RSgn(MB) * ((fabs(MB) / M) / 360.0 - floor((fabs(MB) / M) / 360.0)) * 360.0;
-
-	/* Compute position of the North Lunar Node, either True or Mean. */
-
-	if (us.fTrueNode)
-	{
-		N = N + 5392.0 * RSinD(2.0 * T1 - Y) - 541.0 * RSinD(L1) -
-			442.0 * RSinD(Y) + 423.0 * RSinD(2.0 * T1) - 291.0 * RSinD(2.0 * L - 2.0 * T1);
-	}
-	*nodelo = Mod(N / M + is.rSid);
-	*nodela = 0.0;
 }
 
 global_directories_t dirs =
@@ -9000,146 +7253,44 @@ void x_memset_GCC_CLANG(void* dest, int nByte, size_t count)
 double CastChart(BOOL fDate)
 {
 	CI ci;
-	double housetemp[NUMBER_OF_SIGNS + 1], Off = 0.0, vtx, j, l, m, ll, kk, alt1, alt2;
-	double SunDirPos, SunDirection, ep1 = 0.0;
-	double MoonDirPos, MoonDirection;
-	int i, k, n, ii, mi, arcsav;
-	byte ignoreT[NUMBER_OBJECTS], ignoreT3_a[NUMBER_OBJECTS];
-
+	double Off = 0.0, j;
+	double  ep1 = 0.0;
+	int i;
 	is.rSid = 0.0;
 	computeRiseSet();
-
-	/* Hack: Time zone +/-24 means to have the time of day be in Local Mean */
-	/* Time (LMT). This is done by making the time zone value reflect the	*/
-	/* logical offset from GMT as indicated by the chart's longitude value. */
-
-	if (fabs(ciCore.zon) == 24.0) // 自动计算时区
-		ciCore.zon = DecDeg2DegMin(DegMin2DecDeg(ciCore.lon) / 15.0);
-
-	if (us.fProgressUS && !us.nRel && !us.fTransitInf && !us.fTransit && !us.fInDay)
-	{
-		// calculate with transit datetime
-		is.JDp = MdytszToJulian(ciMain.mon, ciMain.day, ciMain.yea, ciMain.tim, ciMain.dst, ciMain.zon); // 推运日期的儒略积日数 2460468.2916666665, 2460468.6666666665
-	}
-
-	if (us.fProgressUS && (us.fSolarArc == 2 || us.fSolarArc == 4)) // solar arc and lunar arc
-	{
-		arcsav = us.fSolarArc;
-		us.fSolarArc = 0;
-		ci = ciCore;
-		Off = ProcessInput(fDate);
-
-		ComputeVariables(&vtx);
-		if (us.fGeodetic)		/* Check for -G geodetic chart. */
-			is.RAa = Deg2Rad(Mod(-ciCore.lon));
-
-		memcpy(&ignoreT, &ignore1, NUMBER_OBJECTS);
-		memcpy(&ignoreT3_a, &ignore3, NUMBER_OBJECTS);
-
-		for (mi = 0; mi <= cObj; mi++)
-			ignore1[mi] = ignore3[mi] = TRUE;
-
-		ignore1[oSun] = FALSE;
-		ignore3[oSun] = FALSE;
-		ignore1[oMoo] = FALSE;
-		ignore3[oMoo] = FALSE;
-		ComputePlanets();
-		ComputeWithSwissEphemeris(is.T);
-		SunDirPos = cp0.longitude[oSun];
-		MoonDirPos = cp0.longitude[oMoo];
-
-		memcpy(&ignore1, &ignoreT, NUMBER_OBJECTS);
-		memcpy(&ignore3, &ignoreT3_a, NUMBER_OBJECTS);
-
-		ignore1[oSun] = FALSE;
-		ignore3[oSun] = FALSE;
-		ignore1[oMoo] = FALSE;
-		ignore3[oMoo] = FALSE;
-		ciCore = ci;
-		us.fSolarArc = arcsav;
-	}
-
 	ci = ciCore;
 	Longit = DegMin2DecDeg(ciCore.lon);
 	Latit = DegMin2DecDeg(ciCore.lat);
-
 	if (ciCore.mon == -1)
 	{
-
-		/* Hack: If month is negative, then we know chart was read in through a  */
-		/* -o0 position file, so the cp0.longitude positions are already in the arrays. */
-
 		is.MC = cp0.longitude[oMC];
 		is.Asc = cp0.longitude[oAsc];
 	}
 	else
 	{
-		X_MEMSET(cp0.longitude, 0, sizeof(double) * cObj);
-		for (i = 0; i <= cObj; i++)
-		{
-			//cp0.longitude[i] = cp0.latitude[i] = 0.0;	/* On ecliptic unless we say so.  */
-			cp0.vel_longitude[i] = 1.0;					/* Direct until we say otherwise. */
-		}
-
 		Off = ProcessInput(fDate);
-		//
 		SwissHouse(is.T, ciCore.lon, ciCore.lat * rDegRad, us.nHouseSystem, &is.Asc, &is.MC, &is.RAa, &is.Vtx, &ep1, &is.OB, &Off);
 		hRevers = 0;
-
-		if (fabs(ciCore.lat) > Deg2Rad(90.0 - is.OB))
-		{
-			if (Mod(is.Asc - is.MC) > 180.0)
-			{
-				hRevers = 1;
-			}
-		}
-
-
-		/* Go calculate planet, Moon, and North Node positions. */
-		ComputePlanets();
 		if (!ignore1[oMoo] || !ignore1[oNoNode] || !ignore1[oSoNode] || !ignore1[oFor])
 		{
-			ComputeLunar(&cp0.longitude[oMoo], &cp0.latitude[oMoo], &cp0.longitude[oNoNode], &cp0.latitude[oNoNode]);
 			cp0.vel_longitude[oNoNode] = -1.0;
 		}
-
-		/* Compute more accurate ephemeris positions for certain objects. */
 		SetEphemerisPath();
-
 		ComputeWithSwissEphemeris(is.T);
-
-		if (us.objCenter != oEar)
-		{
-			cp0.vel_longitude[oNoNode] = Deg2Rad(-0.053);
-			cp0.vel_longitude[oMoo] = Deg2Rad(12.5);
-		}
-
 		// 南交点
 		cp0.longitude[oSoNode] = Mod(cp0.longitude[oNoNode] + 180.0);
 		cp0.vel_longitude[oSoNode] = cp0.vel_longitude[oNoNode];
 
 		j = cp0.longitude[oMoo] - cp0.longitude[oSun];
 
-		if (us.nArabicNight < 0) // Invert always
-		{
-			if (isDayBirth)
-			{
-				negV(j);
-			}
-		}
-
-		// The first setting and the second setting must give the same result if the birth time is in daybirth hours.
-		if (us.nArabicNight == 0) //Invert Night
-		{
-			if (isDayBirth == 0)
-				negV(j);
-		}
-
+		//if (us.nArabicNight == 0) //Invert Night
+		//{
+		//	if (isDayBirth == 0)
+		//		neg(j);
+		//}
 		// 福点
 		j = fabs(j) < 90.0 ? j : j - RSgn(j) * 360.0;
 		cp0.longitude[oFor] = Mod(j + is.Asc);
-
-		/* Fill in "planet" positions corresponding to house cusps. */
 		cp0.longitude[oVtx] = is.Vtx;
 		cp0.longitude[oEP] = ep1; // ep1 105.81259194743023
 		for (i = 1; i <= NUMBER_OF_SIGNS; i++)
@@ -9152,204 +7303,7 @@ double CastChart(BOOL fDate)
 			cp0.longitude[oDes] = Mod(is.Asc + 180.0);
 			cp0.longitude[oNad] = Mod(is.MC + 180.0);
 		}
-		for (i = oFor; i <= cuspHi; i++)
-			cp0.vel_longitude[i] = Deg2Rad(360.0);
 	}
-
-	/* Go calculate star positions if -U switch in effect. */
-	if (us.nStar)
-		ComputeStars(us.fSidereal ? 0.0 : -Off);
-
-	/* Transform ecliptic to equatorial coordinates if -sr in effect. */
-	if (us.fEquator && !us.fPrimDirs && !us.fPrimDirs3 && !IsPDsChartWithoutTable && !UsePDsInChart)
-	{
-		for (i = 0; i <= cObj; i++)
-		{
-			if (!ignore1[i])
-			{
-				cp0.longitude[i] = Deg2Rad(Tropical(cp0.longitude[i]));
-				cp0.latitude[i] = Deg2Rad(cp0.latitude[i]);
-				EclToEqu(&cp0.longitude[i], &cp0.latitude[i]);
-				cp0.longitude[i] = Rad2Deg(cp0.longitude[i]);
-				cp0.latitude[i] = Rad2Deg(cp0.latitude[i]);
-			}
-		}
-
-		for (i = 1; i <= NUMBER_OF_SIGNS; i++)
-		{
-			l = 0.0;
-			cp0.cusp_pos[i] = Deg2Rad(Tropical(cp0.cusp_pos[i]));
-			EclToEqu(&cp0.cusp_pos[i], &l);
-			cp0.cusp_pos[i] = Rad2Deg(cp0.cusp_pos[i]);
-		}
-	}
-
-	/* Alternative star restrictions - by ecliptic and prime vertical */
-	if (us.nStar)
-	{
-		if (StarRest && !PrimeRest)
-		{
-			for (i = starLo; i <= starHi; i++)
-				ignore1[i] = 1;
-
-			if (!us.fParallel)
-			{
-				for (i = starLo; i <= starHi; i++)
-				{
-					for (k = 1; k <= uranHi; k++)
-					{
-						if (!ignore1[k])
-						{
-							for (n = 1; n <= StarAspects; n++)
-							{
-								l = MinDistance(cp0.longitude[i], cp0.longitude[k]);
-								m = l - rAspAngle[n];
-								if (fabs(m) < GetOrb(i, k, n))
-									ignore1[i] = 0;
-							}
-						}
-					}
-				}
-			}
-			else
-			{
-				for (i = starLo; i <= starHi; i++)
-				{
-					for (k = 1; k <= uranHi; k++)
-					{
-						if (!ignore1[k] && FThing(k))
-						{
-							ll = Deg2Rad(cp0.longitude[k]);
-							alt1 = Deg2Rad(cp0.latitude[k]);
-							EclToEqu(&ll, &alt1);
-							alt1 = Rad2Deg(alt1);
-							ll = Deg2Rad(cp0.longitude[i]);
-							alt2 = Deg2Rad(cp0.latitude[i]);
-							EclToEqu(&ll, &alt2);
-							alt2 = Rad2Deg(alt2);
-							kk = fabs(alt1 - alt2);
-							if (kk < GetOrb(i, k, aCon))
-								ignore1[i] = 0;
-							else if (StarAspects > 1)
-							{
-								kk = fabs(alt2) - fabs(alt1);
-								if (fabs(kk) < GetOrb(i, k, aCon))
-									ignore1[i] = 0;
-							}
-						}
-					}
-				}
-			}
-		}
-		if (PrimeRest)
-		{
-			for (i = 1; i <= cStar; i++)
-			{
-				ii = starLo + i - 1;
-				ignore1[ii] = 1;
-				if (PrimeRest != 2)
-				{
-					for (k = 1; k <= uranHi; k++)
-					{
-						if (!ignore1[k] && FThing(k))
-						{
-							l = StarPrime[i] - ObjPrime[k];
-							if (fabs(l) < PrimeOrb1)
-								ignore1[ii] = 0;
-						}
-					}
-				}
-				if (PrimeRest > 1)
-				{
-					for (k = 0; k <= 8; k++)
-					{
-						l = StarPrime[i] - k * 45.0;
-						if (fabs(l) < PrimeOrb2)
-							ignore1[ii] = 0;
-					}
-				}
-			}
-		}
-	}
-
-	/* Now, we may have to modify the base positions we calculated above  */
-	/* based on what type of chart we are generating.					  */
-
-	/* Bugfix by VA. When "degree per day/month" charts are calculatd,	  */
-	/* is.JDp - is.JD gives wrong difference in time, because is.JD is	  */
-	/* calculated for midnigth of birthday (time is set to 00:00:00 GMT), */
-	/* so the birthtime isn't used and time difference (in days) is off   */
-	/* just by birthtime which gives error in positions up to 10 arcsec.  */
-	/* When is.JD below is replaced by JulianDayFromTime(is.T) which is   */
-	/* real Julian Day for birthtime, time difference is still off, this  */
-	/* time exactly by 12 hours, because Julian Day starts from midday,   */
-	/* not from midnight (as in case of is.JDp) and in subroutine		  */
-	/* ProcessInput() time is.T is shifted appropriately. (Just compare   */
-	/* calculation of is.T in named routine with reverse caclulation	  */
-	/* JulianDayFromTime(is.T) and see this shift by 0.5 day). Therefore  */
-	/* we have substract here the same 12 ours (or 0.5 days).			  */
-
-	if (us.fProgressUS && us.fSolarArc)
-	{							/* Are we doing -p0 solar arc chart? */
-		if (us.fSolarArc == 1)
-		{
-			for (i = 0; i <= cObj; i++)
-				cp0.longitude[i] = Mod(cp0.longitude[i] + (is.JDp - JulianDayFromTime(is.T) - 0.5) / us.rProgDay);
-
-			for (i = 1; i <= NUMBER_OF_SIGNS; i++)
-				cp0.cusp_pos[i] = Mod(cp0.cusp_pos[i] + (is.JDp - JulianDayFromTime(is.T) - 0.5) / us.rProgDay);
-		}
-		if (us.fSolarArc == 2)
-		{
-			SunDirection = SunDirPos - cp0.longitude[oSun];
-
-			if (fConverseArc)
-				SunDirection *= -1;
-
-			for (i = 0; i <= cObj; i++)
-				cp0.longitude[i] = Mod(cp0.longitude[i] + SunDirection);
-			for (i = 1; i <= NUMBER_OF_SIGNS; i++)
-				cp0.cusp_pos[i] = Mod(cp0.cusp_pos[i] + SunDirection);
-
-
-			memcpy(&ignore1, &ignoreT, NUMBER_OBJECTS);
-			memcpy(&ignore3, &ignoreT3_a, NUMBER_OBJECTS);
-		}
-		if (us.fSolarArc == 4)
-		{
-			MoonDirection = MoonDirPos - cp0.longitude[oMoo];
-			if (fConverseArc)
-				MoonDirection *= -1;
-			for (i = 0; i <= cObj; i++)
-				cp0.longitude[i] = Mod(cp0.longitude[i] + MoonDirection);
-			for (i = 1; i <= NUMBER_OF_SIGNS; i++)
-				cp0.cusp_pos[i] = Mod(cp0.cusp_pos[i] + MoonDirection);
-
-			memcpy(&ignore1, &ignoreT, NUMBER_OBJECTS);
-			memcpy(&ignore3, &ignoreT3_a, NUMBER_OBJECTS);
-		}
-	}
-
-	if (us.nHarmonic != 1.0)		/* Are we doing a -x harmonic chart?	 */
-	{
-		for (i = 0; i <= cObj; i++)
-		{
-			cp0.longitude[i] = Mod(cp0.longitude[i] * us.nHarmonic);
-		}
-	}
-
-	if (us.objOnAsc)
-	{
-		if (us.objOnAsc > 0)	/* Is -1 put on Ascendant in effect?	 */
-			j = cp0.longitude[us.objOnAsc] - is.Asc;
-		else					/* Or -2 put object on Midheaven switch? */
-			j = cp0.longitude[-us.objOnAsc] - is.MC;
-		for (i = 1; i <= NUMBER_OF_SIGNS; i++)	/* If so, rotate the houses accordingly. */
-			cp0.cusp_pos[i] = Mod(cp0.cusp_pos[i] + j);
-	}
-
-	/* Check to see if we are -F forcing any objects to be particular values. */
-
 	for (i = 0; i <= cObj; i++)
 	{
 		if (force[i] != 0.0)
@@ -9358,56 +7312,8 @@ double CastChart(BOOL fDate)
 			cp0.latitude[i] = cp0.vel_longitude[i] = 0.0;
 		}
 	}
-
 	ComputeInHouses();			/* Figure out what house everything falls in. */
-
-	/* If -f domal chart switch in effect, switch cp0.longitude and house positions. */
-
-	if (us.fFlip)
-	{
-		for (i = 0; i <= cObj; i++)
-		{
-			k = cp0.house_no[i];
-			cp0.house_no[i] = Z2Sign(cp0.longitude[i]);
-			cp0.longitude[i] = Sign2Z(k) + MinDistance(cp0.cusp_pos[k], cp0.longitude[i]) /
-				MinDistance(cp0.cusp_pos[k], cp0.cusp_pos[Mod12(k + 1)]) * 30.0;
-		}
-		for (i = 1; i <= NUMBER_OF_SIGNS; i++)
-		{
-			k = HousePlaceIn(Sign2Z(i));
-			housetemp[i] = Sign2Z(k) + MinDistance(cp0.cusp_pos[k], Sign2Z(i)) /
-				MinDistance(cp0.cusp_pos[k], cp0.cusp_pos[Mod12(k + 1)]) * 30.0;
-		}
-		for (i = 1; i <= NUMBER_OF_SIGNS; i++)
-			cp0.cusp_pos[i] = housetemp[i];
-	}
-
-	/* If -3 decan chart switch in effect, edit cp0.longitude positions accordingly. */
-
-	if (us.fDecan)
-	{
-		for (i = 0; i <= cObj; i++)
-			cp0.longitude[i] = Decan(cp0.longitude[i]);
-		//ComputeInHouses();
-	}
-
-	/* If -9 navamsa chart switch in effect, edit positions accordingly. */
-
-	if (us.fNavamsa)
-	{
-		for (i = 0; i <= cObj; i++)
-			cp0.longitude[i] = Navamsa(cp0.longitude[i]);
-		//ComputeInHouses();
-	}
-
-	for (i = 0; i <= cObj; i++)
-	{
-		if (!ignore1[i])
-			cp0.dist[i] = PtLen(cp0.pt[i]);
-	}
-
 	ciCore = ci;
-
 	return is.T;
 }
 
@@ -9693,16 +7599,16 @@ void PlanetPPower() //  for ppower1[]
 			if (i != rules[j])
 			{
 				if (RulerPlanet(i))
-					ppower1[rules[j]] += rObjInf[i] / (5.0 * sqrt((double)dLevS[rules[j]]));
+					ppower1[(int)rules[j]] += rObjInf[i] / (5.0 * sqrt((double)dLevS[rules[j]]));
 				else
-					ppower1[rules[j]] += rObjInf[i] / 5.0;
+					ppower1[(int)rules[j]] += rObjInf[i] / 5.0;
 			}
 
 			/* House cusp dispositor has influence, if cp0.longitude is in this house. */
 			/* Addition depends of ruling level (see graphics influence chart). */
 			/* Influence has both natural and situative rulers of house.        */
 
-			if (i != (j = rules[cp0.house_no[i]]))
+			if (i != (j = (int)rules[cp0.house_no[i]]))
 			{
 				if (RulerPlanet(i))
 					ppower1[j] += rObjInf[i] / (10.0 * sqrt((double)dLevH[j]));
@@ -9714,9 +7620,9 @@ void PlanetPPower() //  for ppower1[]
 			if (i != rules[l])
 			{
 				if (RulerPlanet(i))
-					ppower1[rules[l]] += Hy * rObjInf[i] / (10.0 * sqrt((double)dLevHd[rules[l]]));
+					ppower1[(int)rules[l]] += Hy * rObjInf[i] / (10.0 * sqrt((double)dLevHd[rules[l]]));
 				else
-					ppower1[rules[l]] += Hy * rObjInf[i] / 10.0;
+					ppower1[(int)rules[l]] += Hy * rObjInf[i] / 10.0;
 			}
 		}
 	}
@@ -9725,7 +7631,7 @@ void PlanetPPower() //  for ppower1[]
 	{
 		/* Various planets get influence */
 		j = Z2Sign(cp0.cusp_pos[i]);	/* if house cusps fall in signs  */
-		ppower1[rules[j]] += rHouseInf[i] / 2.0;	/* they rule.                    */
+		ppower1[(int)rules[j]] += rHouseInf[i] / 2.0;	/* they rule.                    */
 	}
 
 	/* And now, when all things have calculated positional powers, give  */
@@ -9746,16 +7652,6 @@ wchar_t *addspace(const wchar_t *str, int num)
 	int len = wcslen(str) * 2;
 	for (int i = 0; i < (num - len); i++)
 		wcscat(retA, L" ");
-	return retA;
-}
-
-wchar_t *addspaceB(wchar_t *str, int num)
-{
-	wcscpy(retA, L"");
-	int len = strlen(wchar_to_char(str).c_str());
-	for (int i = 0; i < (num - len); i++)
-		wcscat(retA, L" ");
-	wcscat(retA, str);
 	return retA;
 }
 
@@ -10833,76 +8729,6 @@ BOOL FCreateGrid(BOOL fFlip)
 		return FALSE;
 
 	CP cpBak;
-/*
--		cp0	{longitude=0x00eac6b8 latitude=0x00eaca68 vel_longitude=0x00eace18 ...}	_ChartPositions
--		longitude	0x00eac6b8 struct _ChartPositions cp0	double [118]
-		[0]	0.00000000000000000	double
-		[1]	44.984566108684170	double
-		[2]	197.74470517259891	double
-		[3]	60.599180950545879	double
-		[4]	14.524953284407447	double
-		[5]	137.23055398673893	double
-		[6]	7.3477674453250126	double
-		[7]	322.46697152238005	double
-		[8]	151.15239902342844	double
-		[9]	224.27960518628393	double
-		[10]	159.59718121765471	double
-
--		cp1	{longitude=0x00c88180 latitude=0x00c88530 vel_longitude=0x00c888e0 ...}	_ChartPositions
--		longitude	0x00c88180 struct _ChartPositions cp1	double [118]
-		[0]	0.00000000000000000	double
-		[1]	103.18804943153673	double
-		[2]	258.68664522776169	double
-		[3]	116.75887302624810	double
-		[4]	74.392616945762953	double
-		[5]	192.69827145250628	double
-		[6]	66.903115516646366	double
-		[7]	18.513486369792965	double
-		[8]	208.02847509683596	double
-		[9]	283.23785858865949	double
-		[10]	218.24444792944507	double
-		[11]	168.57823022620073	double
-
--		cp2	{longitude=0x00eb1310 latitude=0x00eb16c0 vel_longitude=0x00eb1a70 ...}	_ChartPositions
--		longitude	0x00eb1310 struct _ChartPositions cp2	double [118]
-		[0]	0.00000000000000000	double
-		[1]	103.18804943153673	double
-		[2]	258.68664522776169	double
-		[3]	116.75887302624810	double
-		[4]	74.392616945762953	double
-		[5]	192.69827145250628	double
-		[6]	66.903115516646366	double
-		[7]	18.513486369792965	double
-		[8]	208.02847509683596	double
-		[9]	283.23785858865949	double
-		[10]	218.24444792944507	double
-		[11]	168.57823022620073	double
-
--		cpPDs	{longitude=0x00eae938 latitude=0x00eaece8 vel_longitude=0x00eaf098 ...}	_ChartPositions
--		longitude	0x00eae938 struct _ChartPositions cpPDs	double [118]
-		[0]	0.00000000000000000	double
-		[1]	103.18804943153673	double
-		[2]	258.68664522776169	double
-		[3]	116.75887302624810	double
-		[4]	74.392616945762953	double
-		[5]	192.69827145250628	double
-		[6]	66.903115516646366	double
-		[7]	18.513486369792965	double
-		[8]	208.02847509683596	double
-		[9]	283.23785858865949	double
-		[10]	218.24444792944507	double
-		[11]	168.57823022620073	double
-
-*/
-	//if( (UsePDsInChart && IsPDsChartWithoutTable) || UsePDsInChart )
-	//{
-	//	//cpBak = cp0;
-	//	//cp0=cpPDs;
-	//	cpBak=cp1;
-	//	cp1=cpPDs;
-	//}
-	if(UsePDsInChart && us.fGrid)
-		int a=0;
 
 	if( UsePDsInChart && IsPDsChartWithoutTable )
 	{
@@ -11160,7 +8986,7 @@ const char* sNoMajor = "No major configurations in aspect grid.\n";
 void PrintGrand(byte ac, int i1, int i2, int i3, int i4)
 {
 	wchar_t sz[cchSzDef];
-	int asp;
+	int asp=0;
 
 	switch (ac)
 	{
@@ -11526,7 +9352,7 @@ void ChartAspect()
 								p *= PowerPar;
 						
 							// here we sort by decreasing power or increasing orb
-							if (fSortAspectsByOrbs && abs(orb) < abs(saveorb) || !fSortAspectsByOrbs && p > savepower)
+							if ((fSortAspectsByOrbs && abs(orb) < abs(saveorb)) || (!fSortAspectsByOrbs && p > savepower))
 							{
 								saveorb = orb;
 								ihi = i;
@@ -11582,412 +9408,6 @@ void ChartAspect()
 	}
 }
 
-void ClearUserSettings(void)
-{
-	/* Chart types */
-
-	us.fListing = FALSE;
-	us.fWheel = FALSE;
-	us.fGrid = FALSE;
-	us.fAspList = FALSE;
-	us.fMidpoint = FALSE;
-	us.fDifference = FALSE;
-	us.fHorizon = FALSE;
-	us.fOrbit = FALSE;
-	us.fSector = FALSE;
-	us.fInfluence = FALSE;
-	us.fAstroGraph = FALSE;
-	us.fCalendar = FALSE;
-	us.fInDay = FALSE;
-	us.fInDayInf = FALSE;
-	us.fEphemeris = FALSE;
-	us.fTransit = FALSE;
-	us.fTransitInf = FALSE;
-	us.fSphere = FALSE;
-
-	////////////////////////////////////////////////////////////////////
-
-	us.fFirdaria = FALSE;
-	us.fPlanetaryHours = FALSE;
-	us.fSquareChart = FALSE;
-	us.fAlmtsPoint = FALSE;
-	us.fAlmtsChart = FALSE;
-	us.fPrimDirs = FALSE;
-	us.fJyotish = FALSE;
-	us.fPrimDirs2 = FALSE;
-	us.fPrimDirs3 = FALSE;
-	////////////////////////////////////////////////////////////////////
-
-	/* Table chart types */
-	us.fSwitch = FALSE;
-	us.fSwitchRare = FALSE;
-	us.fKeyGraph = FALSE;
-	us.fSign = FALSE;
-	us.fSolarEclipse = FALSE;
-	us.fLunarEclipse = FALSE;
-	us.fLunarPhases = FALSE;
-	us.fObject = FALSE;
-	us.fAspect = FALSE;
-	us.fConstel = FALSE;
-	us.fOrbitData = FALSE;
-	us.fMeaning = FALSE;
-	us.fPrintProgramStatus = FALSE;
-	us.f12parts = FALSE;
-	us.fAnti = FALSE;
-	us.fAnti2 = FALSE;
-	us.f12parts2 = FALSE;
-	us.fNavamsas2 = FALSE;
-	us.nArabic = FALSE;
-	us.fZodRel = FALSE;
-	us.fDecennials = FALSE;
-}
-
-#if 0
-// for animate
-extern CP cpPDs;
-int calc2(BOOL terrestrial, BOOL* valid, int* y, int* m, int* d, int* ho, int* mi, int* se, double* t, BOOL* direct, double* da)
-{
-
-	if ((ciTwin.yea - ciNatal.yea) > 130 || (ciTwin.yea - ciNatal.yea) < 0)
-	{
-		not(wi.fAnimate);
-		wi.fAnimate = FALSE;
-		MessageBoxA(0, "Date is out of range", "Note", MB_OK | MB_ICONEXCLAMATION | MB_SETFOREGROUND | MB_SYSTEMMODAL);
-		return -1;
-	}
-
-	int year, month, day, hour, minute, second;
-	double jut;
-
-	int pdnum = CurrentRec;
-	double da1 = pds[pdnum].arc;
-
-	year = ciTwin.yea;
-	month = ciTwin.mon;
-	day = ciTwin.day;
-	jut = DegMin2DecDeg(ciTwin.tim) + 0.5 / 3600;
-
-	hour = (int)jut;
-	minute = (int)fmod(jut * 60, 60);
-	second = (int)fmod(jut * 3600, 60);
-
-	*da = 0.0;
-
-	double arc = 0.0;
-
-	*direct = direction;
-	Place place;
-	jut = DegMin2DecDeg(ciNatal.tim) + 0.5 / 3600;
-	int jhour = (int)jut;
-	int jmin = (int)fmod(jut * 60, 60);
-	int jsec = (int)fmod(jut * 3600, 60);
-
-	BOOL calflag = (
-		ciNatal.yea < 1582 ||
-		(ciNatal.yea == 1582 && (ciNatal.mon < 10 || ciNatal.mon == 10 && ciNatal.day < 15)
-			)) ? 0 : 1;
-
-	timeP.time(ciNatal.yea, ciNatal.mon, ciNatal.day, jhour, jmin, jsec, 0, FALSE, ciNatal.zon, ciNatal.dst, place, FALSE);
-
-	timeP.cal = calflag;
-
-	chart.ChartInit("Roberto", TRUE, timeP, place, RADIX, "", TRUE, 1, FALSE);
-
-	*y = year;
-	*m = month;
-	*d = day;
-	*ho = hour;
-	*mi = minute;
-	*se = second;
-	*t = double(*ho) + double(*mi) / 60.0 + double(*se) / 3600.0;
-
-	double jd = swe_julday(*y, *m, *d, *t, calflag);
-
-	if (chart.time.jd > jd)
-	{
-		// so, we have to restore the date to natal date
-		memcpy(&ciMain, &ciNatal, sizeof(ciMain));
-		return 0;
-	}
-	arc = calcArc(jd, *direct);
-
-	ARC = arc;
-	*da = arc;
-	if (*direct == 1)
-		*da *= -1;
-
-	PDsInChart pdinch;
-	pdinch.PDsInChartInit(chart, *da, calflag);// #self.yz, mz, dz, tz ==> chart;       da=29.804327657788399
-	int pdh, pdm, pds;
-	decToDeg(pdinch.tz, &pdh, &pdm, &pds);
-
-	Time tim;
-	tim.time(pdinch.yz, pdinch.mz, pdinch.dz, pdh, pdm, pds, GREENWICH, TRUE, 0, 0, chart.place, FALSE);
-	is.rSid = 0;
-	if (us.fSidereal)
-	{
-		swe_set_sid_mode(us.nSiderealMode, 0, 0);
-		is.rSid = -swe_get_ayanamsa_ut(tim.jd) + us.rSiderealCorrection;// -24.893349387443948
-	}
-
-	Chart pdchartpls;
-
-	if (!terrestrial)
-	{
-		if (options.pdincharttyp == 0)
-		{
-			pdchart.ChartInit(chart.name, chart.male, tim, chart.place, PDINCHART, "", FALSE, 1, FALSE);//#, proftype, nolat);
-			pdchartpls.ChartInit(chart.name, chart.male, chart.time, chart.place, PDINCHART, "", FALSE, 1, FALSE);
-
-			//#modify planets ...
-			if (options.primarydir == PLACIDIANSEMIARC || options.primarydir == PLACIDIANUNDERTHEPOLE)
-				pdchart.planets.calcMundaneProfPos(pdchart.houses.ascmc2, pdchartpls.planets.planets, chart.place.lat, chart.obl[0]);
-			else
-			{
-				//			pdchart.houses.HousesInit(tim.jd, 0, pdchart.place.lat, pdchart.place.lon, 'R', pdchart.obl[0], options.ayanamsha, pdchart.ayanamsha);
-				pdchart.planets.calcRegioPDsInChartsPos(pdchart.houses.ascmc2, pdchartpls.planets.planets, chart.place.lat, chart.obl[0]);
-			}
-			//#modify lof
-			if (options.primarydir == PLACIDIANSEMIARC || options.primarydir == PLACIDIANUNDERTHEPOLE)
-				pdchart.fortune.calcMundaneProfPos(pdchart.houses.ascmc2, pdchartpls.fortune, chart.place.lat, chart.obl[0]);
-			else
-				pdchart.fortune.calcRegioPDsInChartsPos(pdchart.houses.ascmc2, pdchartpls.fortune, chart.place.lat, chart.obl[0]);
-		}
-		else if (options.pdincharttyp == 1)
-		{
-			pdchart.ChartInit(chart.name, chart.male, tim, chart.place, PDINCHART, "", FALSE, 0, TRUE);
-
-			pdchartpls.ChartInit(chart.name, chart.male, chart.time, chart.place, PDINCHART, "", FALSE, 0, TRUE);
-			//#modify planets ...
-			if (options.primarydir == PLACIDIANSEMIARC || options.primarydir == PLACIDIANUNDERTHEPOLE)
-				pdchart.planets.calcMundaneProfPos(pdchart.houses.ascmc2, pdchartpls.planets.planets, chart.place.lat, chart.obl[0]);
-			else
-			{
-				pdchart.planets.calcRegioPDsInChartsPos(pdchart.houses.ascmc2, pdchartpls.planets.planets, chart.place.lat, chart.obl[0]);
-			}
-			//#modify lof
-			if (options.primarydir == PLACIDIANSEMIARC || options.primarydir == PLACIDIANUNDERTHEPOLE)
-				pdchart.fortune.calcMundaneProfPos(pdchart.houses.ascmc2, pdchartpls.fortune, chart.place.lat, chart.obl[0]);
-			else
-				pdchart.fortune.calcRegioPDsInChartsPos(pdchart.houses.ascmc2, pdchartpls.fortune, chart.place.lat, chart.obl[0]);
-		}
-		else//:#Full Astronomical Procedure
-		{
-			pdchart.ChartInit(chart.name, chart.male, tim, chart.place, 7, "", FALSE, 1, FALSE);//#, proftype, nolat);
-			pdchartpls.ChartInit(chart.name, chart.male, chart.time, chart.place, 7, "", FALSE, 1, FALSE);
-			Planet* pdpls = pdchartpls.planets.planets;
-			if (options.pdinchartsecmotion)
-				pdpls = pdchart.planets.planets;
-			double raequasc, declequasc, dist;
-			swe_cotrans2(pdchart.houses.ascmc[EQUASC], 0.0, 1.0, -chart.obl[0], &raequasc, &declequasc, &dist);
-			pdchart.planets.calcFullAstronomicalProc(*da, chart.obl[0], pdpls, pdchart.place.lat, pdchart.houses.ascmc2, raequasc);//#planets
-			pdchart.fortune.calcFullAstronomicalProc(pdchartpls.fortune, *da, chart.obl[0]);
-		}
-	}
-	else
-	{
-		pdchart.ChartInit(chart.name, chart.male, tim, chart.place, 7, "", FALSE, 1, FALSE);
-		pdchart.fortune.recalcForMundaneChart(chart.fortune.fortune[0], chart.fortune.fortune[1], chart.fortune.fortune[2], chart.fortune.fortune[3], pdchart.houses.ascmc2, pdchart.raequasc, pdchart.obl[0], pdchart.place.lat);
-
-		if (!options.pdinchartterrsecmotion)// Sec. Motion not set
-		{
-			double xmp;
-			if (options.primarydir == 0 || options.primarydir == 1)
-				xmp = pdchart.fortune.speculum[10];
-			else if (options.primarydir == 2)
-				xmp = pdchart.fortune.speculum2[11];
-			else if (options.primarydir == 3)
-				xmp = pdchart.fortune.speculum2[10];
-
-			pdchart.ChartInit(chart.name, chart.male, chart.time, chart.place, 7, "", FALSE, 1, FALSE);//#, proftype, nolat)// 
-			double raequasc, declequasc, dist;
-			swe_cotrans2(pdchart.houses.ascmc[4], 0.0, 1.0, -chart.obl[0], &raequasc, &declequasc, &dist);
-			pdchart.planets.calcMundaneWithoutSM(da1, chart.obl[0], pdchart.place.lat, pdchart.houses.ascmc2, raequasc);
-
-			pdchart.fortune.recalcForMundaneChart(chart.fortune.fortune[0], chart.fortune.fortune[1], chart.fortune.fortune[2], chart.fortune.fortune[3], pdchart.houses.ascmc2, pdchart.raequasc, pdchart.obl[0], pdchart.place.lat);
-
-			if (options.primarydir == 0 || options.primarydir == 1)
-				pdchart.fortune.speculum[10] = xmp;
-			else if (options.primarydir == 2)
-				pdchart.fortune.speculum2[11] = xmp;
-			else if (options.primarydir == 3)
-				pdchart.fortune.speculum2[10] = xmp;
-		}
-	}
-
-	////////////////////////////////////////////////////////////
-	if (*direct == 1)
-		*da *= -1;
-	////////////////////////////////////////////////////////////
-	//	pdchart.houses.ascmc2[0][0]+=is.rSid;
-	//	pdchart.houses.ascmc2[1][0]+=is.rSid;
-
-	int num = 12;
-	int i;
-	for (i = 0; i < num; i++)
-	{
-		pdchart.planets.planets[i].data[0] += is.rSid;
-		pdchart.planets.planets[i].speculums[0][0] += is.rSid;
-		pdchart.planets.planets[i].speculums[1][0] += is.rSid;
-	}
-	pdchart.fortune.fortune[0] += is.rSid;
-
-	wcscpy(keytxt, Lang(tListDyn, options.pdkeyd));
-	if (!options.pdkeydyn)
-		wcscpy(keytxt, Lang(tListStat, options.pdkeys));
-
-	wcscpy(txtdir, L"D");
-	if (*direct == 1)
-		wcscpy(txtdir, L"C");
-
-	wcscpy(dirtxt, Lang(tListDirs, options.primarydir));
-
-	wcscpy(keytypetxt, L"Dynamic Key");
-	if (!options.pdkeydyn)
-		wcscpy(keytypetxt, L"Static Key");
-
-	//char typeListDyn[4][40] = {"TRUE Solar Equatorial Arc", "TRUE Solar Equatorial Arc(Birthday)", "TRUE Solar Ecliptical Arc", "TRUE Solar Ecliptical Arc(Birthday)"};
-	wcscpy(keytxt, Lang(tListDyn, options.pdkeyd));
-
-	if (!options.pdkeydyn)
-		wcscpy(keytxt, Lang(tListStat, options.pdkeys));
-
-	if (options.subprimarydir == 0/*mundane*/)
-		wcscpy(MZtxt, L"Mundane");
-	else
-		wcscpy(MZtxt, L"Zodiacal");
-
-	memset(&cpPDs, 0, sizeof(cpPDs));
-	Chart chrt = pdchart;
-
-	int speculum = 0;
-	if (options.primarydir == 2 || options.primarydir == 3)
-		speculum = 1;
-
-	//#create Ingress-chart
-	CI ciT;
-	ciT = ciCore;
-	ciCore = ciTwin;
-	Place place1;
-	ciCore = ciT;
-
-	//tim.time(*y, *m, *d, *ho, *mi, *se, 1,  TRUE,   ciTwin.zon, ciTwin.dst, place1, FALSE);
-	tim.time(*y, *m, *d, *ho, *mi, *se, 0, FALSE, ciTwin.zon, ciTwin.dst, place1, FALSE);
-	ingchart.ChartInit(chart.name, chart.male, tim, place1, 7, "", FALSE, 1, FALSE);
-
-	double mi2 = *mi, se2 = *se;
-	memcpy(&ciThre, &ciCore, sizeof(ciCore));
-	ciThre.yea = *y;
-	ciThre.mon = *m;
-	ciThre.day = *d;
-	ciThre.tim = *ho + mi2 / 100.0 + se2 / 6000.0;
-
-	for (i = 0; i < num; i++)
-	{
-		ingchart.planets.planets[i].speculums[0][0] += is.rSid;
-		ingchart.planets.planets[i].speculums[1][0] += is.rSid;
-		ingchart.planets.planets[i].data[0] += is.rSid;
-	}
-	ingchart.fortune.fortune[0] += is.rSid;
-
-	CP cpT;
-	ciCore = ciTwin;
-	cpT = cp0;
-	byte ignoreT[NUMBER_OBJECTS];
-	memcpy(&ignoreT, &ignore1, NUMBER_OBJECTS);
-	memcpy(&ignore1, &ignore2, NUMBER_OBJECTS);
-	CastChart(TRUE);
-	memcpy(&ignore1, &ignoreT, NUMBER_OBJECTS);
-	cpIng = cp0;
-	cp0 = cpT;
-	ciCore = ciMain;
-
-	if ((IsPDsChartWithoutTable /*&& UsePDsInChart*/) || IsPDsChartWithoutTable2 || us.nRel == rcProgTran || UsePDsInChart)
-	{
-		for (i = 1; i < 13; i++)
-		{
-			cpPDs.cusp_pos[i] = pdchart.houses.cusps[i];
-			cpPDs.longitude[21 + i] = pdchart.houses.cusps[i];
-		}
-
-		// Copy Logitude and logitude vel
-		for (i = 1; i < 11; i++)
-		{
-			cpPDs.longitude[i] = pdchart.planets.planets[i - 1].data[LON];
-			cpPDs.latitude[i] = pdchart.planets.planets[i - 1].data[LAT];
-			cpPDs.vel_longitude[i] = pdchart.planets.planets[i - 1].data[SPLON];
-		}
-
-		cpPDs.longitude[16] = pdchart.planets.planets[10].data[LON];//  NorthNode
-		cpPDs.longitude[17] = pdchart.planets.planets[11].data[LON];//  SouthNode
-		cpPDs.longitude[19] = pdchart.fortune.fortune[0];//  fortune
-		cpPDs.longitude[22] = pdchart.houses.ascmc2[0][0];//  Asc
-		cpPDs.longitude[31] = pdchart.houses.ascmc2[1][0];//  Mc
-
-		cpPDs.latitude[16] = pdchart.planets.planets[10].data[LAT];//  NorthNode
-		cpPDs.latitude[17] = pdchart.planets.planets[11].data[LAT];//  SouthNode
-		cpPDs.latitude[19] = pdchart.fortune.fortune[LAT];//  fortune
-		cpPDs.latitude[22] = pdchart.houses.ascmc2[0][1];
-		cpPDs.latitude[31] = pdchart.houses.ascmc2[1][1];
-
-		cpPDs.vel_longitude[16] = pdchart.planets.planets[10].data[SPLON];//  NorthNode
-		cpPDs.vel_longitude[17] = pdchart.planets.planets[11].data[SPLON];//  SouthNode
-		cpPDs.vel_longitude[19] = pdchart.fortune.fortune[SPLON];//  fortune 
-	}
-	else
-
-	{
-		// this is the PMP position:
-		for (i = 0; i < 13; i++)
-		{
-
-			if (i < 10)
-			{
-				if (options.primarydir == 0 || options.primarydir == 1)
-					cpPDs.longitude[i + 1] = pdchart.planets.planets[i].speculums[0][10];
-				else if (options.primarydir == 2)
-					cpPDs.longitude[i + 1] = pdchart.planets.planets[i].speculums[1][11];
-				else if (options.primarydir == 3)
-					cpPDs.longitude[i + 1] = pdchart.planets.planets[i].speculums[1][10];
-			}
-			else if (i == 10)
-			{
-				// North Node
-				if (options.primarydir == 0 || options.primarydir == 1)
-					cpPDs.longitude[16] = pdchart.planets.planets[i].speculums[0][10];
-				else if (options.primarydir == 2)
-					cpPDs.longitude[16] = pdchart.planets.planets[i].speculums[1][11];
-				else if (options.primarydir == 3)
-					cpPDs.longitude[16] = pdchart.planets.planets[i].speculums[1][10];
-
-			}
-			else if (i == 11)
-			{
-				// Sorth Node
-				if (options.primarydir == 0 || options.primarydir == 1)
-					cpPDs.longitude[17] = pdchart.planets.planets[i].speculums[0][10];
-				else if (options.primarydir == 2)
-					cpPDs.longitude[17] = pdchart.planets.planets[i].speculums[1][11];
-				else if (options.primarydir == 3)
-					cpPDs.longitude[17] = pdchart.planets.planets[i].speculums[1][10];
-
-			}
-			else if (i == 12)
-			{
-				// Part Fortune 
-				if (options.primarydir == 0 || options.primarydir == 1)
-					cpPDs.longitude[19] = pdchart.fortune.speculum[10];
-				else if (options.primarydir == 2)
-					cpPDs.longitude[19] = pdchart.fortune.speculum2[11];
-				else if (options.primarydir == 3)
-					cpPDs.longitude[19] = pdchart.fortune.speculum2[10];
-			}
-		}
-	}
-	return 0;
-}
-#endif
-
 typedef struct PrimDir
 {
 	BOOL mundane;
@@ -12005,187 +9425,6 @@ typedef struct PrimDir
 PrimDir;
 
 PrimDir pds[30480];
-
-// Compares two NULL-terminated strings, byte by byte, until the end of 
-// the shorter string. Case is disregarded. Third parameter is the maximum
-// number of characters to compare, if greater than zero, otherwise it 
-// is disregarded.
-// Returns true if both strings are the same, false otherwise. 
-BOOL fSstringsMatch(const wchar_t* s1, const wchar_t* s2, int n)
-{
-	for (; *s1 && *s2; s1++, s2++)
-	{
-		if (towlower(*s1) != towlower(*s2))
-		{
-			return FALSE;
-		}
-
-		if (--n == 0)
-		{
-			break;
-		}
-	}
-	return TRUE;
-}
-
-
-int NParseSzW(wchar_t* szEntry, int pm)
-{
-	wchar_t szLocal[cchSzMax], * sz;
-	int cch, n, i;
-	int returnflag = 0;
-
-	/* First strip off any leading or trailing spaces. */
-	for (cch = 0; (szLocal[cch] = szEntry[cch]) != 0; cch++)
-		;
-	szLocal[cch] = chNull;
-	while (cch && (byte)szLocal[cch - 1] <= ' ')
-		szLocal[--cch] = chNull;
-	for (sz = szLocal; *sz && (byte)(*sz) <= ' '; sz++, cch--)
-		;
-	// fix IC name to be "IC "
-	if (sz[0] == L'I' && sz[1] == L'C')
-	{
-		sz[2] = L' ';
-		sz[3] = 0;
-		cch++;
-	}
-	if (cch >= 3) // ask for a minimum of 3 characters, but why? sometimes less is enough!
-	{
-		switch (pm)
-		{
-			/* Parse months, e.g. "February" or "Feb" -> 2 for February. */
-		case pmMon:
-			for (i = 1; i < NUMBER_OF_SIGNS; i++)
-			{
-				if (fSstringsMatch(sz, char_to_wchar(tMonth[i]).c_str(), 0))
-				{
-					returnflag = i;
-					break;
-				}
-			}
-			break;
-
-			/* Parse months in English (e.g. for data files), e.g. "February" or "Feb" -> 2 for February. */
-		case pmMonEn:
-			for (i = 1; i <= NUMBER_OF_SIGNS; i++)
-			{
-				if (fSstringsMatch(sz, char_to_wchar(szMonthEnglish[i]).c_str(), 0))
-				{
-					returnflag = i;
-					break;
-				}
-			}
-			break;
-
-			/* Parse planets, e.g. "Jupiter" or "Jup" -> 6 for Jupiter. */
-		case pmObject:
-
-			for (i = 0; i <= cObj; i++)
-			{
-				if (fSstringsMatch(sz, char_to_wchar(tObjShortName[i]).c_str(), 3))
-					// we can match maximum 3 characters because of cp0.longitude position files that have three chars for cp0.longitude names
-				{
-					returnflag = i;
-					break;
-				}
-			}
-			break;
-		case pmObjectEn:
-
-			for (i = 0; i <= cObj; i++)
-			{
-				if (fSstringsMatch(sz, char_to_wchar((char*)szObjShortNameEnglish[i]).c_str(), 3))
-					// we can match maximum 3 characters because of cp0.longitude position files that have three chars for cp0.longitude names
-				{
-					returnflag = i;
-					break;
-				}
-			}
-			break;
-
-			/* Parse aspects, e.g. "Conjunct" or "Con" -> 1 for the Conjunction. */
-		case pmAspect:
-			for (i = 1; i <= cAspect; i++)
-			{
-				if (fSstringsMatch(sz, char_to_wchar(tAspectAbbrev[i]).c_str(), 0))
-				{
-					returnflag = i;
-					break;
-				}
-			}
-			break;
-
-			/* Parse house systems, e.g. "Koch" or "Koc" -> 1 for Koch houses. */
-		case pmHouseSystem:
-			for (i = 0; i < NUMBER_OF_HOUSE_SYSTEMS; i++)
-			{
-				if (fSstringsMatch(sz, char_to_wchar(tHouseSystem[i]).c_str(), 0))
-				{
-					returnflag = i;
-					break;
-				}
-			}
-			break;
-
-			/* Parse zodiac signs, e.g. "Scorpio" or "Sco" -> 8 for Scorpio. */
-		case pmSign:
-			for (i = 1; i <= NUMBER_OF_SIGNS; i++)
-			{
-				if (fSstringsMatch(sz, char_to_wchar(tSignName[i]).c_str(), 0))
-				{
-					returnflag = i;
-					break;
-				}
-			}
-			break;
-
-		case pmSignEn:
-			for (i = 1; i <= NUMBER_OF_SIGNS; i++)
-			{
-				if (fSstringsMatch(sz, char_to_wchar((char*)szSignAbbrevEnglish[i]).c_str(), 0))
-				{
-					returnflag = i;
-					break;
-				}
-			}
-			break;
-			/* Parse colors, e.g. "White" or "Whi" -> 15 for White. */
-		case pmColor:
-			for (i = 0; i < cColor; i++)
-			{
-				if (fSstringsMatch(sz, char_to_wchar(tColor[i]).c_str(), 0))
-				{
-					returnflag = i;
-					break;
-				}
-			}
-			break;
-		}
-
-		if(returnflag) return returnflag;
-	}
-
-	n = std::stoi(sz);
-
-	if (pm == pmYea)
-	{
-		/* For years, process any "BC" (or "B.C.", "b.c", and variations) and   */
-		/* convert an example such as "5BC" to -4. For negative years, note the */
-		/* difference of one, as 1AD was preceeded by 1BC, with no year zero.   */
-		i = Max(cch - 1, 0);
-		if (i && sz[i] == '.')
-			i--;
-		if (i && ChCap(sz[i]) == 'C')
-			i--;
-		if (i && sz[i] == '.')
-			i--;
-		if (i && ChCap(sz[i]) == 'B')
-			n = 1 - n;
-	}
-	return n;
-}
-
 
 /* Given a string, return a floating point number corresponding to what the  */
 /* string indicates, based on a given parsing mode, like above for integers. */
@@ -12427,7 +9666,7 @@ const double d_alt = 39.00;
 void GetChartResult(CI& ciInput,bool useInput = true)
 {
 	//默认参数设置
-	CI ciDefault = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"","" ,L"","" };
+	CI ciDefault = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"",{0} ,L"",{0},0.0, 0.0, 0.0,0.0,0,0.0,0,L"",L"",L"",0.0,0.0,0.0,{0},{0} };
 	ciDefault.dst = RParseSz(d_dst, pmDst);
 	ciDefault.zon = RParseSz(d_zon, pmZon);
 	ciDefault.lon = RParseSz(d_lon, pmLon);
@@ -12442,7 +9681,7 @@ void GetChartResult(CI& ciInput,bool useInput = true)
 	us.fEuroTime = 1;  //-Yt
 	//:YXG 2223	
 	//chart info input 
-	CI ci = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"","" ,L"","" };
+	CI ci = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"",{0} ,L"",{0},0.0, 0.0, 0.0,0.0,0,0.0,0,L"",L"",L"",0.0,0.0,0.0,{0},{0} };
 	//首先取默认参数
 	ci = ciDefault;
 	us.dstDef = ciDefault.dst;
@@ -12506,10 +9745,8 @@ void GetChartResult(CI& ciInput,bool useInput = true)
 
 		if (us.fPrimDirs)
 		{
-			BOOL valid = TRUE;
-			int y, m, d, ho, mi, se;
-			double t, da;
-			BOOL direct;
+			int y = 0, m = 0, d = 0;
+			double t = 0.0, da;
 			//calc2(pds[CurrentRec].mundane, &valid, &y, &m, &d, &ho, &mi, &se, &t, &direct, &da);
 
 			pds[CurrentRec].arc = da;
@@ -12535,7 +9772,7 @@ void GetChartResult(CI& ciInput,bool useInput = true)
 	wi.fCast = TRUE;
 	us.fEuroDate = 1;
 	double res = CastChart(1);
-	//wprintf(L"%lf\n", res);
+	wprintf(L"%lf\n", res);
 	ChartListing();
 
 	us.fAspList = TRUE;
