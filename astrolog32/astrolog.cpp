@@ -50,31 +50,9 @@ https://passion-astrologue.com/regle-30-degres-astuce-interpretation/
 ** performance of this software.
 */
 
-
-/*
-******************************************************************************
-** Warning Level Switches For Debugging.
-******************************************************************************
-*/
-
-/* Compiler warnings switches needed for MS Visual C++ when warning level
-is set to 4. Used for linting. Don't remove. */
-
-
 #include "TransU/TransU.h"
 #include "astrolog.h"
-/*
-warning 4706: assignment within conditional expression
-warning 4057: 'function' : 'unsigned char *' differs in indirection
-	 to slightly different base types from 'char [3]'
-warning 4131: 'HousePlaceIn' : uses old-style declarator
-warning 4244: '=' : conversion from 'int ' to 'unsigned char ',
-	 possible loss of data
-warning 4701: local variable 't_plac' may be used without
-	 having been initialized
-warning 4100: 'lParam' : unreferenced formal parameter
-2010
-*/
+
 #define _CRT_SECURE_NO_DEPRECATE
 #define _CRT_SECURE_NO_WARNINGS
 #ifndef _WIN32_WINNT
@@ -86,30 +64,12 @@ warning 4100: 'lParam' : unreferenced formal parameter
 #pragma warning( disable : 4706 4057 4131 4244 4701 4100 4005 4996)
 #endif
 
-/*
-******************************************************************************
-** Configuration Constants.
-******************************************************************************
-*/
-
-/* FEATURES SECTION: */
-
-//#define TESTNEW
 #define WIN
-
-#define PS			/* Comment out this #define if you don't want the ability to */
-					/* generate charts in the PostScript graphics format.        */
-
-#define META		/* Comment out this #define if you don't want the ability to  */
-					/* generate charts in the MS Windows metafile picture format. */
 
 #define INTERPRET	/* Comment out this #define if you don't want the ability */
 					/* to display interpretations of the various chart types. */
 
 #define INTERPRETALT
-
-#define ARABIC		/* Comment out this #define if you don't want any chart     */
-					/* lists that include Arabic parts included in the program. */
 
 #define BIORHYTHM	/* Comment out this #define if you don't want the    */
 					/* non-astrological biorhythm charts in the program. */
@@ -175,33 +135,7 @@ Ascii text file. 'B' means write as Windows bitmap (.bmp) file. */
 #define DEFAULTY    740
 #define DEFAULTX    DEFAULTY+SIDESIZE-43		/* Default window size */
 
-#define MAXMETA 200000L			/* Max bytes allowed in a metafile.            */
-#define METAMUL      12			/* Metafile coordinate to chart pixel ratio.   */
-#define PSMUL        11			/* PostScript coordinate to chart pixel ratio. */
-#define CELLSIZE     14			/* Size for each cell in the aspect grid.      */
-#define DEGINC        2			/* Number of degrees per segment for circles.  */
-#define DEFORB      7.0			/* Min distance glyphs can be from each other. */
-#define MAXSCALE    400			/* Max scale factor as passed to -Xs swtich.   */
-#define TILTSTEP  11.25			/* Degrees to change when pressing '[' or ']'. */
-
 #define BIODAYS      14			/* Days to include in graphic biorhythms.      */
-
-#define chH    '-'
-#define chV    '|'
-#define chC    '|'
-#define chNW   '+'
-#define chNE   '+'
-#define chSW   '+'
-#define chSE   '+'
-#define chJN   '-'
-#define chJS   '-'
-#define chJW   '|'
-#define chJE   '|'
-
-#define chDeg 0x20 
-#define chDeg0 (unsigned char)(us.fAnsiChar ? /*0xB0*/ 0xb0 : 0x20) 
-#define chDeg1 (unsigned char) 0xb0
-//#define chDeg1 (unsigned char) ':'
 
 #define chMin1 '\''
 #define chSec1 '"'
@@ -209,16 +143,6 @@ Ascii text file. 'B' means write as Windows bitmap (.bmp) file. */
 // Atlas values
 #define cchSzAtl 54
 #define cchSzZon 13
-#define icnewMax 252
-#define icnusMax 51
-#define icncaMax 13
-#define icnUS    234  // United States
-#define icnCA    38   // Canada
-#define icnFR    76   // France
-#define icnUK    78   // England
-#define iznMax   425
-#define ilistMax 200
-#define rInvalid   (1.23456789E-09)
 
 #define MAX_STRING_NAME_LEN 50
 /*
@@ -236,38 +160,6 @@ Ascii text file. 'B' means write as Windows bitmap (.bmp) file. */
 #include <assert.h>
 #include <stdarg.h>
 #include <string>
-//#include "xml/xmlParser.h"
-//#include "HtmlHelp.h"
-//#pragma comment(lib, "HtmlHelp.lib")
-//#pragma comment(lib, "urlmon.lib")
-
-int fSouthIndian = 0, fNorthIndian = 0, fEastIndian = 0;
-unsigned char chDeg2 = ':';
-//void XChartIndian();
-//char bigstr[10240];
-
-char topic[260] = { "HELPFILE.html" };
-BOOL MacroActivated = FALSE;
-int dragflag;
-int numA, numB;
-BOOL IsHideLine = FALSE;
-int SubMacVersion = 0;
-void PrintCalculateParameters(BOOL print_flag);
-void PrintNatalMsg();
-void PrintChartDirMsg();
-/*
-******************************************************************************
-** Program Constants.
-******************************************************************************
-*/
-
-#ifdef PS
-#define STROKE
-#endif
-
-#ifdef META
-#define STROKE
-#endif
 
 #ifndef FALSE
 #define FALSE 0
@@ -277,259 +169,41 @@ void PrintChartDirMsg();
 #define TRUE  1
 #endif
 
-static char *dms(double x, long iflag);
-#define MoveTo(hdc, x, y) MoveToEx(hdc, x, y, NULL)
-#define NAbs(n) abs(n)
-
-typedef struct
-{
-	int Y;
-	int M;
-	int D;
-	int h;
-	int m;
-	int s;
-} DateTime;
-
-DateTime dt;
-
-//HWND PDs2=0;
 double rise_set[2];
-double location[3];
-void DisplayJyotish();
-void restore2single();
-int MARKS = 0;
-BOOL UseUserValue = FALSE;
-
-#define nScrollDiv		24
-#define nScrollPage		4.5
-#define szFileTempCore	"ASTROLOG.TMP"
-#define szFileTempCoreW	L"ASTROLOG.TMP"
 
 //#define szTtyCore  "tty"
 #define cchSzDef   200
 #define cchSzMax   510
 #define yeaJ2G     1582
 #define monJ2G     mOct
-#define dayJ2G1    4
-#define dayJ2G2    15
 #define chNull     L'\0'
-#define chEscape   '\33'
-#define chBell     '\7'
-#define chReturn   '\r'
-#define chTab      '\t'
-#define chDelete   '\b'
-#define chBreak    '\3'
 #define chRet      L'R'
 #define starMaxName 12
 #define starMaxNName 8
 #define cStar		75
 
 /* Array index limits */
-#define cCnstl     88
 #define cZone      69
-#define cSector    36
 #define cPart      177
 #define cAspConfig 8
-#define cWeek      7
 #define cColor     16
-#define xFont      6
-int yFont = 12;
-
-#define NUMBER_OF_MONTHS	12
 #define NUMBER_OF_SIGNS		12
 #define NUMBER_OF_HOUSES	12
-#define NUMBER_OF_MACROS	121
-int NUMBER_OF_MACROS2 = 0;
-
-#define FIRST_SIDEREAL_MODE		SE_SIDM_FAGAN_BRADLEY	// NOTE: this must always be zero!!
-#define LAST_SIDEREAL_MODE		SE_SIDM_GALCENT_0SAG
-
-//StatusBar parts
-#define SBP_POSITION   0
-#define SBP_MODIFY     1
-#define SBP_INSERT     2
-#define SBP_NEWLINE    3
-#define SBP_CODEPAGE   4
-#define SBP_USER       5
-
-BOOL showWiki = TRUE;
-BOOL showJson = TRUE;
-BOOL IsSpeculum = FALSE;
-bool ischs = true;
 
 double  SIDESIZE = 220;			/* Size of wheel chart information sidebar.    */
-bool IsDoublePanel = false;
 
 int CountryID = 1;
-char ret[6] = { -1,-1,-1,-1,-1,-1 };
-BOOL IsAgeHarm = FALSE;
-BOOL IsAgeHarmAndNatal = FALSE;
 int eepp = -1;
 
-char ignoreS[118];          // for fixed star
 char ignoreSO[118];
-
-int dir = 0;
-int where = -1;
-int flag = 1;
-//CHOOSEFONTA cf;
-char myBuff[64] = "Arial";
-int cWeight = 400;
-unsigned long  bItalic = 0;
-
-int codepage = -1;
-int nTimer = 0;
-int currentzod;
-int currentsys;
-int currentSid;
-char ignore16;
-char ignore17;
-#define BUFLEN  8000
-char asp[512];
-char *buf;
-BOOL oldColor;
-
-BOOL fAnsiColor;
-BOOL fAnsiChar;
-
-BOOL IntoAni = FALSE;
-int SolarReturnYear;
-BOOL isSolarReturn = FALSE;
-BOOL isLunarReturn = FALSE;
-BOOL FoundSolarReturn = FALSE;
-
-char FileName1[16];
-char ephemeris[260] = { "" };
-BOOL fSortForward = 1;
-BOOL fConverseArc = 0;
-
-void drawPlanets5();
 wchar_t *SzLocation2(double lon, double lat);
-
-BOOL IncludeAsteroids = FALSE;
-BOOL IsPlanetModern = FALSE;
-BOOL IsPlanetTraditional = TRUE;
-BOOL IsPlanetLuminaries = FALSE;
-
-BOOL IsDignitiesModern = FALSE;
-BOOL PrintPrimDirToText = FALSE;
-BOOL PrintAlmutenCToText = FALSE;
-BOOL PrintAlmutenPToText = FALSE;
-BOOL PrintPHsToText = FALSE;
-BOOL PrintPDsPostions = FALSE;
-
-BOOL IsBACKTOMAIN = FALSE;
 
 BOOL UsePDsInChart = FALSE;
 BOOL IsPDsChartWithoutTable = FALSE;   // Table
-BOOL IsPDsChartWithoutTable2 = FALSE;  // PDs and natal
 
-BOOL IsProfections = FALSE;
-BOOL IsProfectionsDouble = FALSE;
-BOOL IsSyzygy = FALSE;
-BOOL IsDraconic = FALSE;
-BOOL Is12Part = FALSE;
-
-BOOL IsNewComparison2 = FALSE;
-BOOL IsNewComparison = FALSE;
-BOOL IsComparison = FALSE;
-BOOL IsIngress = FALSE;
-BOOL IsPassage = FALSE;
-BOOL IsTransitAndNatal = FALSE;
-BOOL IsProgressAndTransit = FALSE;
-BOOL IsProgressAndNatal = FALSE;
-BOOL IsTransitAndPDs = FALSE;
-BOOL IsPDsChart = FALSE;
-
-int PAGENUM = 0;
-int CurrentPage = 0;
-int CurrentLine = 0;
 int CurrentRec = 0;
-int LinePerPage = 21;
-int pdrange = 0;
-int DoPD = 0;
-int direction = 0;
-BOOL AUTOSAVE = FALSE;
-BOOL Diurnal = FALSE;
-int DoPr = 0;
 BOOL isDayBirth;
-int PDNum1 = 0;
-double posio[10];
-double posi[9];
-bool retr[10];
-int graha[9] = { 0,1,2,3,4,5,6,7,8 };
-wchar_t as[9][120];
-bool aflag[9];
-int lagna;
-bool useFixedLagna;
-#define beginline 0
-double plpos[13];
-double plpos2[13];
-double plpos3[13];
-void drawPlanets();
-void drawPlanets2();
-void drawPlanets3();
-void RestoreEnv();
-void XChartSphere();
 BOOL computeRiseSet();
-void lunar_eclipse(int flag, char *buf);
-void solar_eclipse(int flag, char *buf);
-
-void XChartWheel2();
-void XChartWheelRelation2();
-void XChartWheelRelation12();
-void XChartWheel0();
-void XChartWheel0Comp();
-void XChartWheelRelationX();
-void XChartWheelRelation3();
-
-int DIVISION_ORD = 0;
-int DIVISION = 1;
-bool isChalit = false;
-int divs[] = { 1, 2, 3, 4, 7, 9, 10, 12, 16, 20, 24, 27, 30, 40, 45, 60, 1, 1, 1 };
-int withRetr = false;
-int rashiOfGraha[10];
-wchar_t *SzZodiacJ(double);
-
-int mahadasha = 0;
-double nakshatraYears[] = { 7, 20, 6, 10, 7, 18, 16, 19, 17 };
-int antaradasha = 0;
-int periodAGrahas[18][9];
-int periodPGrahas[18][9][9];
-double periods[1458];
-int pratyantaradasha = 0;
-double jdStart = 0.0;
-int selection = 0;
-double selJD = 0.0;
-const char* nkNames[9] = { "KT", "SK", "SY", "CH", "MA", "RH", "GU", "SA", "BU" };
-int periodMGrahas[18] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 0, 1, 2, 3, 4, 5, 6, 7, 8 };
-
-void makeTable();
-
-int fenChart[19];
-typedef enum
-{
-	Janma = 1,
-	Hora,
-	Drekkana,
-	Chaturthamsha,
-	Saptamsha,
-	Navamsha,
-	Dasamsha,
-	Dvadasamsha,
-	Shodasamsha,
-	Vimshamsha,
-	Siddhamsha,
-	Bhamsha,
-	Trimshamsha,
-	Khavedamsha,
-	Akshvedamsha,
-	Shashtiamsha,
-	Chalit,
-	ChandraLagna,
-	SuryaLagna
-} partchart;
 
 /* Month index values */
 typedef enum
@@ -643,8 +317,6 @@ typedef enum
 } objects_t;
 
 #define cUran (uranHi - uranLo + 1)	// 9
-#define oOri (starLo - 1 + 10)
-#define oAnd (starLo - 1 + 47)
 
 /* Aspects */
 typedef enum
@@ -692,31 +364,8 @@ typedef enum
 	NUMBER_OF_HOUSE_SYSTEMS,	// 16
 } house_system_t;
 
-enum SwitchCode
-{
-	scError = -1,
-	scGlyph,
-	scCharSet,
-	scDegCharacter,
-	scUseInternationalAtlas,
-	scOmitWizard,
-	scOmitRegionalWizard,
-	scDebugFont,
-	scSimplifiedMode,
-	scAdvancedMode,
-	scDisableMacroShortcuts,
-	scDisableSave,
-	scEnableSave,
-	scTerminator
-};
-
 #define aDir -2
 #define aSig -1
-
-/* Biorhythm cycle constants */
-#define brPhy 23.0
-#define brEmo 28.0
-#define brInt 33.0
 
 /* Relationship chart modes */
 typedef enum
@@ -796,7 +445,6 @@ typedef enum
 #define gJyotish   41
 #define gPrimDirs2      42
 #define gPrimDirs3      43
-//////////////////////////////////////////////
 #define gDebugFont 44
 #define gSolarEclipse 45
 #define gLunarEclipse 46
@@ -812,27 +460,6 @@ typedef enum
 #define gDecennials	56
 #define gHouseLord	57
 #define gEmptyASP 58
-
-/* Colors */
-#define kReverse -2
-#define kDefault -1
-#define kBlack   0
-#define kMaroon  1
-#define kDkGreen 2
-#define kOrange  3
-#define kDkBlue  4
-#define kPurple  5
-#define kDkCyan  6
-#define kLtGray  7
-#define kDkGray  8
-#define kRed     9
-#define kGreen   10
-#define kYellow  11
-#define kBlue    12
-#define kMagenta 13
-#define kCyan    14
-#define kWhite   15
-#define kNull    16
 
 /* Arabic parts */
 #define apFor 0
@@ -865,42 +492,6 @@ typedef enum
 #define pmSignEn		15
 #define pmObjectEn		16
 #define pmWeek          18
-/* Termination codes */
-#define tcError -1
-#define tcOK    0
-#define tcFatal 1
-#define tcForce 2
-
-#define chDirSep '\\'
-#define chSwitch '/'
-#define hdcNil ((HDC)NULL)
-
-// File type and version numbers appear at the head of files, with the 
-// form @xxyy, where xx is the file type and yy the version number. 
-// These numbers are used for compatibility checks.
-
-#define FILE_TYPE_CHART					"01"
-#define FILE_VERSION_CHART				"02"
-
-#define FILE_TYPE_PLANET_POSITION		02
-#define FILE_VERSION_PLANET_POSITION	3
-
-#define FILE_TYPE_CONFIGURATION			3
-#define FILE_VERSION_CONFIGURATION		11
-
-#define FILE_TYPE_COUNTRY_LIST			"04"	// for international and american atlas
-#define FILE_VERSION_COUNTRY_LIST		"00"
-
-#define FILE_TYPE_COUNTRY_FILE			"05"	// for international atlas
-#define FILE_VERSION_COUNTRY_FILE		"00"
-
-#define FILE_TYPE_USA_STATE_FILE		"06"	// for american atlas
-#define FILE_VERSION_USA_STATE_FILE		"00"
-
-//#define FILE_TYPE_ALT_INTERPRET			"09"
-//#define FILE_VERSION_ALT_INTERPRET		"01"
-
-#define BUILD_DATE "BUILD_DATE"
 
 /*
 ******************************************************************************
@@ -972,15 +563,6 @@ typedef struct _GridInfo
 	short v[NUMBER_OBJECTS][NUMBER_OBJECTS];
 }
 GridInfo;
-
-typedef struct _CrossInfo
-{
-	double lat[MAXCROSS];
-	double lon[MAXCROSS];
-	int obj1[MAXCROSS];
-	int obj2[MAXCROSS];
-}
-CrossInfo;
 
 typedef struct _UserSettings
 {
@@ -1393,39 +975,12 @@ typedef struct _GraphicsInternal
 	int nScale;					/* Scale ratio, i.e. percentage / 100.        */
 	int nScaleT;				/* Relative scale to draw chart text at.      */
 	int nPenWid;				/* Pen width to use when creating metafiles.  */
-	KI kiOn;					/* Foreground color. */
-	KI kiOff;					/* Background color. */
-	KI kiLite;					/* Hilight color.    */
-	KI kiGray;					/* A "dim" color.    */
 	int xOffset;				/* Viewport origin.                           */
 	int yOffset;
 	int xTurtle;				/* Current coordinates of drawing pen.        */
 	int yTurtle;
 	int xPen;					/* Cached coordinates where last line ended.  */
 	int yPen;
-#ifdef PS						/* Variables used by the PostScript generator. */
-	BOOL fEps;					/* Are we doing Encapsulated PostScript.    */
-	int cStroke;				/* Number of items drawn without fluahing.  */
-	BOOL fLineCap;				/* Are line ends rounded instead of square. */
-	int nDash;					/* How much long are dashes in lines drawn. */
-	int nFont;					/* What system font are we drawing text in. */
-	double rLineWid;				/* How wide are lines, et al, drawn with.   */
-#endif
-#ifdef META						/* Variables used by the metafile generator.  */
-	word *pwMetaCur;			/* Current mem position when making metafile. */
-	word *pwPoly;				/* Position for start of current polyline.    */
-	long cbMeta;
-	KI kiLineAct;				/* Desired and actual line color. */
-	KI kiLineDes;
-	KI kiFillAct;				/* Desired and actual fill color. */
-	KI kiFillDes;
-	int nFontAct;				/* Desired and actual text font.  */
-	int nFontDes;
-	KI kiTextAct;				/* Desired and actual text color. */
-	KI kiTextDes;
-	int nAlignAct;				/* Desired/actual text alignment. */
-	int nAlignDes;
-#endif
 	int nScaleText;
 	int fDidSphere;      /* Has a chart sphere been drawn once yet?    */
 	int nMode;
@@ -1433,13 +988,6 @@ typedef struct _GraphicsInternal
 	int nGridCell;
 }
 GI;
-
-typedef struct _ArabicInfo
-{
-	wchar_t form[MAX_STRING_NAME_LEN];					/* The formula to calculate it. */
-	wchar_t name[MAX_STRING_NAME_LEN];					/* The name of the Arabic part. */
-}
-AI;
 
 typedef struct _ElementTable
 {
@@ -1515,7 +1063,7 @@ typedef struct _WindowInternal
 	BOOL fChartWindow;			/* Does chart change cause window resize? */
 	BOOL fWindowChart;			/* Does window resize cause chart change? */
 	BOOL fNoUpdate;				/* Do we not automatically update screen? */
-	KI kiPen;					/* The current pen scribble color.        */
+	//KI kiPen;					/* The current pen scribble color.        */
 	int nAnimationJumpFactor;	/* Time increases if positive, decreases if negative  */
 	int nTimerDelay;			/* Milliseconds between animation draws.  */
 	int xPrint;					/* Hor. and ver. resolution for printing  */
@@ -1547,36 +1095,6 @@ typedef enum
 	ANIMATION_FACTOR_MILLENNIA,
 	ANIMATION_FACTOR_HERE_AND_NOW,
 } animation_factor_t;
-
-// operations on a chart stack
-typedef enum
-{
-	CHART_CREATE,
-	CHART_DESTROY,
-	CHART_PREVIOUS,
-	CHART_NEXT,
-} chart_ops_t;
-
-typedef struct _chart_unit
-{
-	CI					user_chart;	// must always be the first element in structure
-	struct _chart_unit	*previous;
-	struct _chart_unit	*next;
-	int					magic_number;
-} chart_unit_t;
-
-typedef enum
-{
-	CHART_HEAP_SEARCH,
-	CHART_HEAP_SORTED,
-	NO_CHART_HEAPS,
-} chart_heap_types;
-
-/*
-******************************************************************************
-** Astrolog Include Files.
-******************************************************************************
-*/
 
 #include "version.h"
 
@@ -1653,22 +1171,14 @@ IS is = {
 CI ciCore = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"",{0} ,L"",{0},0.0, 0.0, 0.0,0.0,0,0.0,0,L"",L"",L"",0.0,0.0,0.0,{0},{0} };
 CI ciMain = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"",{0} ,L"",{0},0.0, 0.0, 0.0,0.0,0,0.0,0,L"",L"",L"",0.0,0.0,0.0,{0},{0} };
 CI ciTwin = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"",{0} ,L"",{0},0.0, 0.0, 0.0,0.0,0,0.0,0,L"",L"",L"",0.0,0.0,0.0,{0},{0} };
-CI ciThre = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"",{0} ,L"",{0},0.0, 0.0, 0.0,0.0,0,0.0,0,L"",L"",L"",0.0,0.0,0.0,{0},{0} };
-CI ciFour = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"",{0} ,L"",{0},0.0, 0.0, 0.0,0.0,0,0.0,0,L"",L"",L"",0.0,0.0,0.0,{0},{0} };
 CI ciTran = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"",{0} ,L"",{0},0.0, 0.0, 0.0,0.0,0,0.0,0,L"",L"",L"",0.0,0.0,0.0,{0},{0} };
-CI ciSave = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"",{0} ,L"",{0},0.0, 0.0, 0.0,0.0,0,0.0,0,L"",L"",L"",0.0,0.0,0.0,{0},{0} };
 
 CI ciNatal = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"",{0} ,L"",{0},0.0, 0.0, 0.0,0.0,0,0.0,0,L"",L"",L"",0.0,0.0,0.0,{0},{0} };
 CI ciNatal2 = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"",{0} ,L"",{0},0.0, 0.0, 0.0,0.0,0,0.0,0,L"",L"",L"",0.0,0.0,0.0,{0},{0} };
 // planet positions
 CP cp0, cp1, cp2, cp3, cp4, cpPDs, cpBak;
-BOOL UseFirstReturn = FALSE;
 BOOL IsDoubleReturn = FALSE; // 一个月中有两次月亮返照
-int fCP3 = 0; // this variable appears to be related to the usage of cp3, but how?
 
-double INVALID = 4.9E-324;
-double julian_day_ut, julian_day;
-bool setJulianDay(CI ci);
 /*
 ******************************************************************************
 ** Global Arrays.
@@ -1679,17 +1189,6 @@ double spacex[cLastMoving + 1], spacey[cLastMoving + 1];
 double spacez[cLastMoving + 1], force[NUMBER_OBJECTS];
 GridInfo *grid = NULL;
 int starname[cStar + 1], kObjA[NUMBER_OBJECTS];
-char *szMacro[NUMBER_OF_MACROS] = { 0 };
-wchar_t szMacroCaptionW[NUMBER_OF_MACROS][256] = { {0} };
-char szMacroCaption[NUMBER_OF_MACROS][256] = { {0} };
-char szMacroMenuType[NUMBER_OF_MACROS][256] = { {0} };
-
-int kObjA1[cLastMoving + 1] = { 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,		/* Planets  */
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,	/* Minors   */
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,	/* Cusps    */
-	0, 0, 0, 0, 0, 0, 0, 0, 0			/* Uranians */
-};
 
 /* Restriction status of each object, as specified with -YR switch. */
 byte ignore1[NUMBER_OBJECTS] = { 1,
@@ -1705,101 +1204,12 @@ byte ignore1[NUMBER_OBJECTS] = { 1,
 1,0,1,1,1,1,1,1,1,1,1,0,
 1,1,0
 };
-
-byte ignoreT4[NUMBER_OBJECTS] = { 1,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,					/* Planets 10 */
-	1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 				/* Minors  21 */
-	0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1,				/* Cusps   32 */
-	1, 1, 1, 1, 1, 1, 1, 1, 1,						/* Uranians 42*/
-1,1,0,0,0,1,1,1,1,0,1,1,
-1,1,0,1,1,1,1,1,1,1,1,1,
-0,1,1,1,1,1,1,0,1,1,1,1,
-0,1,0,0,1,1,1,1,1,1,1,1,
-0,1,0,1,1,1,1,1,0,1,1,1,
-1,0,1,1,1,1,1,1,1,1,1,0,
-1,1,0
-};
-
-/* Restriction of objects when transiting, as specified with -YRT switch. */
-byte ignore2[NUMBER_OBJECTS] = { 1,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,					/* Planets  */
-	1, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 				/* Minors   */
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,				/* Cusps    */
-	1, 1, 1, 1, 1, 1, 1, 1, 1,						/* Uranians */
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,	/* Stars    */
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-	1, 1, 1
-};
-
-byte ignoreT2[NUMBER_OBJECTS] = { 1,
-	0, 0, 0, 0, 0, 0, 0, 1, 1, 1,					/* Planets  */
-	1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 				/* Minors   */
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,				/* Cusps    */
-	1, 1, 1, 1, 1, 1, 1, 1, 1,						/* Uranians */
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,	/* Stars    */
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-	1, 1, 1
-};
-
 /* Restriction of objects when progressing, as specified with -YRP switch.  */
 /* For comparison charts only, else normal ignore1 used.						*/
-
-byte ignore3[NUMBER_OBJECTS] = { 1,
-	0, 0, 0, 0, 0, 0, 0, 1, 1, 1,					/* Planets  */
-	1, 1, 1, 1, 1, 0, 0, 1, 0, 1, 1, 				/* Minors   */
-	0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1,				/* Cusps    */
-	1, 1, 1, 1, 1, 1, 1, 1, 1,						/* Uranians */
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,	/* Stars    */
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-	1, 1, 1
-};
-
-byte ignoreT1[NUMBER_OBJECTS] = { 1,
-0, 0, 0, 0, 0, 0, 0, 0, 0, 0,					/* Planets 10 */
-1, 1, 1, 1, 1, 0, 0, 1, 0, 1, 1, 				/* Minors  21 */
-0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1,				/* Cusps   32 */
-1, 1, 1, 1, 1, 1, 1, 1, 1,						/* Uranians 42*/
-1,1,0,0,0,1,1,1,1,0,1,1,
-1,1,0,1,1,1,1,1,1,1,1,1,
-0,1,1,1,1,1,1,0,1,1,1,1,
-0,1,0,0,1,1,1,1,1,1,1,1,
-0,1,0,1,1,1,1,1,0,1,1,1,
-1,0,1,1,1,1,1,1,1,1,1,0,
-1,1,0
-};
-
-byte ignoreT3[NUMBER_OBJECTS] = { 0,
-	0, 0, 0, 0, 0, 0, 0, 1, 1, 1,					/* Planets  */
-	1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 				/* Minors   */
-	0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1,				/* Cusps    */
-	1, 1, 1, 1, 1, 1, 1, 1, 1,						/* Uranians */
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,	/* Stars    */
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-	1, 1, 1
-};
-
 /* Restriction of aspects as specified with -YRA switch. */
 byte ignoreA[cAspect + 1] = { 0,
 	0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 };
-
-byte ignoreA2[cAspect + 1] = { 0,
-	0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-};
-
-byte ignorez[4] = { 0, 0, 0, 0 };	/* Restrictions for -Zd chart events. */
-
-/* Gauquelin sector plus zones, as specified with -Yl switch. */
-
-byte pluszone[cSector + 1] = { 0,
-	1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1,
-	1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1
-};
-
 
 /*
 ******************************************************************************
@@ -1825,14 +1235,7 @@ double rAspAngle[cAspect + 1] = { 0,
 	0.0, 180.0, 90.0, 120.0, 60.0, 150.0, 30.0, 45.0, 135.0, 72.0, 144.0,
 	36.0, 360.0 / 7.0, 40.0, 80.0, 720.0 / 7.0, 1080.0 / 7.0, 160.0
 };
-
-double rAspAngle2[cAspect + 1] = { 0,
-	0.0, 180.0, 90.0, 120.0, 60.0, 150.0, 30.0, 45.0, 135.0, 72.0, 144.0,
-	36.0, 360.0 / 7.0, 40.0, 80.0, 720.0 / 7.0, 1080.0 / 7.0, 160.0
-};
-
 double rAspOrb[cAspect + 1] = { 0, 7.0, 7.0, 7.0, 7.0, 6.0, 3.0, 3.0, 1.5, 1.5, 1.0, 1.0, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5 };
-double rAspOrb2[cAspect + 1] = { 0, 7.0, 7.0, 7.0, 7.0, 6.0, 3.0, 3.0, 1.5, 1.5, 1.0, 1.0, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5 };
 
 double rObjOrb[cLastMoving + 1] = { 360.0,
 	360.0, 360.0, 360.0, 360.0, 360.0, 360.0, 360.0, 360.0, 360.0, 360.0,
@@ -1856,22 +1259,7 @@ double rObjOrbA[85] = {
   2.0
 };
 
-double rObjOrb2[cLastMoving + 1] = { 360.0,
-	360.0, 360.0, 360.0, 360.0, 360.0, 360.0, 360.0, 360.0, 360.0, 360.0,
-	360.0, 360.0, 360.0, 360.0, 360.0, 360.0, 360.0, 360.0, 360.0, 360.0, 360.0,
-	360.0, 360.0, 360.0, 360.0, 360.0, 360.0,
-	360.0, 360.0, 360.0, 360.0, 360.0, 360.0,
-	360.0, 360.0, 360.0, 360.0, 360.0, 360.0, 360.0, 360.0, 360.0
-};
-
 double rObjAdd[cLastMoving + 1] = { 0.0,
-	1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-	0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-	0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-	0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
-};
-
-double rObjAdd2[cLastMoving + 1] = { 0.0,
 	1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
 	0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
 	0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
@@ -1885,24 +1273,13 @@ char exalt[cLastMoving + 1] = { 0, 1,  2, 11,12,10, 4, 7, 8, 9,  6, 4,  4, 10,5,
 /* This array is the reverse of the ruler arrays:   */
 /* Here, given a sign, return what planet rules it. */
 char rules[NUMBER_OF_SIGNS + 1] = { 0, 5, 4, 3, 2, 1, 3, 4, 5,  6, 7, 7, 6 };
-int rulesA[12 + 1] = { -1,
-  oMar, oVen, oMer, oMoo, oSun, oMer, oVen, oPlu, oJup, oSat, oUra, oNep };
-int rules2A[12 + 1] = { -1,
-  -1, -1, -1, -1, -1, -1, -1, oMar, -1, -1, oSat, oJup };
-
-// colour defaults
-
-int kStar1 = kRed;
-int kStar2 = kOrange;
-int kStar3 = kMaroon;
-int kCornerDecoration = kDkBlue;
+int rulesA[12 + 1] = { -1,oMar, oVen, oMer, oMoo, oSun, oMer, oVen, oPlu, oJup, oSat, oUra, oNep };
+int rules2A[12 + 1] = { -1,-1, -1, -1, -1, -1, -1, -1, oMar, -1, -1, oSat, oJup };
 
 #ifdef INTERPRETALT
 byte NoPrint = 0;
 byte InterpretAlt = 0;
 #endif
-
-byte NoPrintHeader = 0;
 
 /* Influence information used by ChartInfluence() follows. The influence of */
 /* a cp0.longitude in its ruling or exalting sign or house is tacked onto the last */
@@ -1927,29 +1304,7 @@ double rObjInfA[90] = {
 10,10
 };
 
-double rObjInf2[cLastMoving + 3] = { 20,
-	30, 25, 10, 10, 10, 10, 10, 10, 10, 10,
-	5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
-	20, 10, 10, 10, 10, 10, 10, 10, 10, 15, 10, 10,
-	3, 3, 3, 3, 3, 3, 3, 3, 3,
-	20, 10
-};
-
 double ppower1[cLastMoving + 1] = { 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0
-};
-
-double ppower2[cLastMoving + 1] = { 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0
-};
-
-double ppowerTotal[cLastMoving + 1] = { 0,
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -1972,37 +1327,10 @@ double rAspInf[cAspect + 1] = { 0.0,
 	1.0, 0.8, 0.8, 0.6, 0.6, 0.4, 0.4, 0.2, 0.2,
 	0.2, 0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1
 };
-
-//double rAspInfA[25] = {
-//	0.0,
-//  1.0, 0.8, 0.8, 0.6, 0.6, 0.4, 0.4, 0.2, 0.2,
-//  0.2, 0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
-//  0.05, 0.05, 0.05, 0.05, 0.05, 0.05};
-
 double rAspInfA[25] = { 0.0,
 1.0,0.8,0.8,0.6,0.6,0.4,0.4,0.2,0.2,
 0.2,0.2,0.1,0.1,0.1,0.1,0.1,0.1,0.1,
 0.05,0.05,0.05,0.05,0.05,0.05 };
-
-double rAspInf2[cAspect + 1] = { 0.0,
-	1.0, 0.8, 0.8, 0.6, 0.6, 0.4, 0.4, 0.2, 0.2,
-	0.2, 0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1
-};
-
-/* The inherent strength of each cp0.longitude when transiting - */
-double rTransitInf[cLastMoving + 3] = { 10,
-	10, 4, 8, 9, 20, 30, 35, 40, 45, 50,
-	30, 15, 15, 15, 15, 30, 30, 1, 1, 1, 1,
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-	50, 50, 50, 50, 50, 50, 50, 50, 50
-};
-
-double rTransitInf2[cLastMoving + 3] = { 10,
-	10, 4, 8, 9, 20, 30, 35, 40, 45, 50,
-	30, 15, 15, 15, 15, 30, 30, 1, 1, 1, 1,
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-	50, 50, 50, 50, 50, 50, 50, 50, 50
-};
 
 const double rObjDiam[oVesta + 1] = { 12756.0, 1392000.0, 3476.0,
 	4878.0, 12102.0, 6786.0, 142984.0, 120536.0, 51118.0, 49528.0, 2300.0,
@@ -2024,50 +1352,17 @@ const char *szStarConName[cStar + 1] = { "",
 	"SgrA*\0   ", "HerA*\0   ", "alAqr\0   "
 };
 
-int NParseCommandLine(char *szLine, char **argv);
-int NParseCommandLineW(wchar_t *szLine, wchar_t **argv);
-
 double StarOrb = 1.2;
-double PartOrb = 1.0;
 double CoeffComp = 2.5;
 double CoeffPar = 6.0;
-double CoeffTens = 1.0;
 double PowerPar = 0.25;
-double SolidAspect = 8.0;
-double SConjunct = 0.0;
-double SHarmarmon = 0.0;
-double STension = 0.0;
-double SSumma = 0.0;
-double SChart = 0.0;
-double PrimeOrb1 = 1.16666667;
-double PrimeOrb2 = 1.16666667;
-int StarAspects = 1;
-int PartAspects = 1;
-int PartAspectsShow = 5;
-int TensChart = 0;
+
 int hRevers = 0;
-int InfoFlag = 0;
 int PrimeRest = 0;
-int MonthFormat = FALSE;
-byte StarRest = 0;
 byte PolarMCflip = 0;
 byte fEquator = 0;
 byte oscLilith = 0;
-byte fNESW = 0;
 BOOL fSortAspectsByOrbs = 0; // if false, sorting is done by power
-byte fDisp = FALSE;
-
-int CornerDecorationType = 0; // 0 = none, 1 = moire, 2 = spider
-int CornerDecorationSize = 60;
-int CornerDecorationNumberLines = 80;	// used only for spider web
-
-CI *LastChartShown = NULL;
-
-/*
-******************************************************************************
-** Object Calculation Tables.
-******************************************************************************
-*/
 
 const byte rErrorCount[oPlu - oJup + 1] = { 11, 5, 4, 4, 4 };
 const byte rErrorOffset[oPlu - oJup + 1] = { 0, 72, 72 + 51, 72 + 51 + 42, 72 + 51 + 42 + 42 };
@@ -2236,14 +1531,8 @@ GS gs = {
 GI gi = {
 	0, FALSE, -1,
 	NULL, 0, NULL, NULL, 0, 0.0, FALSE,
-	2, 1, 10, kWhite, kBlack, kLtGray, kDkGray, 0, 0, 0, 0, -1, -1
-#ifdef PS
-		, FALSE, 0, FALSE, 0, 0, 1.0
-#endif
-#ifdef META
-		, NULL, NULL, MAXMETA, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1
-#endif
-		,1,FALSE
+	2, 1, 10, 0, 0, 0, 0, -1, -1
+	,1,FALSE
 };
 
 WI wi = {
@@ -2251,7 +1540,7 @@ WI wi = {
 	hdcNil, hdcNil,hdcNil, (HWND)NULL, (HPEN)NULL, (HBRUSH)NULL, (HFONT)NULL,*/
 	0, 0, 0, 0, 0, 0, 0, -1, -1,
 	0, 0, FALSE, TRUE, FALSE, TRUE, FALSE, 1, FALSE,
-	FALSE, FALSE, FALSE, FALSE, TRUE, FALSE, kLtGray, 1, 1000, 0, 0, FALSE,
+	FALSE, FALSE, FALSE, FALSE, TRUE, FALSE, 1, 1000, 0, 0, FALSE,
 	false, /*fDisableMacroShortcuts*/
 	/*NULL,//HFONT h;
 	NULL,//HFONT m_hFont;
@@ -2279,31 +1568,14 @@ WI wi = {
   (obj < oMoo ? 0 : (obj <= cLastPlanet ? obj - 2 : obj - uranLo + cLastPlanet - 1))
 #define Tropical(deg) (deg - is.rSid + us.rSiderealCorrection)
 
-#define BLo(w) ((byte)(w))
-#define BHi(w) ((byte)((word)(w) >> 8 & 0xFF))
-#define WLo(l) ((word)(dword)(l))
-#define WHi(l) ((word)((dword)(l) >> 16 & 0xFFFF))
-#define WFromBB(bLo, bHi) ((word)BLo(bLo) | (word)((byte)(bHi)) << 8)
-#define LFromWW(wLo, wHi) ((dword)WLo(wLo) | (dword)((word)(wHi)) << 16)
-#define LFromBB(b1, b2, b3, b4) LFromWW(WFromBB(b1, b2), WFromBB(b3, b4))
-#define RGBR(l) BLo(l)
-#define RGBG(l) BHi(l)
-#define RGBB(l) ((byte)((dword)(l) >> 16 & 0xFF))
-#define ChHex(n) (char)((n) < 10 ? '0' + (n) : 'a' + (n) - 10)
-#define VgaFromEga(x) NMultDiv((x), 480, 350)
-#define VgaFromCga(x) NMultDiv((x), 480, 200)
 #define Max(v1, v2) ((v1) > (v2) ? (v1) : (v2))
 #define Min(v1, v2) ((v1) < (v2) ? (v1) : (v2))
-#define NSgn(n) ((n) < 0 ? -1 : (n) > 0)
 #define RSgn2(r) ((r) < 0.0 ? -1.0 : 1.0)
 #define FBetween(v, v1, v2) ((v) >= (v1) && (v) <= (v2))
 #define RFract(r) ((r) - floor(r))
 #define ChCap(ch) ((ch) >= 'a' && (ch) <= 'z' ? (ch) - 'a' + 'A' : (ch))
-#define ChCapW(ch) ((ch) >= L'a' && (ch) <= L'z' ? (ch) - L'a' + L'A' : (ch))
-#define ChUncap(ch) (FCapCh(ch) ? (ch) - 'A' + 'a' : (ch))
 #define FCapCh(ch) ((ch) >= 'A' && (ch) <= 'Z')
 #define FNumCh(ch) ((ch) >= '0' && (ch) <= '9')
-#define NMultDiv(n1, n2, n3) ((int)((long)(n1) * (n2) / (n3)))
 #define Ratio(v1, v2, v3) ((v1) + ((v2) - (v1)) * (v3))
 #define Sign2Z(s) ((double)(((s)-1)*30))
 #define Z2Sign(r) (((int)(r))/30+1)
@@ -2312,51 +1584,15 @@ WI wi = {
 #define NFloor(r) ((int)floor(r))
 #define RSinD(r) sin(Deg2Rad(r))
 #define RCosD(r) cos(Deg2Rad(r))
-#define NSinD(nR, nD) ((int)((double)(nR)*RSinD((double)nD)))
-#define NCosD(nR, nD) ((int)((double)(nR)*RCosD((double)nD)))
-#define mod12(n) ((n - 1) % 12 + 1)  // returns 1-12, n must be >= 1
-#define mod36(n) ((n - 1) % 36 + 1)  // returns 1-36, n must be >= 1
 
 // object comparison
-#define FItem(obj)    FBetween(obj, 0, cObj)
 #define FNorm(obj)    FBetween(obj, 0, cLastMoving)
 #define FCusp(obj)    FBetween(obj, cuspLo, cuspHi)
 #define FAngle(obj)   (obj == oAsc || obj == oNad  || obj == oDes  || obj == oMC)
 #define FMinor(obj)   (FCusp(obj) && (obj - oAsc) % 3 != 0)
-#define FUranian(obj) FBetween(obj, uranLo, uranHi)
 #define FStar(obj)    FBetween(obj, starLo, starHi)
 #define FObject(obj)  ((obj) <= oVesta || (obj) >= uranLo)
 #define FThing(obj)   ((obj) <= cThing || (obj) >= uranLo)
-#define FHelio(obj)   (FNorm(obj) && FObject(obj) && (obj) != oMoo)
-
-/* Compute Mollewide projection in pixel scale given latitude. */
-#define NMollewide(y) \
-  ((int)(sqrt((double)(180L*nScl*180L*nScl - 4L*(y)*nScl*(y)*nScl))+0.5))
-/* Do settings indicate the current chart should have the info sidebar? */
-#define fSidebar ((gi.nCurrChart == gWheel || gi.nCurrChart == gHouse || \
-  gi.nCurrChart == gSector) && gs.fText && !us.fVelocity)
-/* Is the current chart most properly displayed as a square graphic? */
-#define fSquare \
-  (gi.nCurrChart == gWheel || gi.nCurrChart == gHouse || gi.nCurrChart == gGrid || \
-  (gi.nCurrChart == gHorizon && us.fPrimeVert) || gi.nCurrChart == gDisposit || \
-  gi.nCurrChart == gOrbit || gi.nCurrChart == gGlobe || gi.nCurrChart == gPolar)
-/* Does the current chart have to be displayed in a map rectangle? */
-#define fMap \
-  (gi.nCurrChart == gAstroGraph || gi.nCurrChart == gWorldMap)
-/* Do settings indicate the current chart should have an outer border? */
-#define fDrawBorder \
-  ((gs.fBorder || gi.nCurrChart == gGrid) && gi.nCurrChart != gGlobe && \
-  gi.nCurrChart != gPolar && (gi.nCurrChart != gWorldMap || !gs.fMollewide))
-/* Do settings indicate current chart should have chart info at its bottom? */
-#define fDrawText \
-  (gs.fText && gi.nCurrChart != gEphemeris && gi.nCurrChart != gCalendar && gi.nCurrChart != gWorldMap && \
-  gi.nCurrChart != gGlobe && gi.nCurrChart != gPolar && ((gi.nCurrChart != gWheel && \
-  gi.nCurrChart != gHouse && gi.nCurrChart != gSector) || us.fVelocity))
-
-#define SIZEOF_FIELD(structure, field) (sizeof(((structure *) 0)->field))
-#define NUM_ELEMENTS(array)  (sizeof(array)/sizeof(*array))
-
-//==================================================================================================
 
 #define RSqr(r) sqrt(r)
 #define RLength3(x, y, z) RSqr(Sq(x) + Sq(y) + Sq(z))
@@ -2367,107 +1603,25 @@ double Latit = 0.0;
 double ObjPrime[cLastMoving + 1];
 double StarPrime[cStar + 1];
 
-/* These are the actual color arrays and variables used by the program.      */
-/* Technically, Astrolog always assumes we are drawing on a color terminal; */
-/* for B/W graphics, all the values below are filled with black or white.    */
-
-KI kMainB[9], kRainbowB[8], kElemB[4], kAspB[cAspect + 1], kObjB[NUMBER_OBJECTS];
-
-/*
-******************************************************************************
-** Graphics Table Data.
-******************************************************************************
-*/
-
-#ifdef STROKE
-//const char szObjectFont[cLastMoving + 2] = ";QRSTUVWXYZ     <    a  c     b  >         ";
-//const char szAspectFont[cAspect + 1] = "!\"#$'&%()+-       ";
-const char szObjectFont[] = ";QRSTUVWXYZ     <    a  c     b  >         ";
-const char szAspectFont[] = "!\"#$'&%()+-       ";
-#endif							/* Contraparallel */
-
 #define PrintL() is.szFileScreen? PrintSzW(L"\n"):PrintSzW(L"\n")
+#define PrintL2() is.szFileScreen? PrintSzW(L"\n\n"):PrintSzW(L"\n\n")
 
 extern void CoorXform(double* azi, double* alt, double tilt);
 
 #define chSig3(A) tSignName[A][0], tSignName[A][1], tSignName[A][2]
 #define chSig3C(A) tSignName[A][0], tSignName[A][1], tSignName[A][2]
-#define chSig2C(A) tSignName[A][0], tSignName[A][1]
 
 #define chObj3(A) tObjShortName[A][0], tObjShortName[A][1], tObjShortName[A][2]
 #define chObj3C(A) tObjShortName[A][0], tObjShortName[A][1]
-#define chMon3(A) tMonth[A][0], tMonth[A][1], tMonth[A][2]
-#define chMon3C(A) tMonth[A][0], tMonth[A][1], tMonth[A][2], tMonth[A][3]
-#define chDay3(A) tDay[A][0], tDay[A][1], tDay[A][2]
-#define chDay3C(A) tDay[A][0], tDay[A][1], tDay[A][2],tDay[A][3]
-#define chDay2(A) tDay[A][0], tDay[A][1]
-
-#define kSignA(s) kElemA[(s)-1 & 3]
-#define kSignB(s) kElemB[(s)-1 & 3]
-#define kModeA(m) kElemA[m <= 1 ? m : eWat]
 
 #define FIgnore(i)  (ignore1[i] || (i) == us.objCenter || (i) == oLil && us.objCenter != oEar)
-#define FIgnore2(i) (ignore2[i] || (i) == us.objCenter || (i) == oLil && us.objCenter != oEar)
-#define FIgnore3(i) (ignore3[i] || (i) == us.objCenter || (i) == oLil && us.objCenter != oEar)
 
-#define notV(V) V = !(V)
 #define negV(V) V = -(V)
 
-#define PrintL() is.szFileScreen? PrintSzW(L"\n"):PrintSzW(L"\n")
-#define PrintL2() is.szFileScreen? PrintSzW(L"\n\n"):PrintSzW(L"\n\n")
-
 #define SwapN(n1, n2) {int  tmp = n1; n1 = n2; n2 = tmp;}
-#define SwapR(r1, r2) {double tmp = r1; r1 = r2; r2 = tmp;}
 
 #define FSwitchF(f) ((((f) | fOr) & !fAnd) ^ fNot)
 #define SwitchF(f) f = FSwitchF(f)
-#define SwitchF2(f) f = (((f) | (fOr || fNot)) & !fAnd)
-
-/* Should an object in the outer wheel be restricted? */
-#define FProper2(i) ( !( us.nRel == rcProgress ? ignore3[i] : ( ( (us.nRel == rcTransit || isSolarReturn || isLunarReturn) || us.nRel == rcProgTran) ? ignore2[i] : ignore1[i])) && i != us.objCenter)
-#define FProper3(i)  ( !ignore3[i] && i != us.objCenter)
-#define FProper21(i) ( !ignore2[i] && i != us.objCenter)
-
-#define FProper22(i) ( !(IsComparison ? ignore3[i] : (IsTransitAndNatal ? ignore2[i] : ignore1[i])) && i != us.objCenter)    
-
-/* Are particular coordinates on the chart? */
-#define FInRect(x, y, x1, y1, x2, y2) \
-  ((x) >= (x1) && (x) < (x2) && (y) >= (y1) && (y) < (y2))
-#define FOnWin(X, Y) FInRect((X), (Y), 0, 0, gs.xWin, gs.yWin)
-/* Get a coordinate based on chart radius, a fraction, and (co)sin value. */
-#define POINT1(U, R, S) ((int)(((U)+1.4)*(R)*(S)))
-#define POINT2(U, R, S) ((int)(((U)-0.3)*(R)*(S)))
-/* Determine (co)sin factors based on zodiac angle and chart orientation. */
-#define PX(A) RCosD(A)
-#define PY(A) RSinD(A)
-#define PZ(A) PlaceInX(A)
-/* Compute Mollewide projection in pixel scale given latitude. */
-#define NMollewide(y) \
-  ((int)(sqrt((double)(180L*nScl*180L*nScl - 4L*(y)*nScl*(y)*nScl))+0.5))
-/* Do settings indicate the current chart should have the info sidebar? */
-#define fSidebar ((gi.nCurrChart == gWheel || gi.nCurrChart == gHouse || \
-  gi.nCurrChart == gSector) && gs.fText && !us.fVelocity)
-/* Is the current chart most properly displayed as a square graphic? */
-#define fSquare \
-  (gi.nCurrChart == gWheel || gi.nCurrChart == gHouse || gi.nCurrChart == gGrid || \
-  (gi.nCurrChart == gHorizon && us.fPrimeVert) || gi.nCurrChart == gDisposit || \
-  gi.nCurrChart == gOrbit || gi.nCurrChart == gGlobe || gi.nCurrChart == gPolar)
-/* Does the current chart have to be displayed in a map rectangle? */
-#define fMap \
-  (gi.nCurrChart == gAstroGraph || gi.nCurrChart == gWorldMap)
-/* Do settings indicate the current chart should have an outer border? */
-#define fDrawBorder \
-  ((gs.fBorder || gi.nCurrChart == gGrid) && gi.nCurrChart != gGlobe && \
-  gi.nCurrChart != gPolar && (gi.nCurrChart != gWorldMap || !gs.fMollewide))
-/* Do settings indicate current chart should have chart info at its bottom? */
-#define fDrawText \
-  (gs.fText && gi.nCurrChart != gEphemeris && gi.nCurrChart != gCalendar && gi.nCurrChart != gWorldMap && \
-  gi.nCurrChart != gGlobe && gi.nCurrChart != gPolar && ((gi.nCurrChart != gWheel && \
-  gi.nCurrChart != gHouse && gi.nCurrChart != gSector) || us.fVelocity))
-
-#define SIZEOF_FIELD(structure, field) (sizeof(((structure *) 0)->field))
-#define NUM_ELEMENTS(array)  (sizeof(array)/sizeof(*array))
-
 
 #define PtZero(pt) pt.x = pt.y = pt.z = 0.0;
 #define PtSet(pt, a, b, c) pt.x = a; pt.y = b; pt.z = c;
@@ -2479,22 +1633,13 @@ extern void CoorXform(double* azi, double* alt, double tilt);
 #define PtNeg2(pt, pt2) pt.x = -pt2.x; pt.y = -pt2.y; pt.z = -pt2.z;
 #define PtVec(pt, pt1, pt2) pt = pt2; PtSub2(pt, pt1);
 #define PtDot(pt1, pt2) (pt1.x*pt2.x + pt1.y*pt2.y + pt1.z*pt2.z)
-#define PtCross(pt, pt1, pt2) pt.x = pt1.y*pt2.z - pt1.z*pt2.y; \
-  pt.y = pt1.z*pt2.x - pt1.x*pt2.z; pt.z = pt1.x*pt2.y - pt1.y*pt2.x;
-
-
-
-
-int kElemA[4] = { 9,3,13,2 };
-int kAspA[cAspect + 1] = { 15,8,5,9,10,14,8,8,7,7,7,7,7,7,7,7,7,7,7 };
-int kRainbowA[8] = { 15, 9, 3, 11, 10, 14, 12, 5 };
-int kMainA[9] = { 0,15,7,8,1,2,6,3,13 };
 
 //==================================================================================================
 
 #define EquToLocal(Z, L, T) CoorXform(Z, L, T)
 #define JulianDayFromTime(t) ((t)*36525.0+2415020.0)
 #define Untropical(deg) ((deg) + is.rSid - us.rZodiacOffset)
+
 #define Mon ciMain.mon
 #define Day1 ciMain.day
 #define Yea ciMain.yea
@@ -2504,70 +1649,17 @@ int kMainA[9] = { 0,15,7,8,1,2,6,3,13 };
 #define Lon ciMain.lon
 #define Lat ciMain.lat
 
-#define cObjInt    uranHi
-#define objMax     (NUMBER_OBJECTS)
-#define cCnstl     88
-#define cSector    36
-#define cPart      177
-#define cWeek      7
-#define cColor     16
-#define cRainbow   7
 #define cRay       7
-#define xFont      6
-#define xFontT     (xFont * gi.nScaleText * gi.nScaleT)
-#define yFontT     (yFont * gi.nScaleText * gi.nScaleT)
-#define xSideT     (SIDESIZE * gi.nScaleText * gi.nScaleT)
 
-#define nDegMax    360
-#define nDegHalf   180
-#define nLarge     9999999
-#define zonLMT     24.0
-
-#define kBlackB   kMainB[0]
-#define kWhiteB   kMainB[1]
-#define kLtGrayB  kMainB[2]
-#define kDkGrayB  kMainB[3]
-#define kMaroonB  kMainB[4]
-#define kDkGreenB kMainB[5]
-#define kDkCyanB  kMainB[6]
-#define kDkBlueB  kMainB[7]
-#define kMagentaB kMainB[8]
-
-#define kRedB    kRainbowB[1]
-#define kOrangeB kRainbowB[2]
-#define kYellowB kRainbowB[3]
-#define kGreenB  kRainbowB[4]
-#define kCyanB   kRainbowB[5]
-#define kBlueB   kRainbowB[6]
-#define kPurpleB kRainbowB[7]
-
-#define Max(v1, v2) ((v1) > (v2) ? (v1) : (v2))
-#define Min(v1, v2) ((v1) < (v2) ? (v1) : (v2))
-#define NSgn(n) ((n) < 0 ? -1 : (n) > 0)
 #define RSgn2(r) ((r) < 0.0 ? -1.0 : 1.0)
-#define FOdd(n) ((n) & 1)
 #define FBetween(v, v1, v2) ((v) >= (v1) && (v) <= (v2))
-#define ChCap(ch) ((ch) >= 'a' && (ch) <= 'z' ? (ch) - 'a' + 'A' : (ch))
-#define ChUncap(ch) (FCapCh(ch) ? (ch) - 'A' + 'a' : (ch))
-#define FCapCh(ch) ((ch) >= 'A' && (ch) <= 'Z')
-#define FUncapCh(ch) ((ch) >= 'a' && (ch) <= 'z')
-#define FNumCh(ch) ((ch) >= '0' && (ch) <= '9')
-#define NHex(ch) ((int)((ch) <= '9' ? (ch) - '0' : (ch) - 'a' + 10) & 15)
-#define NMultDiv(n1, n2, n3) ((int)((long)(n1) * (n2) / (n3)))
 #define Ratio(v1, v2, v3) ((v1) + ((v2) - (v1)) * (v3))
 #define ZFromS(s) ((double)(((s)-1)*30))
 #define SFromZ(r) (((int)(r))/30+1)
 #define RFromD(r) ((r)/rDegRad)
 #define DFromR(r) ((r)*rDegRad)
 #define GFromO(o) ((rDegMax - (o))/10.0)
-//#define GFromO(o) ((rDegMax - cp0.longitude[o])/10.0)
-//#define RAbs(r) fabs(r)
-#define NAbs(n) abs(n)
-#define RFloor(r) floor(r)
 #define Sq(n) ((n)*(n))
-#define RSqr(r) sqrt(r)
-#define RLog(r) log(r)
-#define RLog10(r) (RLog(r) / rLog10)
 #define RSin(r) sin(r)
 #define RCos(r) cos(r)
 #define RTan(r) tan(r)
@@ -2575,15 +1667,6 @@ int kMainA[9] = { 0,15,7,8,1,2,6,3,13 };
 #define RAsin(r) asin(r)
 #define RAcos(r) acos(r)
 #define RTanD(r) RTan(RFromD(r))
-
-typedef struct _ObjDraw {
-	int obj;  /* The object to draw                  */
-	int x;    /* Horizontal pixel position of object */
-	int y;    /* Vertical pixel position of object   */
-	int yg;   /* Vertical pixel position of glyph    */
-	unsigned long kv;    /* Color to use when drawing object    */
-	int f;   /* Whether to draw object at all       */
-} ObjDraw;
 
 #define cPlanet 18
 #define cuspLo  (oCore+1)
@@ -2629,7 +1712,7 @@ enum _eclipses {
 	etAnnular   = 4,  // Annular eclipse
 	etTotal     = 5,  // Total eclipse
 	etMax       = 6,
-  };
+};
 
 #define rPi        3.14159265358979323846
 #define rPi2       (rPi*2.0)
@@ -2647,7 +1730,6 @@ enum _eclipses {
 #define rJD2000    2451545.0
 #define rSmall     (1.7453E-09)
 #define rLarge     10000.0
-#define rInvalid   (1.23456789E-09)
 #define rRound     0.5
 #define RAsinD(r) DFromR(RAsin(r))
 #define RAngleD(x, y) DFromR(RAngle(x, y))
@@ -2703,21 +1785,6 @@ const char* szHouseSystem[NUMBER_OF_HOUSE_SYSTEMS] = {
 	"Placidus", "Koch", "Equal(Asc)", "Campanus", "Meridian",
 	"Regiomontanus", "Porphyry", "Morinus", "Topocentric", "Alcabitius",
 	"Equal(MC)", "Neo-Porphyry", "Whole", "Vedic", "Null", "Shripati"
-};
-
-wchar_t szAspectAbbrev[cAspect + 1][10] = { L"",
-	L"Con", L"Opp", L"Squ", L"Tri", L"Sex",
-	L"Inc", L"SSx", L"SSq", L"Ses", L"Qui", L"BQn",
-	L"SQn", L"Sep", L"Nov", L"BNv", L"BSp", L"TSp", L"QNv"
-};
-
-// //char as[19][5]={"","合","冲","刑","拱","六分","梅花","四合","半刑","补八","五分","倍五","十分","七分","九分","九二","七二","三分","九四"};
-wchar_t szAspectAbbrevC[cAspect + 1][10] = { L"",
-	L"合", L"冲", L"刑", L"拱", L"六分",
-	L"梅花", L"四合", L"半刑", L"补八",
-	L"五分", L"倍五",
-	L"十分", L"七分", L"九分",
-	L"九二", L"七二", L"三分", L"九四"
 };
 
 const char* szZon[cZone] = {
@@ -2781,192 +1848,6 @@ const char* szZonC[cZone] = {
 	"新西兰时间", "ZT", "Z", "IDL",
 	"当地平均时", "LT", "L"
 };
-
-// text that will be displayed in the About dialogue box
-// Note: we need carriage return line feed sequences ("\n") for Windows to display
-// correctly a new line (just '\n' is not enough).
-
-#ifdef ARABIC
-AI ai[cPart] = {
-	{L"    02 01F ", L"Fortune"},
-	{L"    01 02F ", L"Spirit"},
-	{L"    06 S F ", L"Victory"},
-	{L"    F  05F ", L"Valor & Bravery"},
-	{L"    05 03Fh", L"Mind & Administrators"},
-	{L"   h02r02Fh", L"Property & Goods"},
-	{L"    06 07 h", L"Siblings"},
-	{L"   j03 01Fh", L"Death of Siblings"},
-	{L"    06 07Fh", L"Death of Parents"},
-	{L"    07h02Fh", L"Grandparents"},
-	{L"    06 03Fh", L"Real Estate"},
-	{L"    07 06Fh", L"Children & Life"},
-	{L"   R02 02 h", L"Expected Birth"},
-	{L"    05 03 h", L"Disease & Defects (1)"},
-	{L"    05 07 h", L"Disease & Defects (2)"},
-	{L"   R07 07 h", L"Captivity"},
-	{L"    02 03 h", L"Servants"},
-	{L"   h07 04 h", L"Partners"},
-	{L"   h08 02 h", L"Death"},
-	{L"    05 07Fh", L"Sickness & Murder"},
-	{L"    03 07Fh", L"Danger, Violence & Debt"},
-	{L"   h09r09 h", L"Journeys"},
-	{L"   105 07Fh", L"Travel by Water"},
-	{L"    03 02Fh", L"Faith, Trust & Belief"},
-	{L"    02 07Fh", L"Deep Reflection"},
-	{L"    01 07Fh", L"Understanding & Wisdom"},
-	{L"    06 01Fh", L"Fame & Recognition"},
-	{L"    02 05Fh", L"Rulers & Disassociation"},
-	{L"    07 01Fh", L"Father, Fate & Karma"},	/* Combust */
-	{L"    F  07Fh", L"Sudden Advancement"},
-	{L"    01 07 h", L"Celebrity of Rank"},
-	{L"    07 05Fh", L"Surgery & Accident"},
-	{L"    04 03Fh", L"Merchants & Their Work"},
-	{L"    F  S Fh", L"Merchandise (Exchange)"},	/* Moon */
-	{L"    02 04Fh", L"Mother"},
-	{L"    S  F Fh", L"Glory & Constancy"},
-	{L"    01 F Fh", L"Honorable Acquaintances"},
-	{L"    06 F Fh", L"Success"},
-	{L"    04 F Fh", L"Worldliness"},
-	{L"    03 02 h", L"Acquaintances"},
-	{L"    03 S  h", L"Violence"},
-	{L"    01 03Fh", L"Liberty of Person"},
-	{L"    04 06Fh", L"Praise & Acceptance"},
-	{L"   h12r12 h", L"Enmity"},
-	{L"    F  S  h", L"Bad Luck"},
-	{L"    05 F F ", L"Debilitated Bodies"},
-	{L"    02D  F ", L"Boldness & Violence"},
-	{L"    S  03F ", L"Trickery & Deceit"},
-	{L"   h03 05  ", L"Necessities"},
-	{L"    03 F   ", L"Realization of Needs"},
-	{L"    01 05F ", L"Retribution"},
-	{L"    06 02  ", L"Children (Male)"},
-	{L"    04 02  ", L"Children (Female)"},
-	{L"    05 04  ", L"Play & Variety"},	/* Change */
-	{L"    07 03 h", L"Stability"},
-	{L"   h05 06Fh", L"Speculation"},
-	{L"    03 04Fh", L"Art"},
-	{L"   h05r05 h", L"Sexual Attraction"},
-	{L"    10 04 h", L"Sex Drive & Stimulation"},
-	{L"    05 01 h", L"Passion"},
-	{L"    05 04 h", L"Emotion & Affection"},
-	{L"   r08 07 h", L"Most Perilous Year"},
-	{L"   h08 07 h", L"Peril"},
-	{L"    09 08 h", L"Occultism"},
-	{L"    03 01 h", L"Commerce"},
-	{L"h09h03 04 h", L"Marriage Contracts"},
-	{L"   h09r09 h", L"Travel by Land"},
-	{L"    08H08 h", L"Travel by Air"},
-	{L" 30 01 02Fh", L"Destiny"},
-	{L" 30 02 01Fh", L"Vocation & Status"},
-	{L"   019 01 h", L"Honor, Nobility (Day)"},
-	{L"   033 02 h", L"Honor, Nobility (Night)"},
-	{L"    10 01 h", L"Organization"},
-	{L"    04h07 h", L"Divorce"},
-	{L"    08 01 h", L"Ostracism & Loss"},
-	{L"    02 08Fh", L"Friends"},
-	{L"    07 01 h", L"Tragedy & Brethren"},
-	{L"    02 10Fh", L"Race (Consciousness)"},
-	{L"    02D02Fh", L"Bondage & Slavery"},
-	{L"    F  09 h", L"Imprisonment & Sorrow"},
-	{L"    04 08 h", L"Perversion"},
-	{L"   h12 09 h", L"Self-Undoing"},
-	{L"    09 01 h", L"Treachery & Entrapment"},
-	{L"h12r12 09 h", L"Bereavement"},
-	{L"    06h12 h", L"Suicide (Yang)"},
-	{L"   h08 09 h", L"Suicide (Yin)"},
-	{L"    06 09 h", L"Depression"},
-	{L" 05 09 08 h", L"Assassination (Yang)"},
-	{L"   r12 09 h", L"Assassination (Yin)"},
-	{L"    09 06  ", L"Cancer (Disease)"},
-	{L"    08 07  ", L"Catastrophe"},
-	{L"    07 08  ", L"Foolhardiness"},
-	{L"    03 05  ", L"Release & Luck"},
-	{L"    06 03  ", L"Benevolence & Assurance"},
-	{L"    03 06  ", L"Hope & Sensitivity"},
-	{L"    03 07  ", L"Aptness & Aloofness"},
-	{L"    08 09  ", L"Charm & Personality"},
-	{L"    02 03F ", L"Faith & Good Manners"},
-	{L"    01 03  ", L"Temperament"},
-	{L"    04 03  ", L"Security & Treasure"},
-	{L"    08 03  ", L"Originality"},
-	{L"    03 08  ", L"Eccentricity, Astrology"},
-	{L"    09 03  ", L"Divination"},
-	{L"    03 09  ", L"Intrusion"},
-	{L"    05 06  ", L"Negotiation"},
-	{L"    06 05  ", L"Discord & Controversy"},
-	{L"    05 08  ", L"Coincidence"},
-	{L"    08 05  ", L"Unpreparedness"},
-	{L"    05 09  ", L"Popularity"},
-	{L"    09 05  ", L"Misunderstanding"},
-	{L"    04 06  ", L"Sentiment & Marriage"},
-	{L"    06 04  ", L"Loneliness"},
-	{L"    04 07  ", L"Success in Investment"},
-	{L"    07 04  ", L"Frugality & Labor"},
-	{L"    08 04  ", L"Wastefulness"},
-	{L"    04 09  ", L"Vanity"},
-	{L"    09 04  ", L"Corruptness"},
-	{L"    01 05  ", L"Initiative"},
-	{L"    05 02F ", L"Memory"},
-	{L"    04 01  ", L"Love, Beauty & Peace"},
-	{L"    01 04  ", L"Disinterest & Boredom"},
-	{L"    01 06  ", L"Accomplishment"},
-	{L"    07 02F ", L"Influence"},
-	{L"    06 01  ", L"Increase & Impression"},
-	{L"    09 07  ", L"Caution"},
-	{L"    07 09  ", L"Timidity"},
-	{L"    08 06  ", L"Entertainment"},
-	{L"    06 08  ", L"Bequest"},
-	{L"    01 09  ", L"Genius"},
-	{L"    02 09F ", L"Revelation"},
-	{L"    09 02F ", L"Delusion"},
-	{L"    08 02F ", L"Misinterpretation"},
-	{L"    01 08  ", L"Intellectuality"},
-	{L"    06 07 E", L"Earth"},
-	{L"    04 02 E", L"Water"},
-	{L"   r04 03 E", L"Air & Wind"},
-	{L"    05 01 E", L"Fire"},
-	{L"    07 05FE", L"Clouds"},
-	{L"    04 02FE", L"Rains"},
-	{L"    07 03FE", L"Cold"},
-	{L"    06 01FC", L"Wheat"},
-	{L"    06 02FC", L"Barley & Meats"},
-	{L"    04 06FC", L"Rice & Millet"},
-	{L"    07 06FC", L"Corn"},
-	{L"    07 05FC", L"Lentils, Iron, Pungents"},
-	{L"    05 07FC", L"Beans & Onions"},
-	{L"    01 03FC", L"Chick Peas"},
-	{L"    04 07FC", L"Sesame & Grapes"},
-	{L"    03 04FC", L"Sugar & Legumes"},
-	{L"    01 02FC", L"Honey"},
-	{L"    02 05FC", L"Oils"},
-	{L"    04 05FC", L"Nuts & Flax"},
-	{L"    02 03FC", L"Olives"},
-	{L"    05 07FC", L"Apricots & Peaches"},
-	{L"    03 06FC", L"Melons"},
-	{L"    05 02FC", L"Salt"},
-	{L"    03 01FC", L"Sweets"},
-	{L"    07 03FC", L"Astrigents & Purgatives"},
-	{L"    04 03FC", L"Silk & Cotton"},
-	{L"    05 07FC", L"Purgatives (Bitter)"},
-	{L"    06 07FC", L"Purgatives (Acid)"},
-	{L"    30D   H", L"Secrets"},
-	{L"    02 03FH", L"Information True/False"},
-	{L"    F D  FH", L"Injury to Business"},
-	{L" 03 07 06 H", L"Freedmen & Servants"},
-	{L" 02 07 06 H", L"Employers"},
-	{L"   h07 04 H", L"Marriage"},
-	{L"    06 01 H", L"Time for Action/Success"},
-	{L"    07 01 H", L"Time Occupied in Action"},
-	{L" 07 06 01 H", L"Dismissal & Resignation"},
-	{L"    05 02 H", L"Life/Death of Absentee"},
-	{L"    05 01 H", L"Lost Animal (Light)"},
-	{L"    05 07 H", L"Lost Animal (Dark)"},
-	{L"    03 05 H", L"Lawsuit"},
-	{L"h08 05 02 H", L"Decapitation"},
-	{L" 30 07 02 H", L"Torture"},
-	{L" 02h04D   H", L"Lost Objects"}
-};
-#endif /* ARABIC */
 
 //#include "shlobj.h"		// for SHBrowseForFolder
 BOOL FCreateGridA(BOOL fFlip);
@@ -3606,7 +2487,6 @@ void initElemTable(ET* pet)
 	pet->coIC = 0;					/* Objects in Northern houses.        */
 }
 
-
 /* Fill out tables based on the number of unrestricted planets in signs by	*/
 /* element, signs by mode, as well as other values such as the number of	*/
 /* objects in yang vs. yin signs, in various house hemispheres (north/south */
@@ -4069,26 +2949,6 @@ void PrintSz(const char *sz, ...)
 		{
 			putc(*pch, is.S);
 		}
-#if 0
-		if (*pch == '\n' && is.S == stdout && wi.hdcPrint != hdcNil && is.cchRow >= us.nScrollRow)
-		{
-			/* If writing to the printer, start a new page when appropriate. */
-
-			is.cchRow = 0;
-			EndPage(wi.hdcPrint);
-			StartPage(wi.hdcPrint);
-
-			/* StartPage clobbers all the DC settings for Windows 95, 98, etc,   */
-			/* however for NT, 2000 and later it doesn't. Here we cater for both */
-			SetMapMode(wi.hdcPrint, MM_ANISOTROPIC);	/* For SetViewportExtEx */
-			SetViewportOrgEx(wi.hdcPrint, 0, 0, NULL);
-			SetViewportExtEx(wi.hdcPrint, wi.xPrint, wi.yPrint, NULL);
-			SetWindowOrgEx(wi.hdcPrint, 0, 0, NULL);
-			SetWindowExtEx(wi.hdcPrint, wi.xClient, wi.yClient, NULL);
-			SetBkMode(wi.hdcPrint, TRANSPARENT);
-			SelectObject(wi.hdcPrint, wi.hfont);
-		}
-#endif
 	}
 
 	va_end(args);
@@ -4255,27 +3115,6 @@ wchar_t *SzAltitude(double deg)
 		}
 	}
 	return szAlt;
-}
-
-/* Here we return a string simply expressing the given value as degrees */
-/* and minutes (and sometimes seconds) in the 0 to 360 degree circle.   */
-wchar_t *SzDegree(double deg)
-{
-	static wchar_t szPos[11];
-	int d, m;
-	double s;
-
-	deg = fabs(deg) + (is.fSeconds ? 0.5 / 60.0 / 60.0 : 0.5 / 60.0);
-	d = (int)deg;
-	m = (int)(RFract(deg) * 60.0);
-	swprintf(szPos, sizeof(szPos) / sizeof(wchar_t), L"%3d%lc%02d'", d, btowc(chDeg1), m);
-	if (is.fSeconds)
-	{
-		s = RFract(deg) * 60.0;
-		s = RFract(s) * 60.0;
-		swprintf(&szPos[7], sizeof(szPos[7]) / sizeof(wchar_t), L"%02d\"", (int)s);
-	}
-	return szPos;
 }
 
 /* Another string formatter, here we return a date string given a month,    */
@@ -4477,25 +3316,6 @@ wchar_t *SzTimW(double tim)
 	return szTim;
 }
 
-wchar_t *SzTim2(double tim)
-{
-	/* Corrected by Michael Rideout on February 15, 2004: */
-	int hr = 0, min = 0, sec = 0;
-	int d, m, s;
-	double rMin;
-
-	hr = NFloor(tim);
-	rMin = (tim - hr) * 100.0;
-	min = (int)(rMin + 0.5 / 600.0);
-	rFractal = RFract(rMin);
-	if (rFractal > rOne)
-		rFractal = rSmall;
-	sec = (int)(60.0 * rFractal + 0.5);
-
-	decToDeg(DegMin2DecDeg(tim) + 0.50 / 3600.0, &d, &m, &s);
-	return SzTime2(d, m, s);
-}
-
 /* Return a string containing the given time zone, given as a real value     */
 /* having the hours before GMT in the integer part and minutes fractionally. */
 char *SzZone(double zon)
@@ -4548,194 +3368,7 @@ wchar_t *SzZoneW(double zon)
 	return szZon;
 }
 
-/* Nicely format the given longitude and latitude locations and return    */
-/* them in a string. Various parts of the program display a chart header, */
-/* and this allows the similar computations to be coded only once.        */
-char *SzLocation(double lon, double lat)
-{
-	static char szLoc[32];
-	int mini, minj, seci, secj;
-	double rMin;
-	unsigned char ch1, ch2, ch3;
-
-	rMin = RFract(fabs(lon)) * 100.0;
-	mini = (int)(rMin + 0.5 / 600.0);
-	rFractal = RFract(rMin);
-	if (rFractal > rOne)
-		rFractal = rSmall;
-	seci = (int)(60.0 * rFractal + 0.5);
-	if (seci == 60)
-	{
-		int h;
-		double dlat = DegMin2DecDeg(lon);
-		decToDeg(dlat, &h, &mini, &seci);
-	}
-
-	rMin = RFract(fabs(lat)) * 100.0;
-	minj = (int)(rMin + 0.5 / 600.0);
-	rFractal = RFract(rMin);
-	if (rFractal > rOne)
-		rFractal = rSmall;
-	secj = (int)(60.0 * rFractal + 0.5);
-	if (secj == 60)
-	{
-		int h;
-		double dlat = DegMin2DecDeg(lat);
-		decToDeg(dlat, &h, &minj, &secj);
-	}
-
-	//ch1 = chDeg1;
-	ch1 = us.fAnsiChar > 1 ? chDeg2 : chDeg1;
-	ch2 = us.fAnsiChar > 1 ? 39 : chMin1;
-	ch3 = us.fAnsiChar > 1 ? 34 : chSec1;
-
-	if (0)
-	{
-		if (us.fAnsiChar)
-		{
-			if (us.fAnsiChar != 3)
-			{
-				sprintf(szLoc, "%3.0f%c%02d%c%02d%c%c%3.0f%c%02d%c%02d%c%c",
-					floor(fabs(lon)), ch1, mini, ch2, seci, ch3, lon < 0.0 ? 'E' : 'W',
-					floor(fabs(lat)), ch1, minj, ch2, secj, ch3, lat < 0.0 ? 'S' : 'N');
-			}
-			else
-			{
-				sprintf(szLoc, "%3.0f%c%02d%c%02d%3.0f%c%02d%c%02d",
-					floor(fabs(lon)), lon < 0.0 ? 'E' : 'W', mini, ch2, seci,
-					floor(fabs(lat)), lat < 0.0 ? 'S' : 'N', minj, ch2, secj);
-			}
-		}
-		else
-		{
-			sprintf(szLoc, "%3.0f%c%02d%c%02d%c%3.0f%c%02d%c%02d%c",
-				floor(fabs(lon)), ch1, mini, ch2, seci, lon < 0.0 ? 'E' : 'W',
-				floor(fabs(lat)), ch1, minj, ch2, secj, lat < 0.0 ? 'S' : 'N');
-		}
-	}
-	else
-	{
-		if (us.fAnsiChar)
-		{
-			const char* deg = ":";
-			if (us.fAnsiChar != 3)
-			{
-				sprintf(szLoc, "%3.0f%s%02d%c%02d%c%c%3.0f%s%02d%c%02d%c%c",
-					floor(fabs(lon)), deg, mini, ch2, seci, ch3, lon < 0.0 ? 'E' : 'W',
-					floor(fabs(lat)), deg, minj, ch2, secj, ch3, lat < 0.0 ? 'S' : 'N');
-			}
-			else
-			{
-				sprintf(szLoc, "%3.0f%c%02d%c%02d%3.0f%c%02d%c%02d",
-					floor(fabs(lon)), lon < 0.0 ? 'E' : 'W', mini, ch2, seci,
-					floor(fabs(lat)), lat < 0.0 ? 'S' : 'N', minj, ch2, secj);
-			}
-		}
-		else
-		{
-			const char* deg =  ":" ;
-			sprintf(szLoc, "%3.0f%s%02d%c%02d%c%3.0f%s%02d%c%02d%c",
-				floor(fabs(lon)), deg, mini, ch2, seci, lon < 0.0 ? 'E' : 'W',
-				floor(fabs(lat)), deg, minj, ch2, secj, lat < 0.0 ? 'S' : 'N');
-		}
-
-	}
-	return szLoc;
-}
-
-char *SzLocationF(double lon, double lat)
-{
-	static char szLoc[64];
-	int mini, minj, seci, secj;
-	double rMin;
-	unsigned char ch1, ch2, ch3;
-
-	rMin = RFract(fabs(lon)) * 100.0;
-	mini = (int)(rMin + 0.5 / 600.0);
-	rFractal = RFract(rMin);
-	if (rFractal > rOne)
-		rFractal = rSmall;
-	seci = (int)(60.0 * rFractal + 0.5);
-	if (seci == 60)
-	{
-		int h;
-		double dlat = DegMin2DecDeg(lon);
-		decToDeg(dlat, &h, &mini, &seci);
-	}
-
-	rMin = RFract(fabs(lat)) * 100.0;
-	minj = (int)(rMin + 0.5 / 600.0);
-	rFractal = RFract(rMin);
-	if (rFractal > rOne)
-		rFractal = rSmall;
-	secj = (int)(60.0 * rFractal + 0.5);
-	if (secj == 60)
-	{
-		int h;
-		double dlat = DegMin2DecDeg(lat);
-		decToDeg(dlat, &h, &minj, &secj);
-	}
-
-	//ch1 = chDeg1;
-	ch1 = ':';
-	ch2 = us.fAnsiChar > 1 ? 39 : chMin1;
-	ch3 = us.fAnsiChar > 1 ? 34 : chSec1;
-
-	if (0)
-	{
-		if (us.fAnsiChar)
-		{
-			if (us.fAnsiChar != 3)
-			{
-				sprintf(szLoc, "%3.0f%c%02d%c%02d%c%c%3.0f%c%02d%c%02d%c%c",
-					floor(fabs(lon)), ch1, mini, ch2, seci, ch3, lon < 0.0 ? 'E' : 'W',
-					floor(fabs(lat)), ch1, minj, ch2, secj, ch3, lat < 0.0 ? 'S' : 'N');
-			}
-			else
-			{
-				sprintf(szLoc, "%3.0f%c%02d%c%02d%3.0f%c%02d%c%02d",
-					floor(fabs(lon)), lon < 0.0 ? 'E' : 'W', mini, ch2, seci,
-					floor(fabs(lat)), lat < 0.0 ? 'S' : 'N', minj, ch2, secj);
-			}
-		}
-		else
-		{
-			sprintf(szLoc, "%3.0f%c%02d%c%02d%c%3.0f%c%02d%c%02d%c",
-				floor(fabs(lon)), ch1, mini, ch2, seci, lon < 0.0 ? 'E' : 'W',
-				floor(fabs(lat)), ch1, minj, ch2, secj, lat < 0.0 ? 'S' : 'N');
-		}
-	}
-	else
-	{
-		if (us.fAnsiChar)
-		{
-			const char* deg = ":";
-			if (us.fAnsiChar != 3)
-			{
-				sprintf(szLoc, "%3.0f%s%02d%c%02d%c%c%3.0f%s%02d%c%02d%c%c",
-					floor(fabs(lon)), deg, mini, ch2, seci, ch3, lon < 0.0 ? 'E' : 'W',
-					floor(fabs(lat)), deg, minj, ch2, secj, ch3, lat < 0.0 ? 'S' : 'N');
-			}
-			else
-			{
-				sprintf(szLoc, "%3.0f%c%02d%c%02d%3.0f%c%02d%c%02d",
-					floor(fabs(lon)), lon < 0.0 ? 'E' : 'W', mini, ch2, seci,
-					floor(fabs(lat)), lat < 0.0 ? 'S' : 'N', minj, ch2, secj);
-			}
-		}
-		else
-		{
-			const char* deg = ":";
-			sprintf(szLoc, "%3.0f%s%02d%c%02d%c%3.0f%s%02d%c%02d%c",
-				floor(fabs(lon)), deg, mini, ch2, seci, lon < 0.0 ? 'E' : 'W',
-				floor(fabs(lat)), deg, minj, ch2, secj, lat < 0.0 ? 'S' : 'N');
-		}
-
-	}
-	return szLoc;
-}
 wchar_t chDeg3 = 176;//L'°';//°
-
 wchar_t *SzLocation2(double lon, double lat)
 {
 	static wchar_t szLoc[32];
@@ -5007,24 +3640,7 @@ void PrintHeader()
 		swprintf(sz,sizeof(sz)/sizeof(wchar_t),L"%ls",szAppNameW);
 		PrintSzW(sz);
 	}
-	if (IsAgeHarm)
-	{
-		PrintSzW(L"\n");
-		swprintf(sz,sizeof(sz)/sizeof(wchar_t), L"%ls", szAppNameW);
-		PrintSzW(sz);
-		PrintSzW(L" ");
-	}
 	else if (us.nRel == rcSynastry)
-	{
-		swprintf(sz,sizeof(sz)/sizeof(wchar_t), L"%ls", szAppNameW);
-		PrintSzW(sz);
-	}
-	else if (isSolarReturn)
-	{
-		swprintf(sz,sizeof(sz)/sizeof(wchar_t), L"%ls", szAppNameW);
-		PrintSzW(sz);
-	}
-	else if (isLunarReturn)
 	{
 		swprintf(sz,sizeof(sz)/sizeof(wchar_t), L"%ls", szAppNameW);
 		PrintSzW(sz);
@@ -5056,16 +3672,6 @@ void PrintHeader()
 		PrintSzW(sz);
 
 		swprintf(sz,sizeof(sz)/sizeof(wchar_t), L"%ls", L"sNatalHouses3");
-		PrintSzW(sz);
-	}
-	else if (IsSyzygy)
-	{
-		swprintf(sz,sizeof(sz)/sizeof(wchar_t), L"%ls", szAppNameW);
-		PrintSzW(sz);
-	}
-	else if (IsDraconic)
-	{
-		swprintf(sz,sizeof(sz)/sizeof(wchar_t), L"%ls", szAppNameW);
 		PrintSzW(sz);
 	}
 	else if (us.f12parts2)
@@ -5126,24 +3732,6 @@ void PrintHeader()
 		else
 			swprintf(sz,sizeof(sz)/sizeof(wchar_t), L"\n%ls Contra Antiscia  Chart", szAppNameW);
 		PrintSzW(sz);
-	}
-	else if (IsProfections)
-	{
-		swprintf(sz,sizeof(sz)/sizeof(wchar_t), L"%ls", szAppNameW);
-		PrintSzW(sz);
-		PrintSzW(L" ");
-		if (options.zodprof)
-		{
-			swprintf(sz,sizeof(sz)/sizeof(wchar_t), L"%ls",szAppNameW);
-			PrintSzW(sz);
-			PrintSzW(L" ");
-		}
-		else
-		{
-			swprintf(sz,sizeof(sz)/sizeof(wchar_t), L"%ls",szAppNameW);
-			PrintSzW(sz);
-			PrintSzW(L" ");
-		}
 	}
 	else
 	{
@@ -5257,7 +3845,7 @@ void PrintHeader()
 	}
 
 	if (us.fProgressUS || us.nRel == rcTransit || us.nRel == rcDual
-		|| us.nRel == rcSynastry || us.nRel == rcProgress || us.fTransitInf || us.nRel == rcProgTran || isSolarReturn || isLunarReturn)
+		|| us.nRel == rcSynastry || us.nRel == rcProgress || us.fTransitInf || us.nRel == rcProgTran)
 		/*|| us.nRel == rcSynastry || us.nRel == rcProgress || us.fTransitInf)*/
 	{
 		if (us.fProgressUS && !us.nRel)
@@ -5307,9 +3895,9 @@ void PrintHeader()
 					swprintf(sz,sizeof(sz)/sizeof(wchar_t), L"Progressions for\n");
 				}
 			}
-			else if (us.nRel == rcTransit || isSolarReturn || isLunarReturn)
+			else if (us.nRel == rcTransit)
 			{
-				if (!us.fInterpret && (us.fInfluence || us.fListing) || isSolarReturn || isLunarReturn)
+				if (!us.fInterpret && (us.fInfluence || us.fListing))
 					swprintf(sz,sizeof(sz)/sizeof(wchar_t), L"\nNatal houses, transit planets for:\n");
 				else
 					swprintf(sz,sizeof(sz)/sizeof(wchar_t), L"\nTransits for:\n");
@@ -5729,7 +4317,6 @@ void ChartListing()
 	}
 	//memcpy(&ignore1, &ignoreT, NUMBER_OBJECTS);
 }
-
 
 static int gregflag = SE_GREG_CAL;
 
@@ -6221,7 +4808,7 @@ enum _housesystem {
 };
 
 
-static int32 iflag = 0, iflag2;              /* external flag: helio, geo... */
+static int32 iflag = 0;              /* external flag: helio, geo... */
 #define rDegHalf   180.0
 #define rDegMax    360.0
 #define rDegQuad   90.0
@@ -6856,7 +5443,6 @@ void ComputeStars(double SD)
 		}
 }
 
-
 /* Do a coordinate transformation: Given a longitude and latitude value,    */
 /* return the new longitude and latitude values that the same location      */
 /* would have, were the equator tilted by a specified number of degrees.    */
@@ -6932,26 +5518,6 @@ double GetOrbA(int obj1, int obj2, int asp)
 	}
 	return orb;
 }
-// this is like function GetOrb, except that it does not consider
-// stars, parallel aspects or relationship charts
-double GetOrbEx(int obj1, int obj2, int asp)
-{
-	double orb;
-
-	if (obj1 <= cLastMoving && obj2 <= cLastMoving)
-	{
-		orb = Min(Min(rAspOrb[asp], rObjOrb[obj1]), rObjOrb[obj2]);
-		orb += rObjAdd[obj1];
-		orb += rObjAdd[obj2];
-
-		return orb;
-	}
-	else
-	{
-		return 0.0;
-	}
-}
-
 
 //=======================================================================
 /* This is a subprocedure of ComputeInHouses(). Given a zodiac position,  */
@@ -8606,12 +7172,6 @@ void *allocate(long length, char *user)
 	return p;
 }
 
-
-/*
-******************************************************************************
-** Aspect Calculations.
-******************************************************************************
-*/
 /* Set up the aspect/midpoint grid. Allocate memory for this array, if not */
 /* already done. Allocation is only done once, first time this is called.  */
 
@@ -9761,11 +8321,11 @@ void GetChartResult(CI& ciInput,bool useInput = true)
 		}
 		break;
 	case 3:
-		ciThre = ci;
+		//ciThre = ci;
 		//ciTran = ciThre;
 		break;
 	default:
-		ciFour = ci;
+		//ciFour = ci;
 		break;
 	}
 
