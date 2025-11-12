@@ -1,0 +1,424 @@
+stages:
+  - build
+  - test
+  - deploy
+  - release
+
+.variables_template: &variables_definition
+  BUILD_DIR: "build"
+  ARTIFACT_NAME: "astroproject.tar.gz"
+  PACKAGE_NAME: "astroproject"
+
+variables:
+  <<: *variables_definition
+
+# 构建作业模板 
+.build_template: &build_definition
+  stage: build
+  before_script:
+    - |
+      # 检查并安装构建依赖 其中没有权限需要检查使用的Runner在哪个用户下运行看是否需要添加sudo权限安装依赖
+      if command -v apt-get >/dev/null 2>&1; then
+        # Debian/Ubuntu
+        sudo apt-get update
+        sudo apt-get install -y cmake g++ make
+      elif command -v yum >/dev/null 2>&1; then
+        # CentOS/RHEL
+        sudo yum install -y cmake gcc-c++ make
+      elif command -v dnf >/dev/null 2>&1; then
+        # Fedora
+        sudo dnf install -y cmake gcc-c++ make
+      elif command -v apk >/dev/null 2>&1; then
+        # Alpine
+        sudo apk update
+        sudo apk add --no-cache cmake g++ make
+      elif command -v pkg >/dev/null 2>&1; then
+        # FreeBSD
+        sudo pkg install -y cmake gmake gcc
+      elif command -v brew >/dev/null 2>&1; then
+        # macOS
+        brew install cmake
+      else
+        echo "Unsupported OS for automatic dependency installation"
+        exit 1
+      fi
+      # 验证CMake是否正确安装
+      cmake --version
+  script:
+    - mkdir -p astroproject/${BUILD_DIR}
+    - cd astroproject/${BUILD_DIR}
+    - cmake ../ -DCMAKE_BUILD_TYPE=Release
+    - cmake --build .
+    - cp ../src/astro_lib.h lib/
+    - tar -czvf ${ARTIFACT_NAME} lib/*.a lib/astro_lib.h
+    - ls -alrt ${ARTIFACT_NAME}
+  artifacts:
+    paths:
+      - astroproject/${BUILD_DIR}/$ARTIFACT_NAME
+    expire_in: 1 week
+    name: "astroproject-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHORT_SHA}"
+
+# 测试作业模板
+.test_template: &test_definition
+  stage: test
+  script:
+    - mkdir -p astroproject/${BUILD_DIR}
+    - cd astroproject/${BUILD_DIR}
+    - cmake ../ -DCMAKE_BUILD_TYPE=Debug
+    - cmake --build .
+    - cd bin
+    - ./test_astro_lib_debugd
+    # 注意测试作业中名称不一样的 test_astro_lib_debugd 而不是 test_astro_lib_debug
+  artifacts:
+    reports:
+      junit: astroproject/${BUILD_DIR}/bin/test_results.xml
+    paths:
+      - astroproject/${BUILD_DIR}/bin/test_results.xml
+    expire_in: 1 week
+  allow_failure: false
+
+# 代码覆盖率测试模板
+.coverage_template: &coverage_definition
+  stage: test
+  before_script:
+    - |
+      # 安装lcov工具以生成代码覆盖率报告
+      if command -v apt-get >/dev/null 2>&1; then
+        sudo apt-get update
+        sudo apt-get install -y lcov
+      elif command -v yum >/dev/null 2>&1; then
+        sudo yum install -y lcov
+      elif command -v dnf >/dev/null 2>&1; then
+        sudo dnf install -y lcov
+      elif command -v pkg >/dev/null 2>&1; then
+        sudo pkg install -y lcov
+      else
+        echo "无法安装lcov，跳过代码覆盖率报告生成"
+      fi
+  script:
+    - mkdir -p astroproject/${BUILD_DIR}
+    - cd astroproject/${BUILD_DIR}
+    - cmake ../ -DCMAKE_BUILD_TYPE=Debug
+    - cmake --build .
+    - cd bin
+    - |
+      if [ -f "./test_astro_lib_coverage" ]; then
+        echo "运行代码覆盖率测试..."
+        ./test_astro_lib_coverage
+        lcov --capture --directory . --output-file coverage.info
+        genhtml coverage.info --output-directory ../../coverage-report
+      else
+        echo "未找到代码覆盖率测试程序，跳过代码覆盖率测试"
+      fi
+  artifacts:
+    reports:
+      junit: astroproject/${BUILD_DIR}/bin/test_results.xml
+    paths:
+      - astroproject/${BUILD_DIR}/bin/test_results.xml
+      - coverage-report/
+    expire_in: 1 week
+  allow_failure: true
+
+# 开发环境构建
+build_dev:
+  <<: *build_definition
+  variables:
+    <<: *variables_definition
+    ENVIRONMENT: "development"
+  tags:
+    - FreeBSD14.3
+    - Dev
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"  
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
+  environment:
+    name: "development"
+
+# 测试环境构建
+build_test:
+  <<: *build_definition
+  variables:
+    <<: *variables_definition
+    ENVIRONMENT: "testing"
+  tags:
+    - FreeBSD14.3
+    - ProdTest
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
+  environment:
+    name: "testing"
+
+# 生产环境构建
+build_prod:
+  <<: *build_definition
+  variables:
+    <<: *variables_definition
+    ENVIRONMENT: "production"
+  tags:
+    - FreeBSD14.3
+    - Prod
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+  environment:
+    name: "production"
+
+# 开发环境单元测试（含代码覆盖率）
+unit_test_dev:
+  <<: *coverage_definition
+  tags:
+    - FreeBSD14.3
+    - Dev
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
+  environment:
+    name: "development"
+
+# 测试环境单元测试
+unit_test_test:
+  <<: *test_definition
+  tags:
+    - FreeBSD14.3
+    - ProdTest
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
+  environment:
+    name: "testing"
+
+# 生产环境单元测试
+unit_test_prod:
+  <<: *test_definition
+  tags:
+    - FreeBSD14.3
+    - Prod
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+  environment:
+    name: "production"
+
+# 在新建一个合并请求的时候，自动生成合并请求页面概览和描述
+gene_mrdesc:
+  stage: build
+  image: curlimages/curl:latest
+  before_script:
+    - 'echo "Current directory: $(pwd)"'
+    - 'echo "HOME directory: $HOME"'
+    - 'echo "CI_PROJECT_DIR: $CI_PROJECT_DIR"'
+    - 'echo "Checking and installing required tools..."'
+    - if ! command -v jq &> /dev/null; then echo "jq not found, attempting to install..."; if command -v apk &> /dev/null; then sudo apk add --no-cache jq; elif command -v apt-get &> /dev/null; then sudo apt-get update && sudo apt-get install -y jq; elif command -v yum &> /dev/null; then sudo yum install -y jq; elif command -v dnf &> /dev/null; then sudo dnf install -y jq; elif command -v pkg &> /dev/null; then sudo pkg install -y jq; elif command -v zypper &> /dev/null; then sudo zypper install -y jq; else echo "Package manager not found. Please install jq manually."; exit 1; fi; else echo "jq is already installed"; jq --version; fi
+    - if ! command -v bash &> /dev/null; then echo "bash not found, attempting to install..."; if command -v apk &> /dev/null; then sudo apk add --no-cache bash; elif command -v apt-get &> /dev/null; then sudo apt-get update && sudo apt-get install -y bash; elif command -v yum &> /dev/null; then sudo yum install -y bash; elif command -v dnf &> /dev/null; then sudo dnf install -y bash; elif command -v pkg &> /dev/null; then sudo pkg install -y bash; elif command -v zypper &> /dev/null; then sudo zypper install -y bash; else echo "Package manager not found. Please install bash manually."; exit 1; fi; else echo "bash is already installed"; bash --version; fi
+  script:
+    - 'echo "正在为合并请求生成描述内容..."'
+    - pwd
+    - ls -la
+    - ls -la scripts/
+    - PROJECT_DIR="$HOME/$CI_PROJECT_DIR"
+    - 'echo "Project directory: $PROJECT_DIR"'
+    - chmod +x "$PROJECT_DIR/scripts/generate_mr_description.sh"
+    - chmod +x "$PROJECT_DIR/scripts/add_mr_note.sh"
+    - /usr/local/bin/bash "$PROJECT_DIR/scripts/generate_mr_description.sh"
+  tags:
+    - FreeBSD14.3
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  variables:
+    # 注意在GitlabCE中设置好个人访问令牌后立马复制，并在添加PERSONAL_ACCESS_TOKEN时注意受保护选择是否勾选，类似于 create_release 作业
+    GITLAB_TOKEN: $PERSONAL_ACCESS_TOKEN
+
+
+# 当点击合并，合并代码成功后会提交到目标分支，触发deploy 作业，并添加注释
+add_mr_note:
+  stage: deploy
+  script:
+    - 'echo "正在为合并请求添加注释..."'
+    - PROJECT_DIR="$HOME/$CI_PROJECT_DIR"
+    - 'echo "Project directory: $PROJECT_DIR"'
+    # 提取合并请求 IID ，基于合并请求，在点击合并时会生成一个提交，提交信息CI_COMMIT_MESSAGE中包含合并请求的 IID，详情可以在GitlabCE页面项目中“提交”下查看，生成的CI_COMMIT_MESSAGE
+    - |
+      if echo "$CI_COMMIT_MESSAGE" | grep -q "See merge request"; then
+        MR_IID=$(echo "$CI_COMMIT_MESSAGE" | grep "See merge request" | grep -o "!.*" | sed 's/!//')
+      else
+        MR_IID=$(echo $CI_COMMIT_MESSAGE | grep -o "Merge branch.*into.*" | grep -o "Merge branch '[^']*' \(#[0-9]*\)" | grep -o "#[0-9]*" | sed 's/#//')
+      fi
+    - 'echo "Extracted MR IID: $MR_IID"'
+    - chmod +x "$PROJECT_DIR/scripts/add_mr_note.sh"
+    - bash "$PROJECT_DIR/scripts/add_mr_note.sh" "$MR_IID"
+  tags:
+    - FreeBSD14.3
+  rules:
+    # 在 develop 分支上推送时运行（合并到 develop）
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_MESSAGE =~ /^Merge branch.*/
+    # 在 test 分支上推送时运行（合并到 test）
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test" && $CI_COMMIT_MESSAGE =~ /^Merge branch.*/
+    # 在 main 分支上推送时运行（合并到 main）
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main" && $CI_COMMIT_MESSAGE =~ /^Merge branch.*/
+  variables:
+    # 注意在GitlabCE中设置好个人访问令牌后立马复制，并在添加PERSONAL_ACCESS_TOKEN时注意受保护选择是否勾选，类似于 create_release 作业
+    GITLAB_TOKEN: $PERSONAL_ACCESS_TOKEN
+
+# 部署作业模板
+.deploy_template: &deploy_definition
+  stage: deploy
+  script:
+    - echo "Deploying to ${ENVIRONMENT} environment"
+    - echo "Extracting artifact to user home directory..."
+    - |
+      # Create directory in user home
+      mkdir -p $HOME/app/astroproject
+      # Extract artifact to user home directory
+      tar -xzvf astroproject/${BUILD_DIR}/${ARTIFACT_NAME} -C $HOME/app/astroproject
+      echo "Static libraries and headers extracted to $HOME/app/astroproject"
+    - echo "Deployment completed successfully."
+  environment:
+    name: "${ENVIRONMENT}"
+
+# 开发环境部署
+deploy_to_dev:
+  <<: *deploy_definition
+  needs:
+    - job: build_dev
+      artifacts: true
+    - job: unit_test_dev
+      artifacts: true
+  variables:
+    ENVIRONMENT: "development"
+  tags:
+    - FreeBSD14.3
+    - Dev
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+  environment:
+    name: "development"
+
+# 测试环境部署
+deploy_to_test:
+  <<: *deploy_definition
+  needs:
+    - job: build_test
+      artifacts: true
+    - job: unit_test_test
+      artifacts: true
+  variables:
+    ENVIRONMENT: "testing"
+  tags:
+    - FreeBSD14.3
+    - ProdTest
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+  environment:
+    name: "testing"
+
+# 生产环境部署
+deploy_to_prod:
+  <<: *deploy_definition
+  needs:
+    - job: build_prod
+      artifacts: true
+    - job: unit_test_prod
+      artifacts: true
+  variables:
+    ENVIRONMENT: "production"
+  tags:
+    - FreeBSD14.3
+    - Prod
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+  environment:
+    name: "production"
+
+# 创建 Release 并上传构建产物
+create_release:
+  stage: release
+  rules:
+    - if: $CI_COMMIT_TAG
+  tags:
+    - FreeBSD14.3
+    - Prod
+  before_script:
+    - |
+      # 确定版本号
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        PACKAGE_VERSION="v$CI_COMMIT_TAG"
+      else
+        PACKAGE_VERSION="v${CI_COMMIT_SHORT_SHA}"
+      fi
+      export PACKAGE_VERSION
+      echo "Determined package version: $PACKAGE_VERSION"
+  script:
+    - |
+      echo "Creating release for $PACKAGE_VERSION"
+      
+      # 创建发布说明（使用 shell 方式构造 JSON，避免依赖 jq）
+      cat > release_data.json <<EOF
+      {
+        "tag_name": "$CI_COMMIT_TAG",
+        "ref": "$CI_COMMIT_SHA",
+        "name": "Release $PACKAGE_VERSION",
+        "description": "Release created by GitLab CI/CD pipeline for AstroProject",
+        "assets": {
+          "links": [
+            {
+              "name": "$ARTIFACT_NAME",
+              "url": "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/jobs/artifacts/${CI_COMMIT_REF_NAME}/raw/${ARTIFACT_NAME}?job=build_prod"
+            }
+          ]
+        }
+      }EOF
+      
+      # 使用 GitLab API 创建 Release，使用 JOB-TOKEN 而不是 PRIVATE-TOKEN
+      curl --request POST \
+           --header "PRIVATE-TOKEN: $PERSONAL_ACCESS_TOKEN" \
+           --header "Content-Type: application/json" \
+           --data @release_data.json \
+           "$CI_API_V4_URL/projects/$CI_PROJECT_ID/releases"
+  dependencies:
+    - build_prod
+  environment:
+    name: "production"
+  needs:
+    - job: build_prod
+      artifacts: true
+
+# 发布到 Package Registry
+publish_package:
+  stage: release
+  tags:
+    - FreeBSD14.3
+    - Prod
+  before_script:
+    - |
+      # 确定版本号
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        PACKAGE_VERSION="$CI_COMMIT_TAG"
+      else
+        PACKAGE_VERSION="v${CI_COMMIT_SHORT_SHA}"
+      fi
+      export PACKAGE_VERSION
+      echo "Determined package version: $PACKAGE_VERSION"
+  script:
+    - |
+      # 确保变量正确设置
+      echo "Uploading artifact to GitLab Package Registry"
+      echo "API URL: ${CI_API_V4_URL}"
+      echo "Project ID: ${CI_PROJECT_ID}"
+      echo "Package Name: ${PACKAGE_NAME}"
+      echo "Package Version: ${PACKAGE_VERSION}"
+      echo "Artifact Name: ${ARTIFACT_NAME}"
+      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+           --upload-file ${ARTIFACT_NAME} \
+           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/${ARTIFACT_NAME}"
+  rules:
+    - if: $CI_COMMIT_TAG
+  environment:
+    name: "production"
+  dependencies:
+    - build_prod
+  needs:
+    - job: build_prod
+      artifacts: true

@@ -1,3 +1,6 @@
 # 开发工具本地配置目录  
 .vs/  
 .vscode/
+.idea/
+astroproject/build/
+A32_V3_51_Proj_2022
