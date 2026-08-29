@@ -135,21 +135,10 @@ default:
 # 代码覆盖率测试模板
 .coverage_template: &coverage_definition
   stage: test
-  before_script:
-    - |
-      # 安装lcov工具以生成代码覆盖率报告
-      if command -v apt-get >/dev/null 2>&1; then
-        apt-get update
-        apt-get install -y lcov cmake make g++
-      elif command -v yum >/dev/null 2>&1; then
-        yum install -y lcov
-      elif command -v dnf >/dev/null 2>&1; then
-        dnf install -y lcov
-      elif command -v pkg >/dev/null 2>&1; then
-        pkg install -y lcov
-      else
-        echo "无法安装lcov，跳过代码覆盖率报告生成"
-      fi
+  # 原脚本在此安装 lcov，但本项目 CMakeLists 未定义覆盖率目标
+  # (test_astro_lib_coverage)，装了也不会被使用；且 apt 索引 8MB+ 让 job 慢数分钟。
+  # 故去掉 lcov 安装，继承 default.before_script 只装真正需要的 cmake。
+  # 若日后加入覆盖率目标，在此补回 lcov 安装逻辑即可。
   script:
     - mkdir -p astroproject/${BUILD_DIR}
     - cd astroproject/${BUILD_DIR}
