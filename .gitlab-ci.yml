@@ -1,8 +1,37 @@
+# ============================================================
+# 阶段（stage）设计 —— 遵循 GitLab CE 惯例，并按职责重新命名/归位
+#
+#   prepare  准备与协作自动化：MR 描述生成、合并后回写 MR 备注
+#   build    构建：编译源码并打包成可分发制品
+#   verify   验证：校验 build 产出的制品（质量门禁）
+#   deploy   部署：按环境发布制品（dev / test / prod）
+#   release  发布：创建 GitLab Release 并发布软件包
+#
+# 相比原配置的修正：
+#   1. 原 gene_mrdesc（生成 MR 描述）被塞在 build 阶段、
+#      add_mr_note（MR 备注）被塞在 deploy 阶段，语义完全不符，
+#      现统一归入新增的 prepare 阶段。
+#   2. 原 test 阶段下挂着 unit_test_* 作业，但本项目 CMakeLists
+#      并未定义任何单元测试目标（无 gtest/catch，也没有
+#      test_astro_lib_debugd），实际做的是产物校验，名不副实；
+#      故更名为 verify。日后若在 CMakeLists 中加入真实单测，
+#      可再拆出独立的 test 阶段。
+# ============================================================
 stages:
+  - prepare
   - build
-  - test
+  - verify
   - deploy
   - release
+
+# 防止 push 与 merge_request 触发重复流水线（GitLab 官方推荐写法）
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH
 
 .variables_template: &variables_definition
   BUILD_DIR: "build"
@@ -99,79 +128,57 @@ default:
       echo "包内文件总数: $(wc -l < /tmp/_pkg_list.txt)"
   artifacts:
     paths:
-      - astroproject/${BUILD_DIR}/$ARTIFACT_NAME
+      - astroproject/${BUILD_DIR}/${ARTIFACT_NAME}
     expire_in: 1 week
     name: "astroproject-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHORT_SHA}"
 
-# 测试作业模板
-.test_template: &test_definition
-  stage: test
+# 验证作业模板（质量门禁）
+# 合并说明：
+#  原配置有 test / coverage 两个模板，内容几乎完全重复（都是 Debug 重新编译 + 校验），
+#  且 unit_test_dev 继承 coverage、unit_test_test/prod 继承 test —— 同名作业行为不一致。
+#  现合并为单一模板，三个环境行为统一。
+#
+# 效率说明：
+#  原模板会用 Debug 再完整编译一遍（build 阶段已编译过 Release），编译耗时翻倍。
+#  最佳实践是「验证你要发布的东西」，故改为直接校验 build 阶段产出的制品，不再重复编译，
+#  同时也不需要 cmake，可用 before_script: [] 省掉依赖安装。
+.verify_template: &verify_definition
+  stage: verify
+  image: gcc:12
+  before_script: []   # 仅校验制品，不需要 cmake
   script:
-    - mkdir -p astroproject/${BUILD_DIR}
-    - cd astroproject/${BUILD_DIR}
-    - cmake ../ -DCMAKE_BUILD_TYPE=Debug
-    - cmake --build .
     - |
-      # 说明：本项目 CMakeLists 目前未定义任何单元测试目标
-      # （无 gtest/catch，也没有 test_astro_lib_debugd 这个可执行程序），
-      # 原脚本直接执行该二进制必然失败。这里改为「产物冒烟校验」：
-      # 确认静态库与可执行程序确实构建成功、静态库含有效目标文件。
-      # 若日后在 CMakeLists 中加入测试目标，把下面的冒烟校验替换为真实测试即可。
-      echo "== Debug 构建产物检查 =="
-      ls -l ../lib/linux/Debug/
-      ls -l ../bin/linux/Debug/
-      test -f ../lib/linux/Debug/libastrolog32.a || { echo "FAIL: 静态库未生成"; exit 1; }
-      echo "OK: libastrolog32.a 已生成"
-      OBJCNT=$(ar t ../lib/linux/Debug/libastrolog32.a | wc -l)
-      echo "静态库包含目标文件数: $OBJCNT"
-      test "$OBJCNT" -gt 0 || { echo "FAIL: 静态库为空"; exit 1; }
-      echo "SMOKE TEST PASSED"
-  artifacts:
-    paths:
-      - astroproject/${BUILD_DIR}/../lib/linux/Debug/
-    expire_in: 1 week
-  allow_failure: false
+      ARTIFACT="astroproject/${BUILD_DIR}/${ARTIFACT_NAME}"
+      echo "== 校验 build 阶段产出的制品 =="
+      test -f "$ARTIFACT" || { echo "FAIL: 未找到制品 $ARTIFACT"; exit 1; }
+      ls -l "$ARTIFACT"
 
-# 代码覆盖率测试模板
-.coverage_template: &coverage_definition
-  stage: test
-  # 原脚本在此安装 lcov，但本项目 CMakeLists 未定义覆盖率目标
-  # (test_astro_lib_coverage)，装了也不会被使用；且 apt 索引 8MB+ 让 job 慢数分钟。
-  # 故去掉 lcov 安装，继承 default.before_script 只装真正需要的 cmake。
-  # 若日后加入覆盖率目标，在此补回 lcov 安装逻辑即可。
-  script:
-    - mkdir -p astroproject/${BUILD_DIR}
-    - cd astroproject/${BUILD_DIR}
-    - cmake ../ -DCMAKE_BUILD_TYPE=Debug
-    - cmake --build .
-    - |
-      # 修正说明：
-      #  - CMake 的输出目录是 ../bin/linux/Debug/ 与 ../lib/linux/Debug/，
-      #    原脚本 `cd bin` 会因 build 目录下没有 bin 而直接失败
-      #  - 项目 CMakeLists 未定义覆盖率目标(test_astro_lib_coverage)，故如实跳过，
-      #    并补充产物冒烟校验，保证 test 阶段有真实断言
-      echo "== Debug 构建产物检查 =="
-      ls -l ../lib/linux/Debug/ ../bin/linux/Debug/
-      COVBIN="../bin/linux/Debug/test_astro_lib_coverage"
-      if [ -f "$COVBIN" ]; then
-        echo "运行代码覆盖率测试..."
-        (cd ../bin/linux/Debug && ./test_astro_lib_coverage)
-        lcov --capture --directory ../lib/linux/Debug --output-file coverage.info
-        genhtml coverage.info --output-directory ../../coverage-report
-      else
-        echo "未找到覆盖率测试程序(项目 CMakeLists 未定义该目标)，跳过覆盖率报告生成"
-      fi
-      test -f ../lib/linux/Debug/libastrolog32.a || { echo "FAIL: 静态库未生成"; exit 1; }
-      OBJCNT=$(ar t ../lib/linux/Debug/libastrolog32.a | wc -l)
-      echo "静态库包含目标文件数: $OBJCNT"
+      rm -rf _verify && mkdir -p _verify
+      tar -xzf "$ARTIFACT" -C _verify
+
+      # 1) 必须包含静态库，且非空
+      LIB=$(find _verify -name '*.a' | head -1)
+      test -n "$LIB" || { echo "FAIL: 制品中没有静态库(.a)"; exit 1; }
+      OBJCNT=$(ar t "$LIB" | wc -l)
+      echo "静态库: $LIB  目标文件数: $OBJCNT"
       test "$OBJCNT" -gt 0 || { echo "FAIL: 静态库为空"; exit 1; }
-      echo "OK: libastrolog32.a 校验通过"
-  artifacts:
-    paths:
-      - astroproject/lib/linux/Debug/
-      - coverage-report/
-    expire_in: 1 week
-  allow_failure: true
+
+      # 2) 必须包含公开头文件
+      HDR=$(find _verify -name 'astrolog_lib.h' | head -1)
+      test -n "$HDR" || { echo "FAIL: 制品缺少公开头文件 astrolog_lib.h"; exit 1; }
+      echo "头文件: $HDR"
+
+      # 3) 覆盖率/单测：若日后 CMakeLists 定义了对应目标则执行，未定义则跳过（非错误）
+      COVBIN=$(find _verify -name 'test_astro_lib_coverage' | head -1)
+      if [ -n "$COVBIN" ]; then
+        echo "发现覆盖率测试程序，执行中..."
+        "$COVBIN"
+      else
+        echo "注: 项目 CMakeLists 未定义覆盖率/单测目标，跳过（非错误）"
+      fi
+
+      echo "VERIFY PASSED"
+  allow_failure: false   # 质量门禁，不允许静默失败
 
 # 开发环境构建
 build_dev:
@@ -210,36 +217,49 @@ build_prod:
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
     - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
 
-# 开发环境单元测试（含代码覆盖率）
-unit_test_dev:
-  <<: *coverage_definition
+# 开发环境验证（质量门禁：校验 build_dev 产出的制品）
+verify_dev:
+  <<: *verify_definition
+  needs:
+    - job: build_dev
+      artifacts: true
   tags:
     - docker
   rules:
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
     - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
 
-# 测试环境单元测试
-unit_test_test:
-  <<: *test_definition
+# 测试环境验证（质量门禁：校验 build_test 产出的制品）
+verify_test:
+  <<: *verify_definition
+  needs:
+    - job: build_test
+      artifacts: true
   tags:
     - docker
   rules:
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
     - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
 
-# 生产环境单元测试
-unit_test_prod:
-  <<: *test_definition
+# 生产环境验证（质量门禁：校验 build_prod 产出的制品）
+verify_prod:
+  <<: *verify_definition
+  needs:
+    - job: build_prod
+      artifacts: true
   tags:
     - docker
   rules:
+    # 关键修复：原规则缺少 $CI_COMMIT_TAG，导致打 tag 发布生产时
+    # 验证作业不运行，而 deploy_to_prod 又 needs 它 —— 生产链路要么断裂、
+    # 要么绕过质量门禁。补上 tag 规则，确保发布前必过验证。
+    - if: $CI_COMMIT_TAG
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
     - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
 
 # 在新建一个合并请求的时候，自动生成合并请求页面概览和描述
 gene_mrdesc:
-  stage: build
+  stage: prepare   # 原为 build，语义不符：这是协作自动化，不是构建
   image: curlimages/curl:latest
   before_script:
     - 'echo "Current directory: $(pwd)"'
@@ -269,7 +289,7 @@ gene_mrdesc:
 
 # 当点击合并，合并代码成功后会提交到目标分支，触发deploy 作业，并添加注释
 add_mr_note:
-  stage: deploy
+  stage: prepare   # 原为 deploy，语义不符：这是 MR 通知，不是部署
   script:
     - 'echo "正在为合并请求添加注释..."'
     - PROJECT_DIR="$HOME/$CI_PROJECT_DIR"
@@ -324,7 +344,7 @@ deploy_to_dev:
   needs:
     - job: build_dev
       artifacts: true
-    - job: unit_test_dev
+    - job: verify_dev
       artifacts: true
   variables:
     ENVIRONMENT: "development"
@@ -339,7 +359,7 @@ deploy_to_test:
   needs:
     - job: build_test
       artifacts: true
-    - job: unit_test_test
+    - job: verify_test
       artifacts: true
   variables:
     ENVIRONMENT: "testing"
@@ -354,7 +374,7 @@ deploy_to_prod:
   needs:
     - job: build_prod
       artifacts: true
-    - job: unit_test_prod
+    - job: verify_prod
       artifacts: true
   variables:
     ENVIRONMENT: "production"
