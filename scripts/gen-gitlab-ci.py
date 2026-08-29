@@ -242,6 +242,34 @@ def gen_create_release():
 """
 
 
+def gen_sync_release_atomgit():
+    """同步 GitLab Release 到 Atomgit（发行版元数据 + 产物附件）。
+
+    push mirror 只同步 git 数据，Releases 页默认是空的；
+    此 job 在 tag 流水线 release 阶段，用 Atomgit v5 API 创建/更新 Release 并上传产物。
+    需要项目 CI/CD 变量 ATOMGIT_PAT（Atomgit 个人访问令牌，组织仓库写权限）。
+    """
+    deps = "\n".join(f"    - build_prod_{plat_job_suffix(p)}" for p in PLATFORMS)
+    needs = "\n".join(f"""    - job: build_prod_{plat_job_suffix(p)}
+      artifacts: true""" for p in PLATFORMS)
+    return f"""sync_release_atomgit:
+  stage: release
+  rules:
+    - if: $CI_COMMIT_TAG
+  tags:
+    - docker
+  image: alpine:3.20
+  before_script:
+    - apk add --no-cache curl jq
+  script:
+    - sh scripts/sync-atomgit-release.sh
+  dependencies:
+{deps}
+  needs:
+{needs}
+"""
+
+
 # ============================================================
 # 头部（workflow / stages / default / variables / 模板）
 # ============================================================
@@ -560,6 +588,8 @@ def main():
     parts.append(gen_deploy_jobs())
     parts.append("\n# ============================================================\n# 创建 Release（tag 时触发）：assets 挂全部系统平台产物链接\n# ============================================================\n")
     parts.append(gen_create_release())
+    parts.append("\n# ============================================================\n# 同步 Release 到 Atomgit（tag 时触发）：发行版元数据 + 产物附件\n# ============================================================\n")
+    parts.append(gen_sync_release_atomgit())
     parts.append("\n# ============================================================\n# 发布到 Package Registry（tag 时触发，按系统分 job，版本带系统）\n# ============================================================\n")
     parts.append(gen_publish_jobs())
 
