@@ -139,6 +139,17 @@ elseif(UNIX AND NOT APPLE)
         set(SWE_LIB_PATH "${CMAKE_CURRENT_SOURCE_DIR}/swe/lib/linux")
         find_library(SWE_LIB NAMES swe PATHS ${SWE_LIB_PATH})
         target_link_libraries(astrolog32 ${SWE_LIB})
+        # musl 兼容（Alpine 等）：预编译 libswe.a 由 glibc 环境构建，
+        # 引用了 glibc 特有的 fseeko64/ftello64；musl 的 off_t 天生 64 位
+        # 但无 *64 别名。检测到系统缺 fseeko64 时编译 shim 提供等价实现。
+        include(CheckSymbolExists)
+        check_symbol_exists(fseeko64 "stdio.h" HAVE_FSEEKO64)
+        if(NOT HAVE_FSEEKO64)
+            message(STATUS "musl libc detected: enabling fseeko64/ftello64 compat shim")
+            add_library(swemuslcompat STATIC ${CMAKE_CURRENT_SOURCE_DIR}/swe/musl_compat.c)
+        else()
+            message(STATUS "glibc detected: no musl compat shim needed")
+        endif()
     endif()
 endif()
 
@@ -146,6 +157,10 @@ endif()
 add_executable(astrolog32_oldmain test/oldmain.cpp)
 # 链接静态库和SWE库
 target_link_libraries(astrolog32_oldmain astrolog32 ${SWE_LIB})
+# musl 兼容 shim 必须放在 libswe.a 之后链接（静态链接按序解析符号）
+if(TARGET swemuslcompat)
+    target_link_libraries(astrolog32_oldmain swemuslcompat)
+endif()
 
 # 添加Windows平台特定的链接选项
 if(WIN32 AND MSVC)
@@ -174,6 +189,10 @@ endif()
 add_executable(astrolog32_apimainchart test/apimainchart.cpp)
 # 链接静态库和SWE库
 target_link_libraries(astrolog32_apimainchart astrolog32 ${SWE_LIB})
+# musl 兼容 shim（同 astrolog32_oldmain，见 linux 分支）
+if(TARGET swemuslcompat)
+    target_link_libraries(astrolog32_apimainchart swemuslcompat)
+endif()
 
 # 添加Windows平台特定的链接选项
 if(WIN32 AND MSVC)
@@ -202,6 +221,10 @@ endif()
 add_executable(astrolog32_apichart2 test/apichart2.cpp)
 # 链接静态库和SWE库
 target_link_libraries(astrolog32_apichart2 astrolog32 ${SWE_LIB})
+# musl 兼容 shim（同 astrolog32_oldmain，见 linux 分支）
+if(TARGET swemuslcompat)
+    target_link_libraries(astrolog32_apichart2 swemuslcompat)
+endif()
 
 # 添加Windows平台特定的链接选项
 if(WIN32 AND MSVC)
