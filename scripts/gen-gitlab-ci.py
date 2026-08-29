@@ -1,0 +1,571 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+生成 .gitlab-ci.yml —— 多系统构建矩阵（配置即代码）
+====================================================
+本平台为「单一共享 docker runner」，构建环境由 docker 镜像提供。
+原先用 ABI 命名（linux-glibc / linux-musl），对最终用户不够直观；
+现改为「发行版名-版本」（如 ubuntu-22.04 / alpine-3.20），用户看包名即知系统。
+
+用法：修改 PLATFORMS / ENVS 后重新运行本脚本即可再生成 .gitlab-ci.yml
+    python scripts/gen-gitlab-ci.py
+"""
+import io, os, sys
+
+# ============================================================
+# 平台矩阵（新增平台只需在此加一行，重新生成即可）
+#  id:  平台标识（用于产物名/包名/PLATFORM 变量，如 ubuntu-22.04）
+#  image: docker 镜像
+#  pkg:  包管理器（apt / apk / dnf），决定工具链安装与镜像加速逻辑
+#  os/ver: MANIFEST 中的 OS 名称与版本
+# ============================================================
+PLATFORMS = [
+    dict(id="ubuntu-22.04", image="ubuntu:22.04", pkg="apt", os="Ubuntu",      ver="22.04"),
+    dict(id="ubuntu-24.04", image="ubuntu:24.04", pkg="apt", os="Ubuntu",      ver="24.04"),
+    dict(id="debian-12",    image="debian:12",    pkg="apt", os="Debian",      ver="12"),
+    dict(id="alpine-3.20",  image="alpine:3.20",  pkg="apk", os="Alpine",      ver="3.20"),
+    dict(id="rockylinux-9", image="rockylinux:9", pkg="dnf", os="Rocky Linux", ver="9"),
+    dict(id="fedora-40",    image="fedora:40",    pkg="dnf", os="Fedora",      ver="40"),
+]
+
+# 环境矩阵（分支 → 环境名 → 触发规则）
+ENVS = [
+    dict(key="dev",  branch="develop", env="development", tag=False),
+    dict(key="test", branch="test",    env="testing",     tag=False),
+    dict(key="prod", branch="main",    env="production",  tag=True),
+]
+
+
+def plat_job_suffix(p):
+    """job 名后缀：ubuntu-22.04 -> ubuntu_2204（GitLab job 名不允许点）"""
+    return p["id"].replace(".", "_").replace("-", "_")
+
+
+def rules_block(env):
+    b = env["branch"]
+    lines = []
+    if env["tag"]:
+        lines.append("    - if: $CI_COMMIT_TAG")
+    lines.append(f'    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "{b}"')
+    lines.append(f'    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "{b}"')
+    return "\n".join(lines)
+
+
+def rules_block_deploy(env):
+    """deploy 阶段规则：push 到对应分支；prod 额外含 tag"""
+    b = env["branch"]
+    lines = []
+    if env["tag"]:
+        lines.append("    - if: $CI_COMMIT_TAG")
+    lines.append(f'    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "{b}"')
+    return "\n".join(lines)
+
+
+def gen_build_jobs():
+    out = []
+    for env in ENVS:
+        for p in PLATFORMS:
+            s = plat_job_suffix(p)
+            out.append(f"""build_{env['key']}_{s}:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "{p['id']}"
+    OS_NAME: "{p['os']}"
+    OS_VERSION: "{p['ver']}"
+    BUILD_IMAGE: "{p['image']}"
+    ENVIRONMENT: "{env['env']}"
+  tags:
+    - docker
+  rules:
+{rules_block(env)}
+""")
+    return "\n".join(out)
+
+
+def gen_verify_jobs():
+    out = []
+    for env in ENVS:
+        for p in PLATFORMS:
+            s = plat_job_suffix(p)
+            out.append(f"""verify_{env['key']}_{s}:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "{p['id']}"
+  needs:
+    - job: build_{env['key']}_{s}
+      artifacts: true
+  tags:
+    - docker
+  rules:
+{rules_block(env)}
+""")
+    return "\n".join(out)
+
+
+def gen_deploy_jobs():
+    out = []
+    for env in ENVS:
+        for p in PLATFORMS:
+            s = plat_job_suffix(p)
+            out.append(f"""deploy_to_{env['key']}_{s}:
+  <<: *deploy_definition
+  needs:
+    - job: build_{env['key']}_{s}
+      artifacts: true
+    - job: verify_{env['key']}_{s}
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "{p['id']}"
+    PACKAGE_NAME: "astroproject-{p['id']}"
+    ENVIRONMENT: "{env['env']}"
+  tags:
+    - docker
+  rules:
+{rules_block_deploy(env)}
+""")
+    return "\n".join(out)
+
+
+def gen_publish_jobs():
+    out = []
+    for p in PLATFORMS:
+        s = plat_job_suffix(p)
+        out.append(f"""publish_package_{s}:
+  stage: release
+  tags:
+    - docker
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "{p['id']}"
+    PACKAGE_NAME: "astroproject-{p['id']}"
+  before_script:
+    - |
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        PACKAGE_VERSION="$CI_COMMIT_TAG"
+      else
+        PACKAGE_VERSION="v${{CI_COMMIT_SHORT_SHA}}"
+      fi
+      export PACKAGE_VERSION
+      echo "Determined package version: $PACKAGE_VERSION"
+  script:
+    - |
+      export ARCH=$(uname -m)
+      export ARTIFACT_NAME="astroproject-${{PLATFORM}}-${{ARCH}}.tar.gz"
+      echo "Uploading ${{PLATFORM}} artifact to GitLab Package Registry"
+      echo "Package: ${{PACKAGE_NAME}} / ${{PACKAGE_VERSION}} / ${{ARTIFACT_NAME}}"
+      curl --fail --silent --show-error \\
+        --header "JOB-TOKEN: ${{CI_JOB_TOKEN}}" \\
+        --upload-file "astroproject/${{BUILD_DIR}}/${{ARTIFACT_NAME}}" \\
+        "${{CI_API_V4_URL}}/projects/${{CI_PROJECT_ID}}/packages/generic/${{PACKAGE_NAME}}/${{PACKAGE_VERSION}}/${{ARTIFACT_NAME}}"
+      echo "Published OK: ${{ARTIFACT_NAME}}"
+  rules:
+    - if: $CI_COMMIT_TAG
+  dependencies:
+    - build_prod_{s}
+  needs:
+    - job: build_prod_{s}
+      artifacts: true
+""")
+    return "\n".join(out)
+
+
+def gen_release_links():
+    """create_release 的 printf 资产链接（每平台一组，作为 printf 参数行）"""
+    lines = []
+    n = len(PLATFORMS)
+    for i, p in enumerate(PLATFORMS):
+        s = plat_job_suffix(p)
+        comma = "," if i < n - 1 else ""
+        pid = p["id"]
+        # 每个平台 3 个 printf 参数：{ 行 / name+url 行 / }, 行（均带续行符 \）
+        lines.append('        "      {" \\')
+        lines.append(f'        "        \\"name\\": \\"astroproject-{pid}-${{ARCH}}.tar.gz\\"," \\')
+        lines.append(f'        "        \\"url\\": \\"${{CI_API_V4_URL}}/projects/${{CI_PROJECT_ID}}/jobs/artifacts/${{CI_COMMIT_REF_NAME}}/raw/astroproject/build/astroproject-{pid}-${{ARCH}}.tar.gz?job=build_prod_{s}\\"" \\')
+        lines.append(f'        "      }}{comma}" \\')
+    return "\n".join(lines)
+
+
+def gen_create_release():
+    links = gen_release_links()
+    deps = "\n".join(f"    - build_prod_{plat_job_suffix(p)}" for p in PLATFORMS)
+    needs = "\n".join(f"""    - job: build_prod_{plat_job_suffix(p)}
+      artifacts: true""" for p in PLATFORMS)
+    return f"""create_release:
+  stage: release
+  rules:
+    - if: $CI_COMMIT_TAG
+  tags:
+    - docker
+  before_script:
+    - |
+      # 注意：CI_COMMIT_TAG 已含 v 前缀(如 v0.1.0)，不要再加 v
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        PACKAGE_VERSION="$CI_COMMIT_TAG"
+      else
+        PACKAGE_VERSION="v${{CI_COMMIT_SHORT_SHA}}"
+      fi
+      export PACKAGE_VERSION
+      echo "Determined package version: $PACKAGE_VERSION"
+  script:
+    - |
+      set -e
+      echo "Creating release for $PACKAGE_VERSION"
+      export ARCH=$(uname -m)
+      # 用 printf 构造 release JSON（避免 heredoc 缩进陷阱；双引号使变量展开）
+      # 资产链接覆盖全部 {len(PLATFORMS)} 个系统平台
+      printf '%s\\n' \\
+        "{{" \\
+        "  \\"tag_name\\": \\"$CI_COMMIT_TAG\\"," \\
+        "  \\"ref\\": \\"$CI_COMMIT_TAG\\"," \\
+        "  \\"name\\": \\"Release $PACKAGE_VERSION\\"," \\
+        "  \\"description\\": \\"Release created by GitLab CI/CD for AstroProject ({len(PLATFORMS)} linux distros)\\", " \\
+        "  \\"assets\\": {{" \\
+        "    \\"links\\": [" \\
+{links}
+        "    ]" \\
+        "  }}" \\
+        "}}" > release_data.json
+      cat release_data.json
+      curl --request POST \\
+           --header "PRIVATE-TOKEN: $PERSONAL_ACCESS_TOKEN" \\
+           --header "Content-Type: application/json" \\
+           --data @release_data.json \\
+           "$CI_API_V4_URL/projects/$CI_PROJECT_ID/releases"
+      echo "RELEASE_CREATED"
+  dependencies:
+{deps}
+  needs:
+{needs}
+"""
+
+
+# ============================================================
+# 头部（workflow / stages / default / variables / 模板）
+# ============================================================
+HEADER = r'''# ============================================================
+# 阶段（stage）设计 —— 遵循 GitLab CE 惯例，并按职责重新命名/归位
+#
+#   prepare  准备与协作自动化：MR 描述生成、合并后回写 MR 备注
+#   build    构建：编译源码并打包成可分发制品
+#   verify   验证：校验 build 产出的制品（质量门禁）
+#   deploy   部署：按环境发布制品（dev / test / prod）
+#   release  发布：创建 GitLab Release 并发布软件包
+#
+# 相比原配置的修正：
+#   1. 原 gene_mrdesc（生成 MR 描述）被塞在 build 阶段、
+#      add_mr_note（MR 备注）被塞在 deploy 阶段，语义完全不符，
+#      现统一归入新增的 prepare 阶段。
+#   2. 原 test 阶段下挂着 unit_test_* 作业，但本项目 CMakeLists
+#      并未定义任何单元测试目标（无 gtest/catch，也没有
+#      test_astro_lib_debugd），实际做的是产物校验，名不副实；
+#      故更名为 verify。日后若在 CMakeLists 中加入真实单测，
+#      可再拆出独立的 test 阶段。
+# ============================================================
+stages:
+  - prepare
+  - build
+  - verify
+  - deploy
+  - release
+
+# 防止 push 与 merge_request 触发重复流水线（GitLab 官方推荐写法）
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH
+
+.variables_template: &variables_definition
+  BUILD_DIR: "build"
+  # 注：ARTIFACT_NAME/PACKAGE_NAME 已改为按平台动态生成（见各 job），
+  #     不再提供全局默认值，避免与平台化命名混淆。
+
+variables:
+  <<: *variables_definition
+  # SWE 为 git submodule（astroproject/swe/swisseph），job 前必须拉取
+  GIT_SUBMODULE_STRATEGY: recursive
+
+# ==== 本平台适配：单一共享 docker runner ====
+# 原设计依赖「每台环境机一个 runner」+ 在真实 OS 上 sudo 装依赖。
+# 本平台宿主机仅 16GB，无法同时跑多台环境机，故改为：
+#   一台 docker runner + 镜像提供构建环境，dev/test/prod 由分支规则区分。
+default:
+  image: gcc:12
+  before_script:
+    - |
+      # 尽力而为的依赖安装：
+      #  - 有的镜像以 root 跑(无 sudo)，有的以普通用户跑且没有 sudo -> 无 sudo 则置空
+      #  - 有的镜像没有包管理器(curlimages/curl 等) -> 跳过即可
+      #  - 任何情况下都不得让 job 失败，非构建类 job 请用 before_script: [] 直接跳过
+      if [ "$(id -u)" = "0" ]; then SUDO=""; else SUDO="sudo"; fi
+      command -v sudo >/dev/null 2>&1 || SUDO=""
+      if ! command -v cmake >/dev/null 2>&1; then
+        echo "cmake 缺失，尝试安装构建工具链..."
+        if command -v apt-get >/dev/null 2>&1; then
+          # 加速：默认源(deb.debian.org / archive.ubuntu.com)在本网络下极慢，
+          # 且每个 job 都是全新容器、都要重装一遍。改用清华 TUNA。
+          # 要点：
+          #  - 基础镜像无 ca-certificates，https 源会 update 失败，故统一用 http
+          #  - 源 URL 自带路径后缀(如 /ubuntu、/debian)，替换时必须一并吃掉，
+          #    否则会变成 /ubuntu/ubuntu 双路径
+          #  - Debian 12 / Ubuntu 24.04 是 deb822(.sources)，Ubuntu 22.04 是 .list，都要处理
+          if [ "$(id -u)" = "0" ]; then
+            for _f in /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
+              [ -f "$_f" ] && sed -i \
+                's|http://deb.debian.org/debian|http://mirrors.tuna.tsinghua.edu.cn/debian|g; s|https://deb.debian.org/debian|http://mirrors.tuna.tsinghua.edu.cn/debian|g; s|http://security.debian.org/debian-security|http://mirrors.tuna.tsinghua.edu.cn/debian-security|g; s|https://security.debian.org/debian-security|http://mirrors.tuna.tsinghua.edu.cn/debian-security|g; s|http://archive.ubuntu.com/ubuntu|http://mirrors.tuna.tsinghua.edu.cn/ubuntu|g; s|https://archive.ubuntu.com/ubuntu|http://mirrors.tuna.tsinghua.edu.cn/ubuntu|g; s|http://security.ubuntu.com/ubuntu|http://mirrors.tuna.tsinghua.edu.cn/ubuntu|g; s|https://security.ubuntu.com/ubuntu|http://mirrors.tuna.tsinghua.edu.cn/ubuntu|g' "$_f"
+            done || true
+          fi
+          $SUDO apt-get update -qq && $SUDO apt-get install -y -qq cmake make g++ \
+            || echo "WARN: 构建工具链安装失败(权限或网络)，继续尝试"
+        elif command -v apk >/dev/null 2>&1; then
+          # Alpine 也用 TUNA 加速（默认 dl-cdn.alpinelinux.org 慢；alpine 基础镜像自带 ca-certificates）
+          if [ "$(id -u)" = "0" ]; then
+            sed -i 's|dl-cdn.alpinelinux.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apk/repositories 2>/dev/null || true
+          fi
+          $SUDO apk add --no-cache cmake make g++ \
+            || echo "WARN: 构建工具链安装失败(权限或网络)，继续尝试"
+        elif command -v dnf >/dev/null 2>&1; then
+          # Rocky/Fedora 用 dnf。TUNA 不镜像 Rocky，改用 USTC(中科大，实测可达)：
+          #   rocky   -> https://mirrors.ustc.edu.cn/rocky/（与官方同结构，吃 $contentdir）
+          #   fedora  -> https://mirrors.ustc.edu.cn/fedora/linux/（官方 baseurl 是
+          #              download.example 占位符，靠 metalink 解析，替换占位符并禁 metalink）
+          if [ "$(id -u)" = "0" ]; then
+            sed -i 's|^mirrorlist=|#mirrorlist=|g; s|^metalink=|#metalink=|g' /etc/yum.repos.d/*.repo 2>/dev/null || true
+            sed -i 's|^#baseurl=http://dl.rockylinux.org/\$contentdir|baseurl=https://mirrors.ustc.edu.cn/rocky|g; s|^#baseurl=http://download.example/pub/fedora|baseurl=https://mirrors.ustc.edu.cn/fedora/linux|g; s|^baseurl=http://download.example/pub/fedora|baseurl=https://mirrors.ustc.edu.cn/fedora/linux|g' /etc/yum.repos.d/*.repo 2>/dev/null || true
+          fi
+          $SUDO dnf install -y -q cmake make gcc-c++ \
+            || echo "WARN: 构建工具链安装失败(权限或网络)，继续尝试"
+        elif command -v yum >/dev/null 2>&1; then
+          $SUDO yum install -y cmake make gcc-c++ \
+            || echo "WARN: 构建工具链安装失败(权限或网络)，继续尝试"
+        else
+          echo "WARN: 未找到受支持的包管理器，跳过依赖安装"
+        fi
+      fi
+      cmake --version || echo "WARN: 本镜像无 cmake，需要编译的 job 会失败"
+
+# 构建作业模板
+# ============================================================
+# 多系统构建矩阵（由 scripts/gen-gitlab-ci.py 生成，改平台矩阵请改该脚本）
+# ------------------------------------------------------------
+# docker runner 只能运行 Linux 系镜像，因此可即时构建的系统为：
+#   ubuntu-22.04 / ubuntu-24.04 / debian-12  —— Debian 系(apt, glibc, gcc 11/13/12)
+#   alpine-3.20                              —— Alpine(apk, musl libc)
+#   rockylinux-9 / fedora-40                 —— RHEL 系(dnf, glibc, gcc 11/14)
+# 产物与发布包名均带「系统-架构」标识（如 astroproject-ubuntu-22.04-x86_64.tar.gz），
+# 包内附 MANIFEST 说明系统名/版本/架构/libc/gcc/commit/构建时间，用户解包即可辨识。
+#
+# FreeBSD / macOS / Windows：CMakeLists 已完整支持(PLATFORM_DIR 分支)，
+# 但需对应 OS 的独立 runner（本平台内存墙内无法常驻），后续可在环境机
+# （dev-linux/dev-win 等）挂 runner 扩展 —— 见 OPS-GUIDE §4.14。
+# ============================================================
+
+# ---- 构建模板：按平台实例化（PLATFORM/BUILD_IMAGE 由各 job variables 注入）----
+.build_template: &build_definition
+  stage: build
+  image: ${BUILD_IMAGE}
+  script:
+    - |
+      set -e
+      export ARCH=$(uname -m)
+      export ARTIFACT_NAME="astroproject-${PLATFORM}-${ARCH}.tar.gz"
+      echo ">>> [build] platform=${PLATFORM} os=${OS_NAME} ${OS_VERSION} arch=${ARCH} artifact=${ARTIFACT_NAME}"
+      mkdir -p astroproject/${BUILD_DIR}
+      cd astroproject/${BUILD_DIR}
+      cmake ../ -DCMAKE_BUILD_TYPE=Release
+      cmake --build .
+      # 打包（CMakeLists 输出到 lib/${PLATFORM_DIR}/Release，Linux 系 PLATFORM_DIR=linux）
+      mkdir -p pkg/lib pkg/include
+      cp ../lib/linux/Release/*.a pkg/lib/
+      cp -r ../include/. pkg/include/
+      # 生成 MANIFEST：用户解包即知系统/版本/架构/libc/gcc/来源
+      {
+        echo "PROJECT=astroproject"
+        echo "PLATFORM=${PLATFORM}"
+        echo "OS_NAME=${OS_NAME}"
+        echo "OS_VERSION=${OS_VERSION}"
+        echo "ARCH=${ARCH}"
+        if [ -f /etc/alpine-release ]; then LIBC=musl; else LIBC=glibc; fi
+        echo "LIBC=${LIBC}"
+        echo "GCC=$(gcc --version | head -1 | awk '{print $3}')"
+        echo "COMMIT=${CI_COMMIT_SHORT_SHA}"
+        echo "REF=${CI_COMMIT_REF_NAME}"
+        echo "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+      } > pkg/MANIFEST
+      tar -czvf ${ARTIFACT_NAME} -C pkg lib include MANIFEST
+      ls -l ${ARTIFACT_NAME}
+      # 清单(先写文件再 head，避免 tar|head 的 SIGPIPE 被 pipefail 判失败)
+      echo "打包内容清单(前 20 项):"
+      tar -tzf ${ARTIFACT_NAME} > /tmp/_pkg_list.txt
+      head -20 /tmp/_pkg_list.txt
+      echo "包内文件总数: $(wc -l < /tmp/_pkg_list.txt)"
+      # 回显 MANIFEST
+      echo "--- MANIFEST ---"
+      tar -xzf ${ARTIFACT_NAME} -O MANIFEST
+  artifacts:
+    paths:
+      - astroproject/${BUILD_DIR}/astroproject-*.tar.gz
+    expire_in: 1 week
+    name: "astroproject-${PLATFORM}-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHORT_SHA}"
+
+# ---- 验证模板（质量门禁，按平台校验制品 + MANIFEST）----
+.verify_template: &verify_definition
+  stage: verify
+  image: gcc:12
+  before_script: []   # 仅校验制品，不需要 cmake
+  script:
+    - |
+      set -e
+      export ARCH=$(uname -m)
+      ARTIFACT=$(ls astroproject/${BUILD_DIR}/astroproject-${PLATFORM}-${ARCH}.tar.gz 2>/dev/null | head -1)
+      echo "== 校验 build 阶段产出(${PLATFORM}) =="
+      test -n "$ARTIFACT" || { echo "FAIL: 未找到 ${PLATFORM} 平台制品"; exit 1; }
+      ls -l "$ARTIFACT"
+
+      rm -rf _verify && mkdir -p _verify
+      tar -xzf "$ARTIFACT" -C _verify
+
+      # 1) MANIFEST 必须存在且平台标识正确
+      MF=$(find _verify -name MANIFEST | head -1)
+      test -n "$MF" || { echo "FAIL: 制品缺少 MANIFEST"; exit 1; }
+      grep -q "PLATFORM=${PLATFORM}" "$MF" || { echo "FAIL: MANIFEST 平台标识不符"; cat "$MF"; exit 1; }
+      echo "MANIFEST: $(cat "$MF" | tr '\n' ';')"
+
+      # 2) 必须包含静态库，且非空
+      LIB=$(find _verify -name '*.a' | head -1)
+      test -n "$LIB" || { echo "FAIL: 制品中没有静态库(.a)"; exit 1; }
+      OBJCNT=$(ar t "$LIB" | wc -l)
+      echo "静态库: $LIB  目标文件数: $OBJCNT"
+      test "$OBJCNT" -gt 0 || { echo "FAIL: 静态库为空"; exit 1; }
+
+      # 3) 必须包含公开头文件
+      HDR=$(find _verify -name 'astrolog_lib.h' | head -1)
+      test -n "$HDR" || { echo "FAIL: 制品缺少公开头文件 astrolog_lib.h"; exit 1; }
+      echo "头文件: $HDR"
+
+      # 4) 覆盖率/单测：CMakeLists 未定义则跳过（非错误）
+      COVBIN=$(find _verify -name 'test_astro_lib_coverage' | head -1)
+      if [ -n "$COVBIN" ]; then
+        echo "发现覆盖率测试程序，执行中..."
+        "$COVBIN"
+      else
+        echo "注: 项目 CMakeLists 未定义覆盖率/单测目标，跳过（非错误）"
+      fi
+
+      echo "VERIFY PASSED (${PLATFORM})"
+  allow_failure: false   # 质量门禁，不允许静默失败
+
+# 部署作业模板
+.deploy_template: &deploy_definition
+  stage: deploy
+  image: curlimages/curl:latest
+  before_script: []   # 发布产物不需要构建工具链
+  script:
+    - |
+      set -e
+      export ARCH=$(uname -m)
+      export ARTIFACT_NAME="astroproject-${PLATFORM}-${ARCH}.tar.gz"
+      # 适配说明：docker executor 的容器是临时的，原设计"解压到 runner 本机 $HOME"
+      # 在容器里没有意义（job 结束即销毁）。改为发布到 GitLab Generic Package
+      # Registry 做持久化保存；包名带系统标识（astroproject-ubuntu-22.04 等），
+      # 用户可在 Packages 页面按系统/版本辨识下载。
+      ARTIFACT="astroproject/${BUILD_DIR}/${ARTIFACT_NAME}"
+      test -f "$ARTIFACT" || { echo "FAIL: 未找到制品 $ARTIFACT"; exit 1; }
+      echo "Publishing ${PLATFORM} -> packages/generic/${PACKAGE_NAME}/${ENVIRONMENT}-${CI_COMMIT_SHORT_SHA}/${ARTIFACT_NAME}"
+      curl --fail --silent --show-error \
+        --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+        --upload-file "$ARTIFACT" \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${ENVIRONMENT}-${CI_COMMIT_SHORT_SHA}/${ARTIFACT_NAME}"
+      echo "Published OK: ${ARTIFACT_NAME}"
+  # 注：GitLab 19.2 有 bug —— deploy 阶段 job 带 environment 会导致 script 校验失败，
+  #     故本平台统一不在 deploy job 上使用 environment 关键字。
+'''
+
+BODY_PREPARE = r'''
+# ============================================================
+# 协作自动化（prepare 阶段）
+# ============================================================
+gene_mrdesc:
+  stage: prepare   # 原为 build，语义不符：这是协作自动化，不是构建
+  image: curlimages/curl:latest
+  before_script:
+    - 'echo "Current directory: $(pwd)"'
+    - 'echo "HOME directory: $HOME"'
+    - 'echo "CI_PROJECT_DIR: $CI_PROJECT_DIR"'
+    - 'echo "Checking and installing required tools..."'
+    - if ! command -v jq &> /dev/null; then echo "jq not found, attempting to install..."; if command -v apk &> /dev/null; then apk add --no-cache jq; elif command -v apt-get &> /dev/null; then apt-get update && apt-get install -y jq; elif command -v yum &> /dev/null; then yum install -y jq; elif command -v dnf &> /dev/null; then dnf install -y jq; elif command -v pkg &> /dev/null; then pkg install -y jq; elif command -v zypper &> /dev/null; then zypper install -y jq; else echo "Package manager not found. Please install jq manually."; exit 1; fi; else echo "jq is already installed"; jq --version; fi
+    - if ! command -v bash &> /dev/null; then echo "bash not found, attempting to install..."; if command -v apk &> /dev/null; then apk add --no-cache bash; elif command -v apt-get &> /dev/null; then apt-get update && apt-get install -y bash; elif command -v yum &> /dev/null; then yum install -y bash; elif command -v dnf &> /dev/null; then dnf install -y bash; elif command -v pkg &> /dev/null; then pkg install -y bash; elif command -v zypper &> /dev/null; then zypper install -y bash; else echo "Package manager not found. Please install bash manually."; exit 1; fi; else echo "bash is already installed"; bash --version; fi
+  script:
+    - 'echo "正在为合并请求生成描述内容..."'
+    - pwd
+    - ls -la
+    - ls -la scripts/
+    - PROJECT_DIR="$HOME/$CI_PROJECT_DIR"
+    - 'echo "Project directory: $PROJECT_DIR"'
+    - chmod +x "$PROJECT_DIR/scripts/generate_mr_description.sh"
+    - chmod +x "$PROJECT_DIR/scripts/add_mr_note.sh"
+    - /usr/local/bin/bash "$PROJECT_DIR/scripts/generate_mr_description.sh"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  variables:
+    GITLAB_TOKEN: $PERSONAL_ACCESS_TOKEN
+
+# 当点击合并，合并代码成功后会提交到目标分支，触发deploy 作业，并添加注释
+add_mr_note:
+  stage: prepare   # 原为 deploy，语义不符：这是 MR 通知，不是部署
+  script:
+    - 'echo "正在为合并请求添加注释..."'
+    - PROJECT_DIR="$HOME/$CI_PROJECT_DIR"
+    - 'echo "Project directory: $PROJECT_DIR"'
+    - |
+      if echo "$CI_COMMIT_MESSAGE" | grep -q "See merge request"; then
+        MR_IID=$(echo "$CI_COMMIT_MESSAGE" | grep "See merge request" | grep -o "!.*" | sed 's/!//')
+      else
+        MR_IID=$(echo $CI_COMMIT_MESSAGE | grep -o "Merge branch.*into.*" | grep -o "Merge branch '[^']*' \(#[0-9]*\)" | grep -o "#[0-9]*" | sed 's/#//')
+      fi
+    - 'echo "Extracted MR IID: $MR_IID"'
+    - chmod +x "$PROJECT_DIR/scripts/add_mr_note.sh"
+    - bash "$PROJECT_DIR/scripts/add_mr_note.sh" "$MR_IID"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_MESSAGE =~ /^Merge branch.*/
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test" && $CI_COMMIT_MESSAGE =~ /^Merge branch.*/
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main" && $CI_COMMIT_MESSAGE =~ /^Merge branch.*/
+  variables:
+    GITLAB_TOKEN: $PERSONAL_ACCESS_TOKEN
+
+# ============================================================
+# 开发环境（develop 分支）—— 全系统矩阵
+# ============================================================
+'''
+
+
+def main():
+    parts = [HEADER, BODY_PREPARE]
+    parts.append(gen_build_jobs())
+    parts.append("\n# ============================================================\n# 验证（质量门禁）—— 全系统矩阵\n# ============================================================\n")
+    parts.append(gen_verify_jobs())
+    parts.append("\n# ============================================================\n# 部署（按环境发布）—— 全系统矩阵\n# ============================================================\n")
+    parts.append(gen_deploy_jobs())
+    parts.append("\n# ============================================================\n# 创建 Release（tag 时触发）：assets 挂全部系统平台产物链接\n# ============================================================\n")
+    parts.append(gen_create_release())
+    parts.append("\n# ============================================================\n# 发布到 Package Registry（tag 时触发，按系统分 job，版本带系统）\n# ============================================================\n")
+    parts.append(gen_publish_jobs())
+
+    out = "\n".join(parts)
+    dst = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".gitlab-ci.yml")
+    with io.open(dst, "w", encoding="utf-8", newline="\n") as f:
+        f.write(out)
+    print(f"GENERATED: {dst} ({len(out.splitlines())} lines, {len(PLATFORMS)} platforms x {len(ENVS)} envs)")
+
+
+if __name__ == "__main__":
+    main()

@@ -60,25 +60,38 @@ default:
       if ! command -v cmake >/dev/null 2>&1; then
         echo "cmake 缺失，尝试安装构建工具链..."
         if command -v apt-get >/dev/null 2>&1; then
-          # 加速：默认源 deb.debian.org 在本网络下极慢（8.6MB 的 cmake 要数分钟），
-          # 且每个 job 都是全新容器、都要重装一遍。改用国内镜像可把安装压到数秒。
+          # 加速：默认源(deb.debian.org / archive.ubuntu.com)在本网络下极慢，
+          # 且每个 job 都是全新容器、都要重装一遍。改用清华 TUNA。
+          # 要点：
+          #  - 基础镜像无 ca-certificates，https 源会 update 失败，故统一用 http
+          #  - 源 URL 自带路径后缀(如 /ubuntu、/debian)，替换时必须一并吃掉，
+          #    否则会变成 /ubuntu/ubuntu 双路径
+          #  - Debian 12 / Ubuntu 24.04 是 deb822(.sources)，Ubuntu 22.04 是 .list，都要处理
           if [ "$(id -u)" = "0" ]; then
-            # 注意：本网络实测 mirrors.aliyun.com 不可达(HTTP 000)，用清华 TUNA。
-            # gcc:12(Debian 12) 的源是 deb822 格式：/etc/apt/sources.list.d/debian.sources
-            # （URIs: http://deb.debian.org/debian），必须同时处理 .list 与 .sources。
-            # 强制替换为 https://mirrors.tuna.tsinghua.edu.cn 避免 http 301 重定向的不确定性。
             for _f in /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
-              [ -f "$_f" ] && sed -i                 's|http://deb.debian.org|https://mirrors.tuna.tsinghua.edu.cn|g; s|https://deb.debian.org|https://mirrors.tuna.tsinghua.edu.cn|g; s|http://security.debian.org|https://mirrors.tuna.tsinghua.edu.cn|g; s|https://security.debian.org|https://mirrors.tuna.tsinghua.edu.cn|g' "$_f"
+              [ -f "$_f" ] && sed -i \
+                's|http://deb.debian.org/debian|http://mirrors.tuna.tsinghua.edu.cn/debian|g; s|https://deb.debian.org/debian|http://mirrors.tuna.tsinghua.edu.cn/debian|g; s|http://security.debian.org/debian-security|http://mirrors.tuna.tsinghua.edu.cn/debian-security|g; s|https://security.debian.org/debian-security|http://mirrors.tuna.tsinghua.edu.cn/debian-security|g; s|http://archive.ubuntu.com/ubuntu|http://mirrors.tuna.tsinghua.edu.cn/ubuntu|g; s|https://archive.ubuntu.com/ubuntu|http://mirrors.tuna.tsinghua.edu.cn/ubuntu|g; s|http://security.ubuntu.com/ubuntu|http://mirrors.tuna.tsinghua.edu.cn/ubuntu|g; s|https://security.ubuntu.com/ubuntu|http://mirrors.tuna.tsinghua.edu.cn/ubuntu|g' "$_f"
             done || true
           fi
           $SUDO apt-get update -qq && $SUDO apt-get install -y -qq cmake make g++ \
             || echo "WARN: 构建工具链安装失败(权限或网络)，继续尝试"
         elif command -v apk >/dev/null 2>&1; then
-          # Alpine 也用 TUNA 加速（默认 dl-cdn.alpinelinux.org 慢）
+          # Alpine 也用 TUNA 加速（默认 dl-cdn.alpinelinux.org 慢；alpine 基础镜像自带 ca-certificates）
           if [ "$(id -u)" = "0" ]; then
             sed -i 's|dl-cdn.alpinelinux.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apk/repositories 2>/dev/null || true
           fi
           $SUDO apk add --no-cache cmake make g++ \
+            || echo "WARN: 构建工具链安装失败(权限或网络)，继续尝试"
+        elif command -v dnf >/dev/null 2>&1; then
+          # Rocky/Fedora 用 dnf。TUNA 不镜像 Rocky，改用 USTC(中科大，实测可达)：
+          #   rocky   -> https://mirrors.ustc.edu.cn/rocky/（与官方同结构，吃 $contentdir）
+          #   fedora  -> https://mirrors.ustc.edu.cn/fedora/linux/（官方 baseurl 是
+          #              download.example 占位符，靠 metalink 解析，替换占位符并禁 metalink）
+          if [ "$(id -u)" = "0" ]; then
+            sed -i 's|^mirrorlist=|#mirrorlist=|g; s|^metalink=|#metalink=|g' /etc/yum.repos.d/*.repo 2>/dev/null || true
+            sed -i 's|^#baseurl=http://dl.rockylinux.org/\$contentdir|baseurl=https://mirrors.ustc.edu.cn/rocky|g; s|^#baseurl=http://download.example/pub/fedora|baseurl=https://mirrors.ustc.edu.cn/fedora/linux|g; s|^baseurl=http://download.example/pub/fedora|baseurl=https://mirrors.ustc.edu.cn/fedora/linux|g' /etc/yum.repos.d/*.repo 2>/dev/null || true
+          fi
+          $SUDO dnf install -y -q cmake make gcc-c++ \
             || echo "WARN: 构建工具链安装失败(权限或网络)，继续尝试"
         elif command -v yum >/dev/null 2>&1; then
           $SUDO yum install -y cmake make gcc-c++ \
@@ -89,15 +102,16 @@ default:
       fi
       cmake --version || echo "WARN: 本镜像无 cmake，需要编译的 job 会失败"
 
-# 构建作业模板 
+# 构建作业模板
 # ============================================================
-# 多平台构建（平台矩阵）
+# 多系统构建矩阵（由 scripts/gen-gitlab-ci.py 生成，改平台矩阵请改该脚本）
 # ------------------------------------------------------------
-# docker runner 只能运行 Linux 系镜像，因此可即时构建的平台为：
-#   linux-glibc : Debian(gcc:12)  —— glibc ABI，覆盖 Ubuntu/Debian/CentOS 等发行版
-#   linux-musl  : Alpine(latest) —— musl ABI，覆盖 Alpine / 静态链接场景
-# 产物与发布包名均带「平台-架构」标识（如 astroproject-linux-glibc-x86_64.tar.gz），
-# 包内附 MANIFEST 说明平台/架构/libc/commit/构建时间，用户下载后解包即可辨识。
+# docker runner 只能运行 Linux 系镜像，因此可即时构建的系统为：
+#   ubuntu-22.04 / ubuntu-24.04 / debian-12  —— Debian 系(apt, glibc, gcc 11/13/12)
+#   alpine-3.20                              —— Alpine(apk, musl libc)
+#   rockylinux-9 / fedora-40                 —— RHEL 系(dnf, glibc, gcc 11/14)
+# 产物与发布包名均带「系统-架构」标识（如 astroproject-ubuntu-22.04-x86_64.tar.gz），
+# 包内附 MANIFEST 说明系统名/版本/架构/libc/gcc/commit/构建时间，用户解包即可辨识。
 #
 # FreeBSD / macOS / Windows：CMakeLists 已完整支持(PLATFORM_DIR 分支)，
 # 但需对应 OS 的独立 runner（本平台内存墙内无法常驻），后续可在环境机
@@ -113,7 +127,7 @@ default:
       set -e
       export ARCH=$(uname -m)
       export ARTIFACT_NAME="astroproject-${PLATFORM}-${ARCH}.tar.gz"
-      echo ">>> [build] platform=${PLATFORM} arch=${ARCH} artifact=${ARTIFACT_NAME}"
+      echo ">>> [build] platform=${PLATFORM} os=${OS_NAME} ${OS_VERSION} arch=${ARCH} artifact=${ARTIFACT_NAME}"
       mkdir -p astroproject/${BUILD_DIR}
       cd astroproject/${BUILD_DIR}
       cmake ../ -DCMAKE_BUILD_TYPE=Release
@@ -122,13 +136,16 @@ default:
       mkdir -p pkg/lib pkg/include
       cp ../lib/linux/Release/*.a pkg/lib/
       cp -r ../include/. pkg/include/
-      # 生成 MANIFEST：用户解包即知平台/架构/libc/来源
+      # 生成 MANIFEST：用户解包即知系统/版本/架构/libc/gcc/来源
       {
         echo "PROJECT=astroproject"
         echo "PLATFORM=${PLATFORM}"
+        echo "OS_NAME=${OS_NAME}"
+        echo "OS_VERSION=${OS_VERSION}"
         echo "ARCH=${ARCH}"
         if [ -f /etc/alpine-release ]; then LIBC=musl; else LIBC=glibc; fi
         echo "LIBC=${LIBC}"
+        echo "GCC=$(gcc --version | head -1 | awk '{print $3}')"
         echo "COMMIT=${CI_COMMIT_SHORT_SHA}"
         echo "REF=${CI_COMMIT_REF_NAME}"
         echo "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -196,182 +213,35 @@ default:
       echo "VERIFY PASSED (${PLATFORM})"
   allow_failure: false   # 质量门禁，不允许静默失败
 
-# ============================================================
-# 开发环境（develop 分支）—— 双平台
-# ============================================================
-build_dev_glibc:
-  <<: *build_definition
-  variables:
-    BUILD_DIR: "build"
-    PLATFORM: "linux-glibc"
-    BUILD_IMAGE: "gcc:12"
-    ENVIRONMENT: "development"
-  tags:
-    - docker
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
-    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
+# 部署作业模板
+.deploy_template: &deploy_definition
+  stage: deploy
+  image: curlimages/curl:latest
+  before_script: []   # 发布产物不需要构建工具链
+  script:
+    - |
+      set -e
+      export ARCH=$(uname -m)
+      export ARTIFACT_NAME="astroproject-${PLATFORM}-${ARCH}.tar.gz"
+      # 适配说明：docker executor 的容器是临时的，原设计"解压到 runner 本机 $HOME"
+      # 在容器里没有意义（job 结束即销毁）。改为发布到 GitLab Generic Package
+      # Registry 做持久化保存；包名带系统标识（astroproject-ubuntu-22.04 等），
+      # 用户可在 Packages 页面按系统/版本辨识下载。
+      ARTIFACT="astroproject/${BUILD_DIR}/${ARTIFACT_NAME}"
+      test -f "$ARTIFACT" || { echo "FAIL: 未找到制品 $ARTIFACT"; exit 1; }
+      echo "Publishing ${PLATFORM} -> packages/generic/${PACKAGE_NAME}/${ENVIRONMENT}-${CI_COMMIT_SHORT_SHA}/${ARTIFACT_NAME}"
+      curl --fail --silent --show-error \
+        --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+        --upload-file "$ARTIFACT" \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${ENVIRONMENT}-${CI_COMMIT_SHORT_SHA}/${ARTIFACT_NAME}"
+      echo "Published OK: ${ARTIFACT_NAME}"
+  # 注：GitLab 19.2 有 bug —— deploy 阶段 job 带 environment 会导致 script 校验失败，
+  #     故本平台统一不在 deploy job 上使用 environment 关键字。
 
-build_dev_musl:
-  <<: *build_definition
-  variables:
-    BUILD_DIR: "build"
-    PLATFORM: "linux-musl"
-    BUILD_IMAGE: "alpine:latest"
-    ENVIRONMENT: "development"
-  tags:
-    - docker
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
-    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
-
-verify_dev_glibc:
-  <<: *verify_definition
-  variables:
-    BUILD_DIR: "build"
-    PLATFORM: "linux-glibc"
-  needs:
-    - job: build_dev_glibc
-      artifacts: true
-  tags:
-    - docker
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
-    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
-
-verify_dev_musl:
-  <<: *verify_definition
-  variables:
-    BUILD_DIR: "build"
-    PLATFORM: "linux-musl"
-  needs:
-    - job: build_dev_musl
-      artifacts: true
-  tags:
-    - docker
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
-    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
 
 # ============================================================
-# 测试环境（test 分支）—— 双平台
+# 协作自动化（prepare 阶段）
 # ============================================================
-build_test_glibc:
-  <<: *build_definition
-  variables:
-    BUILD_DIR: "build"
-    PLATFORM: "linux-glibc"
-    BUILD_IMAGE: "gcc:12"
-    ENVIRONMENT: "testing"
-  tags:
-    - docker
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
-    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
-
-build_test_musl:
-  <<: *build_definition
-  variables:
-    BUILD_DIR: "build"
-    PLATFORM: "linux-musl"
-    BUILD_IMAGE: "alpine:latest"
-    ENVIRONMENT: "testing"
-  tags:
-    - docker
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
-    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
-
-verify_test_glibc:
-  <<: *verify_definition
-  variables:
-    BUILD_DIR: "build"
-    PLATFORM: "linux-glibc"
-  needs:
-    - job: build_test_glibc
-      artifacts: true
-  tags:
-    - docker
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
-    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
-
-verify_test_musl:
-  <<: *verify_definition
-  variables:
-    BUILD_DIR: "build"
-    PLATFORM: "linux-musl"
-  needs:
-    - job: build_test_musl
-      artifacts: true
-  tags:
-    - docker
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
-    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
-
-# ============================================================
-# 生产环境（main 分支 / tag）—— 双平台
-# ============================================================
-build_prod_glibc:
-  <<: *build_definition
-  variables:
-    BUILD_DIR: "build"
-    PLATFORM: "linux-glibc"
-    BUILD_IMAGE: "gcc:12"
-    ENVIRONMENT: "production"
-  tags:
-    - docker
-  rules:
-    - if: $CI_COMMIT_TAG
-    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
-    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
-
-build_prod_musl:
-  <<: *build_definition
-  variables:
-    BUILD_DIR: "build"
-    PLATFORM: "linux-musl"
-    BUILD_IMAGE: "alpine:latest"
-    ENVIRONMENT: "production"
-  tags:
-    - docker
-  rules:
-    - if: $CI_COMMIT_TAG
-    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
-    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
-
-verify_prod_glibc:
-  <<: *verify_definition
-  variables:
-    BUILD_DIR: "build"
-    PLATFORM: "linux-glibc"
-  needs:
-    - job: build_prod_glibc
-      artifacts: true
-  tags:
-    - docker
-  rules:
-    # 关键：必须含 $CI_COMMIT_TAG，确保打 tag 发布生产前必过验证（质量门禁）
-    - if: $CI_COMMIT_TAG
-    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
-    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
-
-verify_prod_musl:
-  <<: *verify_definition
-  variables:
-    BUILD_DIR: "build"
-    PLATFORM: "linux-musl"
-  needs:
-    - job: build_prod_musl
-      artifacts: true
-  tags:
-    - docker
-  rules:
-    - if: $CI_COMMIT_TAG
-    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
-    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
-
 gene_mrdesc:
   stage: prepare   # 原为 build，语义不符：这是协作自动化，不是构建
   image: curlimages/curl:latest
@@ -397,9 +267,7 @@ gene_mrdesc:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   variables:
-    # 注意在GitlabCE中设置好个人访问令牌后立马复制，并在添加PERSONAL_ACCESS_TOKEN时注意受保护选择是否勾选，类似于 create_release 作业
     GITLAB_TOKEN: $PERSONAL_ACCESS_TOKEN
-
 
 # 当点击合并，合并代码成功后会提交到目标分支，触发deploy 作业，并添加注释
 add_mr_note:
@@ -408,7 +276,6 @@ add_mr_note:
     - 'echo "正在为合并请求添加注释..."'
     - PROJECT_DIR="$HOME/$CI_PROJECT_DIR"
     - 'echo "Project directory: $PROJECT_DIR"'
-    # 提取合并请求 IID ，基于合并请求，在点击合并时会生成一个提交，提交信息CI_COMMIT_MESSAGE中包含合并请求的 IID，详情可以在GitlabCE页面项目中“提交”下查看，生成的CI_COMMIT_MESSAGE
     - |
       if echo "$CI_COMMIT_MESSAGE" | grep -q "See merge request"; then
         MR_IID=$(echo "$CI_COMMIT_MESSAGE" | grep "See merge request" | grep -o "!.*" | sed 's/!//')
@@ -421,123 +288,775 @@ add_mr_note:
   tags:
     - docker
   rules:
-    # 在 develop 分支上推送时运行（合并到 develop）
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_MESSAGE =~ /^Merge branch.*/
-    # 在 test 分支上推送时运行（合并到 test）
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test" && $CI_COMMIT_MESSAGE =~ /^Merge branch.*/
-    # 在 main 分支上推送时运行（合并到 main）
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main" && $CI_COMMIT_MESSAGE =~ /^Merge branch.*/
   variables:
-    # 注意在GitlabCE中设置好个人访问令牌后立马复制，并在添加PERSONAL_ACCESS_TOKEN时注意受保护选择是否勾选，类似于 create_release 作业
     GITLAB_TOKEN: $PERSONAL_ACCESS_TOKEN
 
-# 部署作业模板
-.deploy_template: &deploy_definition
-  stage: deploy
-  image: curlimages/curl:latest
-  before_script: []   # 发布产物不需要构建工具链
-  script:
-    - |
-      set -e
-      export ARCH=$(uname -m)
-      export ARTIFACT_NAME="astroproject-${PLATFORM}-${ARCH}.tar.gz"
-      # 适配说明：docker executor 的容器是临时的，原设计"解压到 runner 本机 $HOME"
-      # 在容器里没有意义（job 结束即销毁）。改为发布到 GitLab Generic Package
-      # Registry 做持久化保存；包名带平台标识（astroproject-linux-glibc 等），
-      # 用户可在 Packages 页面按平台/版本辨识下载。
-      ARTIFACT="astroproject/${BUILD_DIR}/${ARTIFACT_NAME}"
-      test -f "$ARTIFACT" || { echo "FAIL: 未找到制品 $ARTIFACT"; exit 1; }
-      echo "Publishing ${PLATFORM} -> packages/generic/${PACKAGE_NAME}/${ENVIRONMENT}-${CI_COMMIT_SHORT_SHA}/${ARTIFACT_NAME}"
-      curl --fail --silent --show-error \
-        --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
-        --upload-file "$ARTIFACT" \
-        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${ENVIRONMENT}-${CI_COMMIT_SHORT_SHA}/${ARTIFACT_NAME}"
-      echo "Published OK: ${ARTIFACT_NAME}"
-  # 注：GitLab 19.2 有 bug —— deploy 阶段 job 带 environment 会导致 script 校验失败，
-  #     故本平台统一不在 deploy job 上使用 environment 关键字。
+# ============================================================
+# 开发环境（develop 分支）—— 全系统矩阵
+# ============================================================
 
-# ================= 开发环境部署（develop 分支，双平台） =================
-deploy_to_dev_glibc:
+build_dev_ubuntu_22_04:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "ubuntu-22.04"
+    OS_NAME: "Ubuntu"
+    OS_VERSION: "22.04"
+    BUILD_IMAGE: "ubuntu:22.04"
+    ENVIRONMENT: "development"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
+
+build_dev_ubuntu_24_04:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "ubuntu-24.04"
+    OS_NAME: "Ubuntu"
+    OS_VERSION: "24.04"
+    BUILD_IMAGE: "ubuntu:24.04"
+    ENVIRONMENT: "development"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
+
+build_dev_debian_12:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "debian-12"
+    OS_NAME: "Debian"
+    OS_VERSION: "12"
+    BUILD_IMAGE: "debian:12"
+    ENVIRONMENT: "development"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
+
+build_dev_alpine_3_20:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "alpine-3.20"
+    OS_NAME: "Alpine"
+    OS_VERSION: "3.20"
+    BUILD_IMAGE: "alpine:3.20"
+    ENVIRONMENT: "development"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
+
+build_dev_rockylinux_9:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "rockylinux-9"
+    OS_NAME: "Rocky Linux"
+    OS_VERSION: "9"
+    BUILD_IMAGE: "rockylinux:9"
+    ENVIRONMENT: "development"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
+
+build_dev_fedora_40:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "fedora-40"
+    OS_NAME: "Fedora"
+    OS_VERSION: "40"
+    BUILD_IMAGE: "fedora:40"
+    ENVIRONMENT: "development"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
+
+build_test_ubuntu_22_04:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "ubuntu-22.04"
+    OS_NAME: "Ubuntu"
+    OS_VERSION: "22.04"
+    BUILD_IMAGE: "ubuntu:22.04"
+    ENVIRONMENT: "testing"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
+
+build_test_ubuntu_24_04:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "ubuntu-24.04"
+    OS_NAME: "Ubuntu"
+    OS_VERSION: "24.04"
+    BUILD_IMAGE: "ubuntu:24.04"
+    ENVIRONMENT: "testing"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
+
+build_test_debian_12:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "debian-12"
+    OS_NAME: "Debian"
+    OS_VERSION: "12"
+    BUILD_IMAGE: "debian:12"
+    ENVIRONMENT: "testing"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
+
+build_test_alpine_3_20:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "alpine-3.20"
+    OS_NAME: "Alpine"
+    OS_VERSION: "3.20"
+    BUILD_IMAGE: "alpine:3.20"
+    ENVIRONMENT: "testing"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
+
+build_test_rockylinux_9:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "rockylinux-9"
+    OS_NAME: "Rocky Linux"
+    OS_VERSION: "9"
+    BUILD_IMAGE: "rockylinux:9"
+    ENVIRONMENT: "testing"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
+
+build_test_fedora_40:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "fedora-40"
+    OS_NAME: "Fedora"
+    OS_VERSION: "40"
+    BUILD_IMAGE: "fedora:40"
+    ENVIRONMENT: "testing"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
+
+build_prod_ubuntu_22_04:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "ubuntu-22.04"
+    OS_NAME: "Ubuntu"
+    OS_VERSION: "22.04"
+    BUILD_IMAGE: "ubuntu:22.04"
+    ENVIRONMENT: "production"
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+
+build_prod_ubuntu_24_04:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "ubuntu-24.04"
+    OS_NAME: "Ubuntu"
+    OS_VERSION: "24.04"
+    BUILD_IMAGE: "ubuntu:24.04"
+    ENVIRONMENT: "production"
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+
+build_prod_debian_12:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "debian-12"
+    OS_NAME: "Debian"
+    OS_VERSION: "12"
+    BUILD_IMAGE: "debian:12"
+    ENVIRONMENT: "production"
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+
+build_prod_alpine_3_20:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "alpine-3.20"
+    OS_NAME: "Alpine"
+    OS_VERSION: "3.20"
+    BUILD_IMAGE: "alpine:3.20"
+    ENVIRONMENT: "production"
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+
+build_prod_rockylinux_9:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "rockylinux-9"
+    OS_NAME: "Rocky Linux"
+    OS_VERSION: "9"
+    BUILD_IMAGE: "rockylinux:9"
+    ENVIRONMENT: "production"
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+
+build_prod_fedora_40:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "fedora-40"
+    OS_NAME: "Fedora"
+    OS_VERSION: "40"
+    BUILD_IMAGE: "fedora:40"
+    ENVIRONMENT: "production"
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+
+
+# ============================================================
+# 验证（质量门禁）—— 全系统矩阵
+# ============================================================
+
+verify_dev_ubuntu_22_04:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "ubuntu-22.04"
+  needs:
+    - job: build_dev_ubuntu_22_04
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
+
+verify_dev_ubuntu_24_04:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "ubuntu-24.04"
+  needs:
+    - job: build_dev_ubuntu_24_04
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
+
+verify_dev_debian_12:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "debian-12"
+  needs:
+    - job: build_dev_debian_12
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
+
+verify_dev_alpine_3_20:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "alpine-3.20"
+  needs:
+    - job: build_dev_alpine_3_20
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
+
+verify_dev_rockylinux_9:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "rockylinux-9"
+  needs:
+    - job: build_dev_rockylinux_9
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
+
+verify_dev_fedora_40:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "fedora-40"
+  needs:
+    - job: build_dev_fedora_40
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
+
+verify_test_ubuntu_22_04:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "ubuntu-22.04"
+  needs:
+    - job: build_test_ubuntu_22_04
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
+
+verify_test_ubuntu_24_04:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "ubuntu-24.04"
+  needs:
+    - job: build_test_ubuntu_24_04
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
+
+verify_test_debian_12:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "debian-12"
+  needs:
+    - job: build_test_debian_12
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
+
+verify_test_alpine_3_20:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "alpine-3.20"
+  needs:
+    - job: build_test_alpine_3_20
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
+
+verify_test_rockylinux_9:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "rockylinux-9"
+  needs:
+    - job: build_test_rockylinux_9
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
+
+verify_test_fedora_40:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "fedora-40"
+  needs:
+    - job: build_test_fedora_40
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
+
+verify_prod_ubuntu_22_04:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "ubuntu-22.04"
+  needs:
+    - job: build_prod_ubuntu_22_04
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+
+verify_prod_ubuntu_24_04:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "ubuntu-24.04"
+  needs:
+    - job: build_prod_ubuntu_24_04
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+
+verify_prod_debian_12:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "debian-12"
+  needs:
+    - job: build_prod_debian_12
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+
+verify_prod_alpine_3_20:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "alpine-3.20"
+  needs:
+    - job: build_prod_alpine_3_20
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+
+verify_prod_rockylinux_9:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "rockylinux-9"
+  needs:
+    - job: build_prod_rockylinux_9
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+
+verify_prod_fedora_40:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "fedora-40"
+  needs:
+    - job: build_prod_fedora_40
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+
+
+# ============================================================
+# 部署（按环境发布）—— 全系统矩阵
+# ============================================================
+
+deploy_to_dev_ubuntu_22_04:
   <<: *deploy_definition
   needs:
-    - job: build_dev_glibc
+    - job: build_dev_ubuntu_22_04
       artifacts: true
-    - job: verify_dev_glibc
+    - job: verify_dev_ubuntu_22_04
       artifacts: true
   variables:
     BUILD_DIR: "build"
-    PLATFORM: "linux-glibc"
-    PACKAGE_NAME: "astroproject-linux-glibc"
+    PLATFORM: "ubuntu-22.04"
+    PACKAGE_NAME: "astroproject-ubuntu-22.04"
     ENVIRONMENT: "development"
   tags:
     - docker
   rules:
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
 
-deploy_to_dev_musl:
+deploy_to_dev_ubuntu_24_04:
   <<: *deploy_definition
   needs:
-    - job: build_dev_musl
+    - job: build_dev_ubuntu_24_04
       artifacts: true
-    - job: verify_dev_musl
+    - job: verify_dev_ubuntu_24_04
       artifacts: true
   variables:
     BUILD_DIR: "build"
-    PLATFORM: "linux-musl"
-    PACKAGE_NAME: "astroproject-linux-musl"
+    PLATFORM: "ubuntu-24.04"
+    PACKAGE_NAME: "astroproject-ubuntu-24.04"
     ENVIRONMENT: "development"
   tags:
     - docker
   rules:
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
 
-# ================= 测试环境部署（test 分支，双平台） =================
-deploy_to_test_glibc:
+deploy_to_dev_debian_12:
   <<: *deploy_definition
   needs:
-    - job: build_test_glibc
+    - job: build_dev_debian_12
       artifacts: true
-    - job: verify_test_glibc
+    - job: verify_dev_debian_12
       artifacts: true
   variables:
     BUILD_DIR: "build"
-    PLATFORM: "linux-glibc"
-    PACKAGE_NAME: "astroproject-linux-glibc"
+    PLATFORM: "debian-12"
+    PACKAGE_NAME: "astroproject-debian-12"
+    ENVIRONMENT: "development"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+
+deploy_to_dev_alpine_3_20:
+  <<: *deploy_definition
+  needs:
+    - job: build_dev_alpine_3_20
+      artifacts: true
+    - job: verify_dev_alpine_3_20
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "alpine-3.20"
+    PACKAGE_NAME: "astroproject-alpine-3.20"
+    ENVIRONMENT: "development"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+
+deploy_to_dev_rockylinux_9:
+  <<: *deploy_definition
+  needs:
+    - job: build_dev_rockylinux_9
+      artifacts: true
+    - job: verify_dev_rockylinux_9
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "rockylinux-9"
+    PACKAGE_NAME: "astroproject-rockylinux-9"
+    ENVIRONMENT: "development"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+
+deploy_to_dev_fedora_40:
+  <<: *deploy_definition
+  needs:
+    - job: build_dev_fedora_40
+      artifacts: true
+    - job: verify_dev_fedora_40
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "fedora-40"
+    PACKAGE_NAME: "astroproject-fedora-40"
+    ENVIRONMENT: "development"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+
+deploy_to_test_ubuntu_22_04:
+  <<: *deploy_definition
+  needs:
+    - job: build_test_ubuntu_22_04
+      artifacts: true
+    - job: verify_test_ubuntu_22_04
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "ubuntu-22.04"
+    PACKAGE_NAME: "astroproject-ubuntu-22.04"
     ENVIRONMENT: "testing"
   tags:
     - docker
   rules:
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
 
-deploy_to_test_musl:
+deploy_to_test_ubuntu_24_04:
   <<: *deploy_definition
   needs:
-    - job: build_test_musl
+    - job: build_test_ubuntu_24_04
       artifacts: true
-    - job: verify_test_musl
+    - job: verify_test_ubuntu_24_04
       artifacts: true
   variables:
     BUILD_DIR: "build"
-    PLATFORM: "linux-musl"
-    PACKAGE_NAME: "astroproject-linux-musl"
+    PLATFORM: "ubuntu-24.04"
+    PACKAGE_NAME: "astroproject-ubuntu-24.04"
     ENVIRONMENT: "testing"
   tags:
     - docker
   rules:
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
 
-# ================= 生产环境部署（main 分支 / tag，双平台） =================
-deploy_to_prod_glibc:
+deploy_to_test_debian_12:
   <<: *deploy_definition
   needs:
-    - job: build_prod_glibc
+    - job: build_test_debian_12
       artifacts: true
-    - job: verify_prod_glibc
+    - job: verify_test_debian_12
       artifacts: true
   variables:
     BUILD_DIR: "build"
-    PLATFORM: "linux-glibc"
-    PACKAGE_NAME: "astroproject-linux-glibc"
+    PLATFORM: "debian-12"
+    PACKAGE_NAME: "astroproject-debian-12"
+    ENVIRONMENT: "testing"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+
+deploy_to_test_alpine_3_20:
+  <<: *deploy_definition
+  needs:
+    - job: build_test_alpine_3_20
+      artifacts: true
+    - job: verify_test_alpine_3_20
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "alpine-3.20"
+    PACKAGE_NAME: "astroproject-alpine-3.20"
+    ENVIRONMENT: "testing"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+
+deploy_to_test_rockylinux_9:
+  <<: *deploy_definition
+  needs:
+    - job: build_test_rockylinux_9
+      artifacts: true
+    - job: verify_test_rockylinux_9
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "rockylinux-9"
+    PACKAGE_NAME: "astroproject-rockylinux-9"
+    ENVIRONMENT: "testing"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+
+deploy_to_test_fedora_40:
+  <<: *deploy_definition
+  needs:
+    - job: build_test_fedora_40
+      artifacts: true
+    - job: verify_test_fedora_40
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "fedora-40"
+    PACKAGE_NAME: "astroproject-fedora-40"
+    ENVIRONMENT: "testing"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+
+deploy_to_prod_ubuntu_22_04:
+  <<: *deploy_definition
+  needs:
+    - job: build_prod_ubuntu_22_04
+      artifacts: true
+    - job: verify_prod_ubuntu_22_04
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "ubuntu-22.04"
+    PACKAGE_NAME: "astroproject-ubuntu-22.04"
     ENVIRONMENT: "production"
   tags:
     - docker
@@ -545,17 +1064,17 @@ deploy_to_prod_glibc:
     - if: $CI_COMMIT_TAG
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
 
-deploy_to_prod_musl:
+deploy_to_prod_ubuntu_24_04:
   <<: *deploy_definition
   needs:
-    - job: build_prod_musl
+    - job: build_prod_ubuntu_24_04
       artifacts: true
-    - job: verify_prod_musl
+    - job: verify_prod_ubuntu_24_04
       artifacts: true
   variables:
     BUILD_DIR: "build"
-    PLATFORM: "linux-musl"
-    PACKAGE_NAME: "astroproject-linux-musl"
+    PLATFORM: "ubuntu-24.04"
+    PACKAGE_NAME: "astroproject-ubuntu-24.04"
     ENVIRONMENT: "production"
   tags:
     - docker
@@ -563,9 +1082,83 @@ deploy_to_prod_musl:
     - if: $CI_COMMIT_TAG
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
 
+deploy_to_prod_debian_12:
+  <<: *deploy_definition
+  needs:
+    - job: build_prod_debian_12
+      artifacts: true
+    - job: verify_prod_debian_12
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "debian-12"
+    PACKAGE_NAME: "astroproject-debian-12"
+    ENVIRONMENT: "production"
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+
+deploy_to_prod_alpine_3_20:
+  <<: *deploy_definition
+  needs:
+    - job: build_prod_alpine_3_20
+      artifacts: true
+    - job: verify_prod_alpine_3_20
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "alpine-3.20"
+    PACKAGE_NAME: "astroproject-alpine-3.20"
+    ENVIRONMENT: "production"
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+
+deploy_to_prod_rockylinux_9:
+  <<: *deploy_definition
+  needs:
+    - job: build_prod_rockylinux_9
+      artifacts: true
+    - job: verify_prod_rockylinux_9
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "rockylinux-9"
+    PACKAGE_NAME: "astroproject-rockylinux-9"
+    ENVIRONMENT: "production"
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+
+deploy_to_prod_fedora_40:
+  <<: *deploy_definition
+  needs:
+    - job: build_prod_fedora_40
+      artifacts: true
+    - job: verify_prod_fedora_40
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "fedora-40"
+    PACKAGE_NAME: "astroproject-fedora-40"
+    ENVIRONMENT: "production"
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+
+
 # ============================================================
-# 创建 Release（tag 时触发）：assets 挂双平台产物链接
+# 创建 Release（tag 时触发）：assets 挂全部系统平台产物链接
 # ============================================================
+
 create_release:
   stage: release
   rules:
@@ -574,7 +1167,6 @@ create_release:
     - docker
   before_script:
     - |
-      # 确定版本号
       # 注意：CI_COMMIT_TAG 已含 v 前缀(如 v0.1.0)，不要再加 v
       if [ -n "$CI_COMMIT_TAG" ]; then
         PACKAGE_VERSION="$CI_COMMIT_TAG"
@@ -589,21 +1181,38 @@ create_release:
       echo "Creating release for $PACKAGE_VERSION"
       export ARCH=$(uname -m)
       # 用 printf 构造 release JSON（避免 heredoc 缩进陷阱；双引号使变量展开）
+      # 资产链接覆盖全部 6 个系统平台
       printf '%s\n' \
         "{" \
         "  \"tag_name\": \"$CI_COMMIT_TAG\"," \
         "  \"ref\": \"$CI_COMMIT_TAG\"," \
         "  \"name\": \"Release $PACKAGE_VERSION\"," \
-        "  \"description\": \"Release created by GitLab CI/CD for AstroProject (multi-platform)\"," \
+        "  \"description\": \"Release created by GitLab CI/CD for AstroProject (6 linux distros)\", " \
         "  \"assets\": {" \
         "    \"links\": [" \
         "      {" \
-        "        \"name\": \"astroproject-linux-glibc-${ARCH}.tar.gz\"," \
-        "        \"url\": \"${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/jobs/artifacts/${CI_COMMIT_REF_NAME}/raw/astroproject/build/astroproject-linux-glibc-${ARCH}.tar.gz?job=build_prod_glibc\"" \
+        "        \"name\": \"astroproject-ubuntu-22.04-${ARCH}.tar.gz\"," \
+        "        \"url\": \"${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/jobs/artifacts/${CI_COMMIT_REF_NAME}/raw/astroproject/build/astroproject-ubuntu-22.04-${ARCH}.tar.gz?job=build_prod_ubuntu_22_04\"" \
         "      }," \
         "      {" \
-        "        \"name\": \"astroproject-linux-musl-${ARCH}.tar.gz\"," \
-        "        \"url\": \"${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/jobs/artifacts/${CI_COMMIT_REF_NAME}/raw/astroproject/build/astroproject-linux-musl-${ARCH}.tar.gz?job=build_prod_musl\"" \
+        "        \"name\": \"astroproject-ubuntu-24.04-${ARCH}.tar.gz\"," \
+        "        \"url\": \"${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/jobs/artifacts/${CI_COMMIT_REF_NAME}/raw/astroproject/build/astroproject-ubuntu-24.04-${ARCH}.tar.gz?job=build_prod_ubuntu_24_04\"" \
+        "      }," \
+        "      {" \
+        "        \"name\": \"astroproject-debian-12-${ARCH}.tar.gz\"," \
+        "        \"url\": \"${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/jobs/artifacts/${CI_COMMIT_REF_NAME}/raw/astroproject/build/astroproject-debian-12-${ARCH}.tar.gz?job=build_prod_debian_12\"" \
+        "      }," \
+        "      {" \
+        "        \"name\": \"astroproject-alpine-3.20-${ARCH}.tar.gz\"," \
+        "        \"url\": \"${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/jobs/artifacts/${CI_COMMIT_REF_NAME}/raw/astroproject/build/astroproject-alpine-3.20-${ARCH}.tar.gz?job=build_prod_alpine_3_20\"" \
+        "      }," \
+        "      {" \
+        "        \"name\": \"astroproject-rockylinux-9-${ARCH}.tar.gz\"," \
+        "        \"url\": \"${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/jobs/artifacts/${CI_COMMIT_REF_NAME}/raw/astroproject/build/astroproject-rockylinux-9-${ARCH}.tar.gz?job=build_prod_rockylinux_9\"" \
+        "      }," \
+        "      {" \
+        "        \"name\": \"astroproject-fedora-40-${ARCH}.tar.gz\"," \
+        "        \"url\": \"${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/jobs/artifacts/${CI_COMMIT_REF_NAME}/raw/astroproject/build/astroproject-fedora-40-${ARCH}.tar.gz?job=build_prod_fedora_40\"" \
         "      }" \
         "    ]" \
         "  }" \
@@ -615,27 +1224,40 @@ create_release:
            --data @release_data.json \
            "$CI_API_V4_URL/projects/$CI_PROJECT_ID/releases"
       echo "RELEASE_CREATED"
-
   dependencies:
-    - build_prod_glibc
-    - build_prod_musl
+    - build_prod_ubuntu_22_04
+    - build_prod_ubuntu_24_04
+    - build_prod_debian_12
+    - build_prod_alpine_3_20
+    - build_prod_rockylinux_9
+    - build_prod_fedora_40
   needs:
-    - job: build_prod_glibc
+    - job: build_prod_ubuntu_22_04
       artifacts: true
-    - job: build_prod_musl
+    - job: build_prod_ubuntu_24_04
+      artifacts: true
+    - job: build_prod_debian_12
+      artifacts: true
+    - job: build_prod_alpine_3_20
+      artifacts: true
+    - job: build_prod_rockylinux_9
+      artifacts: true
+    - job: build_prod_fedora_40
       artifacts: true
 
+
 # ============================================================
-# 发布到 Package Registry（tag 时触发，双平台分 job，版本带平台）
+# 发布到 Package Registry（tag 时触发，按系统分 job，版本带系统）
 # ============================================================
-publish_package_glibc:
+
+publish_package_ubuntu_22_04:
   stage: release
   tags:
     - docker
   variables:
     BUILD_DIR: "build"
-    PLATFORM: "linux-glibc"
-    PACKAGE_NAME: "astroproject-linux-glibc"
+    PLATFORM: "ubuntu-22.04"
+    PACKAGE_NAME: "astroproject-ubuntu-22.04"
   before_script:
     - |
       if [ -n "$CI_COMMIT_TAG" ]; then
@@ -659,19 +1281,19 @@ publish_package_glibc:
   rules:
     - if: $CI_COMMIT_TAG
   dependencies:
-    - build_prod_glibc
+    - build_prod_ubuntu_22_04
   needs:
-    - job: build_prod_glibc
+    - job: build_prod_ubuntu_22_04
       artifacts: true
 
-publish_package_musl:
+publish_package_ubuntu_24_04:
   stage: release
   tags:
     - docker
   variables:
     BUILD_DIR: "build"
-    PLATFORM: "linux-musl"
-    PACKAGE_NAME: "astroproject-linux-musl"
+    PLATFORM: "ubuntu-24.04"
+    PACKAGE_NAME: "astroproject-ubuntu-24.04"
   before_script:
     - |
       if [ -n "$CI_COMMIT_TAG" ]; then
@@ -695,7 +1317,151 @@ publish_package_musl:
   rules:
     - if: $CI_COMMIT_TAG
   dependencies:
-    - build_prod_musl
+    - build_prod_ubuntu_24_04
   needs:
-    - job: build_prod_musl
+    - job: build_prod_ubuntu_24_04
+      artifacts: true
+
+publish_package_debian_12:
+  stage: release
+  tags:
+    - docker
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "debian-12"
+    PACKAGE_NAME: "astroproject-debian-12"
+  before_script:
+    - |
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        PACKAGE_VERSION="$CI_COMMIT_TAG"
+      else
+        PACKAGE_VERSION="v${CI_COMMIT_SHORT_SHA}"
+      fi
+      export PACKAGE_VERSION
+      echo "Determined package version: $PACKAGE_VERSION"
+  script:
+    - |
+      export ARCH=$(uname -m)
+      export ARTIFACT_NAME="astroproject-${PLATFORM}-${ARCH}.tar.gz"
+      echo "Uploading ${PLATFORM} artifact to GitLab Package Registry"
+      echo "Package: ${PACKAGE_NAME} / ${PACKAGE_VERSION} / ${ARTIFACT_NAME}"
+      curl --fail --silent --show-error \
+        --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+        --upload-file "astroproject/${BUILD_DIR}/${ARTIFACT_NAME}" \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/${ARTIFACT_NAME}"
+      echo "Published OK: ${ARTIFACT_NAME}"
+  rules:
+    - if: $CI_COMMIT_TAG
+  dependencies:
+    - build_prod_debian_12
+  needs:
+    - job: build_prod_debian_12
+      artifacts: true
+
+publish_package_alpine_3_20:
+  stage: release
+  tags:
+    - docker
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "alpine-3.20"
+    PACKAGE_NAME: "astroproject-alpine-3.20"
+  before_script:
+    - |
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        PACKAGE_VERSION="$CI_COMMIT_TAG"
+      else
+        PACKAGE_VERSION="v${CI_COMMIT_SHORT_SHA}"
+      fi
+      export PACKAGE_VERSION
+      echo "Determined package version: $PACKAGE_VERSION"
+  script:
+    - |
+      export ARCH=$(uname -m)
+      export ARTIFACT_NAME="astroproject-${PLATFORM}-${ARCH}.tar.gz"
+      echo "Uploading ${PLATFORM} artifact to GitLab Package Registry"
+      echo "Package: ${PACKAGE_NAME} / ${PACKAGE_VERSION} / ${ARTIFACT_NAME}"
+      curl --fail --silent --show-error \
+        --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+        --upload-file "astroproject/${BUILD_DIR}/${ARTIFACT_NAME}" \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/${ARTIFACT_NAME}"
+      echo "Published OK: ${ARTIFACT_NAME}"
+  rules:
+    - if: $CI_COMMIT_TAG
+  dependencies:
+    - build_prod_alpine_3_20
+  needs:
+    - job: build_prod_alpine_3_20
+      artifacts: true
+
+publish_package_rockylinux_9:
+  stage: release
+  tags:
+    - docker
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "rockylinux-9"
+    PACKAGE_NAME: "astroproject-rockylinux-9"
+  before_script:
+    - |
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        PACKAGE_VERSION="$CI_COMMIT_TAG"
+      else
+        PACKAGE_VERSION="v${CI_COMMIT_SHORT_SHA}"
+      fi
+      export PACKAGE_VERSION
+      echo "Determined package version: $PACKAGE_VERSION"
+  script:
+    - |
+      export ARCH=$(uname -m)
+      export ARTIFACT_NAME="astroproject-${PLATFORM}-${ARCH}.tar.gz"
+      echo "Uploading ${PLATFORM} artifact to GitLab Package Registry"
+      echo "Package: ${PACKAGE_NAME} / ${PACKAGE_VERSION} / ${ARTIFACT_NAME}"
+      curl --fail --silent --show-error \
+        --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+        --upload-file "astroproject/${BUILD_DIR}/${ARTIFACT_NAME}" \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/${ARTIFACT_NAME}"
+      echo "Published OK: ${ARTIFACT_NAME}"
+  rules:
+    - if: $CI_COMMIT_TAG
+  dependencies:
+    - build_prod_rockylinux_9
+  needs:
+    - job: build_prod_rockylinux_9
+      artifacts: true
+
+publish_package_fedora_40:
+  stage: release
+  tags:
+    - docker
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "fedora-40"
+    PACKAGE_NAME: "astroproject-fedora-40"
+  before_script:
+    - |
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        PACKAGE_VERSION="$CI_COMMIT_TAG"
+      else
+        PACKAGE_VERSION="v${CI_COMMIT_SHORT_SHA}"
+      fi
+      export PACKAGE_VERSION
+      echo "Determined package version: $PACKAGE_VERSION"
+  script:
+    - |
+      export ARCH=$(uname -m)
+      export ARTIFACT_NAME="astroproject-${PLATFORM}-${ARCH}.tar.gz"
+      echo "Uploading ${PLATFORM} artifact to GitLab Package Registry"
+      echo "Package: ${PACKAGE_NAME} / ${PACKAGE_VERSION} / ${ARTIFACT_NAME}"
+      curl --fail --silent --show-error \
+        --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+        --upload-file "astroproject/${BUILD_DIR}/${ARTIFACT_NAME}" \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/${ARTIFACT_NAME}"
+      echo "Published OK: ${ARTIFACT_NAME}"
+  rules:
+    - if: $CI_COMMIT_TAG
+  dependencies:
+    - build_prod_fedora_40
+  needs:
+    - job: build_prod_fedora_40
       artifacts: true
