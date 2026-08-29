@@ -3,17 +3,17 @@
 
 #if defined(_WIN32)
 	#include "windows.h"
-	#include "../../swe/inc/swedll.h"
+	#include "../../swe/swisseph/swedll.h"
     #define STR_CMPI _stricmp
 	#define MEM_CCPY _memccpy
 	#define STR_DUP _strdup
 	#define X_MEMSET x_memset_Intel
 #else
-	#include "../../swe/inc/swephexp.h"
-	#include "../../swe/inc/sweph.h"
-	#include "../../swe/inc/swephlib.h"
-	#include "../../swe/inc/swehouse.h"
-	#include "../../swe/inc/sweodef.h"
+	#include "../../swe/swisseph/swephexp.h"
+	#include "../../swe/swisseph/sweph.h"
+	#include "../../swe/swisseph/swephlib.h"
+	#include "../../swe/swisseph/swehouse.h"
+	#include "../../swe/swisseph/sweodef.h"
 
 	#include <string.h>
 	#define STR_CMPI strcasecmp

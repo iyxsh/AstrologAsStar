@@ -1,0 +1,4 @@
+[submodule "astroproject/swe/swisseph"]
+	path = astroproject/swe/swisseph
+	# 相对 URL：git 按主仓库所在平台解析（GitLab -> root/swisseph，Atomgit -> aohke/swisseph）
+	url = ./swisseph.git

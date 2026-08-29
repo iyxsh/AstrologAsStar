@@ -2,7 +2,7 @@
 #include "../../include/models/chart_data.h"
 #include "../../include/models/settings.h"
 #include "../../include/utils/utils.h"
-#include "../../swe/inc/swephexp.h"
+#include "../../swe/swisseph/swephexp.h"
 #include "../../include/core/planet.h"
 #include <math.h>
 extern US us;

@@ -40,6 +40,8 @@ workflow:
 
 variables:
   <<: *variables_definition
+  # SWE 为 git submodule（astroproject/swe/swisseph），job 前必须拉取
+  GIT_SUBMODULE_STRATEGY: recursive
 
 # ==== 本平台适配：单一共享 docker runner ====
 # 原设计依赖「每台环境机一个 runner」+ 在真实 OS 上 sudo 装依赖。

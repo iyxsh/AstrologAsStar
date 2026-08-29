@@ -3,7 +3,8 @@
 #include "../../include/models/chart_data.h"
 #include "../../include/models/settings.h"
 #include "../../include/utils/utils.h"
-#include "../../swe/inc/swephexp.h"
+#include "../../swe/swisseph/swephexp.h"
+#include "../../swe/swe_sidtime_args.h"
 #include <math.h>
 
 extern US us;
