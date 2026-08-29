@@ -83,16 +83,14 @@ default:
           $SUDO apk add --no-cache cmake make g++ \
             || echo "WARN: 构建工具链安装失败(权限或网络)，继续尝试"
         elif command -v dnf >/dev/null 2>&1; then
-          # Rocky/Fedora 用 dnf。TUNA 不镜像 Rocky，改用 USTC(中科大，实测可达)：
-          #   rocky   -> https://mirrors.ustc.edu.cn/rocky/（与官方同结构，吃 $contentdir）
-          #   fedora  -> https://mirrors.ustc.edu.cn/fedora/linux/（官方 baseurl 是
-          #              download.example 占位符，靠 metalink 解析，替换占位符并禁 metalink）
+          # Rocky/Fedora 用 dnf。镜像选型（实测）：
+          #   rocky   -> 中科大 USTC（TUNA 不镜像 Rocky；baseurl 含 $contentdir 要吃掉）
+          #   fedora  -> 阿里云 aliyun（USTC/TUNA 的 fedora 缺 Everything 仓库 404；
+          #              aliyun 路径无 /linux/ 层：/fedora/releases/40/...；
+          #              官方 baseurl 是 download.example 占位符，替换时吃 /pub/fedora/linux）
           if [ "$(id -u)" = "0" ]; then
             sed -i 's|^mirrorlist=|#mirrorlist=|g; s|^metalink=|#metalink=|g' /etc/yum.repos.d/*.repo 2>/dev/null || true
-            # 注意：fedora 官方 baseurl 是 download.example 占位符(靠 metalink 解析)，
-            # 且路径为 /pub/fedora/linux/...，替换时吃 /pub/fedora 且 replacement 不要再带 /linux
-            # （否则会变成 /fedora/linux/linux/... 双路径）。
-            sed -i 's|^#baseurl=http://dl.rockylinux.org/\$contentdir|baseurl=https://mirrors.ustc.edu.cn/rocky|g; s|^#baseurl=http://download.example/pub/fedora|baseurl=https://mirrors.ustc.edu.cn/fedora|g; s|^baseurl=http://download.example/pub/fedora|baseurl=https://mirrors.ustc.edu.cn/fedora|g' /etc/yum.repos.d/*.repo 2>/dev/null || true
+            sed -i 's|^#baseurl=http://dl.rockylinux.org/\$contentdir|baseurl=https://mirrors.ustc.edu.cn/rocky|g; s|^#baseurl=http://download.example/pub/fedora/linux|baseurl=http://mirrors.aliyun.com/fedora|g; s|^baseurl=http://download.example/pub/fedora/linux|baseurl=http://mirrors.aliyun.com/fedora|g' /etc/yum.repos.d/*.repo 2>/dev/null || true
           fi
           $SUDO dnf install -y -q cmake make gcc-c++ \
             || echo "WARN: 构建工具链安装失败(权限或网络)，继续尝试"
