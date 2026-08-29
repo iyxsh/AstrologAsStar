@@ -58,6 +58,11 @@ default:
       if ! command -v cmake >/dev/null 2>&1; then
         echo "cmake 缺失，尝试安装构建工具链..."
         if command -v apt-get >/dev/null 2>&1; then
+          # 加速：默认源 deb.debian.org 在本网络下极慢（8.6MB 的 cmake 要数分钟），
+          # 且每个 job 都是全新容器、都要重装一遍。改用国内镜像可把安装压到数秒。
+          if [ "$(id -u)" = "0" ]; then
+            sed -i 's|deb.debian.org|mirrors.aliyun.com|g; s|security.debian.org|mirrors.aliyun.com|g'               /etc/apt/sources.list /etc/apt/sources.list.d/*.list 2>/dev/null || true
+          fi
           $SUDO apt-get update -qq && $SUDO apt-get install -y -qq cmake make g++ \
             || echo "WARN: 构建工具链安装失败(权限或网络)，继续尝试"
         elif command -v apk >/dev/null 2>&1; then
