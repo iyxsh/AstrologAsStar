@@ -575,8 +575,9 @@ create_release:
   before_script:
     - |
       # 确定版本号
+      # 注意：CI_COMMIT_TAG 已含 v 前缀(如 v0.1.0)，不要再加 v
       if [ -n "$CI_COMMIT_TAG" ]; then
-        PACKAGE_VERSION="v$CI_COMMIT_TAG"
+        PACKAGE_VERSION="$CI_COMMIT_TAG"
       else
         PACKAGE_VERSION="v${CI_COMMIT_SHORT_SHA}"
       fi
@@ -584,29 +585,32 @@ create_release:
       echo "Determined package version: $PACKAGE_VERSION"
   script:
     - |
+      set -e
       echo "Creating release for $PACKAGE_VERSION"
       export ARCH=$(uname -m)
       # 双平台资产链接（glibc + musl）
-      cat > release_data.json <<EOF
-      {
-        "tag_name": "$CI_COMMIT_TAG",
-        "ref": "$CI_COMMIT_SHA",
-        "name": "Release $PACKAGE_VERSION",
-        "description": "Release created by GitLab CI/CD for AstroProject (multi-platform)",
-        "assets": {
-          "links": [
-            {
-              "name": "astroproject-linux-glibc-${ARCH}.tar.gz",
-              "url": "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/jobs/artifacts/${CI_COMMIT_REF_NAME}/raw/astroproject/build/astroproject-linux-glibc-${ARCH}.tar.gz?job=build_prod_glibc"
-            },
-            {
-              "name": "astroproject-linux-musl-${ARCH}.tar.gz",
-              "url": "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/jobs/artifacts/${CI_COMMIT_REF_NAME}/raw/astroproject/build/astroproject-linux-musl-${ARCH}.tar.gz?job=build_prod_musl"
-            }
-          ]
-        }
-      }EOF
-      cat release_data.json
+      # 生成 release JSON（用 printf 逐行构造，避免 heredoc 在 YAML 块中的缩进陷阱）
+      # 注意：参数必须用双引号，单引号会阻止 $CI_COMMIT_TAG/${ARCH} 等变量展开
+      printf '%s\n' \
+        "{" \
+        "  \"tag_name\": \"$CI_COMMIT_TAG\"," \
+        "  \"ref\": \"$CI_COMMIT_SHA\"," \
+        "  \"name\": \"Release $PACKAGE_VERSION\"," \
+        "  \"description\": \"Release created by GitLab CI/CD for AstroProject (multi-platform)\"," \
+        "  \"assets\": {" \
+        "    \"links\": [" \
+        "      {" \
+        "        \"name\": \"astroproject-linux-glibc-${ARCH}.tar.gz\"," \
+        "        \"url\": \"${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/jobs/artifacts/${CI_COMMIT_REF_NAME}/raw/astroproject/build/astroproject-linux-glibc-${ARCH}.tar.gz?job=build_prod_glibc\"" \
+        "      }," \
+        "      {" \
+        "        \"name\": \"astroproject-linux-musl-${ARCH}.tar.gz\"," \
+        "        \"url\": \"${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/jobs/artifacts/${CI_COMMIT_REF_NAME}/raw/astroproject/build/astroproject-linux-musl-${ARCH}.tar.gz?job=build_prod_musl\"" \
+        "      }" \
+        "    ]" \
+        "  }" \
+        "}" > release_data.json
+      cat release_data.json      cat release_data.json      cat release_data.json
       curl --request POST \
            --header "PRIVATE-TOKEN: $PERSONAL_ACCESS_TOKEN" \
            --header "Content-Type: application/json" \
