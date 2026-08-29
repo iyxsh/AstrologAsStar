@@ -35,8 +35,8 @@ workflow:
 
 .variables_template: &variables_definition
   BUILD_DIR: "build"
-  ARTIFACT_NAME: "astroproject.tar.gz"
-  PACKAGE_NAME: "astroproject"
+  # 注：ARTIFACT_NAME/PACKAGE_NAME 已改为按平台动态生成（见各 job），
+  #     不再提供全局默认值，避免与平台化命名混淆。
 
 variables:
   <<: *variables_definition
@@ -61,13 +61,18 @@ default:
           # 加速：默认源 deb.debian.org 在本网络下极慢（8.6MB 的 cmake 要数分钟），
           # 且每个 job 都是全新容器、都要重装一遍。改用国内镜像可把安装压到数秒。
           if [ "$(id -u)" = "0" ]; then
+            # 注意：本网络实测 mirrors.aliyun.com 不可达(HTTP 000)，用清华 TUNA
             for _f in /etc/apt/sources.list /etc/apt/sources.list.d/*.list; do
-              [ -f "$_f" ] && sed -i 's|deb.debian.org|mirrors.aliyun.com|g; s|security.debian.org|mirrors.aliyun.com|g' "$_f"
+              [ -f "$_f" ] && sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g; s|security.debian.org|mirrors.tuna.tsinghua.edu.cn|g' "$_f"
             done || true
           fi
           $SUDO apt-get update -qq && $SUDO apt-get install -y -qq cmake make g++ \
             || echo "WARN: 构建工具链安装失败(权限或网络)，继续尝试"
         elif command -v apk >/dev/null 2>&1; then
+          # Alpine 也用 TUNA 加速（默认 dl-cdn.alpinelinux.org 慢）
+          if [ "$(id -u)" = "0" ]; then
+            sed -i 's|dl-cdn.alpinelinux.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apk/repositories 2>/dev/null || true
+          fi
           $SUDO apk add --no-cache cmake make g++ \
             || echo "WARN: 构建工具链安装失败(权限或网络)，继续尝试"
         elif command -v yum >/dev/null 2>&1; then
@@ -80,75 +85,101 @@ default:
       cmake --version || echo "WARN: 本镜像无 cmake，需要编译的 job 会失败"
 
 # 构建作业模板 
+# ============================================================
+# 多平台构建（平台矩阵）
+# ------------------------------------------------------------
+# docker runner 只能运行 Linux 系镜像，因此可即时构建的平台为：
+#   linux-glibc : Debian(gcc:12)  —— glibc ABI，覆盖 Ubuntu/Debian/CentOS 等发行版
+#   linux-musl  : Alpine(latest) —— musl ABI，覆盖 Alpine / 静态链接场景
+# 产物与发布包名均带「平台-架构」标识（如 astroproject-linux-glibc-x86_64.tar.gz），
+# 包内附 MANIFEST 说明平台/架构/libc/commit/构建时间，用户下载后解包即可辨识。
+#
+# FreeBSD / macOS / Windows：CMakeLists 已完整支持(PLATFORM_DIR 分支)，
+# 但需对应 OS 的独立 runner（本平台内存墙内无法常驻），后续可在环境机
+# （dev-linux/dev-win 等）挂 runner 扩展 —— 见 OPS-GUIDE §4.14。
+# ============================================================
+
+# ---- 构建模板：按平台实例化（PLATFORM/BUILD_IMAGE 由各 job variables 注入）----
 .build_template: &build_definition
   stage: build
-  # 不定义 before_script -> 继承 default.before_script（含 apt 镜像加速 + cmake 安装）
-  # 原模板自带一份重复的多 OS 依赖安装逻辑，且会覆盖 default，导致镜像加速失效，已移除
+  image: ${BUILD_IMAGE}
   script:
-    - mkdir -p astroproject/${BUILD_DIR}
-    - cd astroproject/${BUILD_DIR}
-    - cmake ../ -DCMAKE_BUILD_TYPE=Release
-    - cmake --build .
     - |
-      # 打包（已修正）：
-      #  - CMakeLists 的 CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE 指向
-      #    astroproject/lib/linux/Release/ ，原脚本按 build/lib/*.a 取，路径不符
-      #  - 原脚本引用的 astro_lib.h 全项目不存在，真实头文件是 include/astrolog_lib.h
-      #  - 改为打包整个 include/ 目录树，避免只拷一个头文件导致子目录依赖缺失
+      set -e
+      export ARCH=$(uname -m)
+      export ARTIFACT_NAME="astroproject-${PLATFORM}-${ARCH}.tar.gz"
+      echo ">>> [build] platform=${PLATFORM} arch=${ARCH} artifact=${ARTIFACT_NAME}"
+      mkdir -p astroproject/${BUILD_DIR}
+      cd astroproject/${BUILD_DIR}
+      cmake ../ -DCMAKE_BUILD_TYPE=Release
+      cmake --build .
+      # 打包（CMakeLists 输出到 lib/${PLATFORM_DIR}/Release，Linux 系 PLATFORM_DIR=linux）
       mkdir -p pkg/lib pkg/include
       cp ../lib/linux/Release/*.a pkg/lib/
       cp -r ../include/. pkg/include/
-      tar -czvf ${ARTIFACT_NAME} -C pkg lib include
-      ls -alrt ${ARTIFACT_NAME}
-      # 注意：不要写成 tar -tzf x | head -20 —— head 提前关闭管道会让 tar 收到
-      # SIGPIPE(退出码 141)，runner 开了 pipefail 会把整个 job 判失败。
+      # 生成 MANIFEST：用户解包即知平台/架构/libc/来源
+      {
+        echo "PROJECT=astroproject"
+        echo "PLATFORM=${PLATFORM}"
+        echo "ARCH=${ARCH}"
+        if [ -f /etc/alpine-release ]; then LIBC=musl; else LIBC=glibc; fi
+        echo "LIBC=${LIBC}"
+        echo "COMMIT=${CI_COMMIT_SHORT_SHA}"
+        echo "REF=${CI_COMMIT_REF_NAME}"
+        echo "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+      } > pkg/MANIFEST
+      tar -czvf ${ARTIFACT_NAME} -C pkg lib include MANIFEST
+      ls -l ${ARTIFACT_NAME}
+      # 清单(先写文件再 head，避免 tar|head 的 SIGPIPE 被 pipefail 判失败)
       echo "打包内容清单(前 20 项):"
       tar -tzf ${ARTIFACT_NAME} > /tmp/_pkg_list.txt
       head -20 /tmp/_pkg_list.txt
       echo "包内文件总数: $(wc -l < /tmp/_pkg_list.txt)"
+      # 回显 MANIFEST
+      echo "--- MANIFEST ---"
+      tar -xzf ${ARTIFACT_NAME} -O MANIFEST
   artifacts:
     paths:
-      - astroproject/${BUILD_DIR}/${ARTIFACT_NAME}
+      - astroproject/${BUILD_DIR}/astroproject-*.tar.gz
     expire_in: 1 week
-    name: "astroproject-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHORT_SHA}"
+    name: "astroproject-${PLATFORM}-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHORT_SHA}"
 
-# 验证作业模板（质量门禁）
-# 合并说明：
-#  原配置有 test / coverage 两个模板，内容几乎完全重复（都是 Debug 重新编译 + 校验），
-#  且 unit_test_dev 继承 coverage、unit_test_test/prod 继承 test —— 同名作业行为不一致。
-#  现合并为单一模板，三个环境行为统一。
-#
-# 效率说明：
-#  原模板会用 Debug 再完整编译一遍（build 阶段已编译过 Release），编译耗时翻倍。
-#  最佳实践是「验证你要发布的东西」，故改为直接校验 build 阶段产出的制品，不再重复编译，
-#  同时也不需要 cmake，可用 before_script: [] 省掉依赖安装。
+# ---- 验证模板（质量门禁，按平台校验制品 + MANIFEST）----
 .verify_template: &verify_definition
   stage: verify
   image: gcc:12
   before_script: []   # 仅校验制品，不需要 cmake
   script:
     - |
-      ARTIFACT="astroproject/${BUILD_DIR}/${ARTIFACT_NAME}"
-      echo "== 校验 build 阶段产出的制品 =="
-      test -f "$ARTIFACT" || { echo "FAIL: 未找到制品 $ARTIFACT"; exit 1; }
+      set -e
+      export ARCH=$(uname -m)
+      ARTIFACT=$(ls astroproject/${BUILD_DIR}/astroproject-${PLATFORM}-${ARCH}.tar.gz 2>/dev/null | head -1)
+      echo "== 校验 build 阶段产出(${PLATFORM}) =="
+      test -n "$ARTIFACT" || { echo "FAIL: 未找到 ${PLATFORM} 平台制品"; exit 1; }
       ls -l "$ARTIFACT"
 
       rm -rf _verify && mkdir -p _verify
       tar -xzf "$ARTIFACT" -C _verify
 
-      # 1) 必须包含静态库，且非空
+      # 1) MANIFEST 必须存在且平台标识正确
+      MF=$(find _verify -name MANIFEST | head -1)
+      test -n "$MF" || { echo "FAIL: 制品缺少 MANIFEST"; exit 1; }
+      grep -q "PLATFORM=${PLATFORM}" "$MF" || { echo "FAIL: MANIFEST 平台标识不符"; cat "$MF"; exit 1; }
+      echo "MANIFEST: $(cat "$MF" | tr '\n' ';')"
+
+      # 2) 必须包含静态库，且非空
       LIB=$(find _verify -name '*.a' | head -1)
       test -n "$LIB" || { echo "FAIL: 制品中没有静态库(.a)"; exit 1; }
       OBJCNT=$(ar t "$LIB" | wc -l)
       echo "静态库: $LIB  目标文件数: $OBJCNT"
       test "$OBJCNT" -gt 0 || { echo "FAIL: 静态库为空"; exit 1; }
 
-      # 2) 必须包含公开头文件
+      # 3) 必须包含公开头文件
       HDR=$(find _verify -name 'astrolog_lib.h' | head -1)
       test -n "$HDR" || { echo "FAIL: 制品缺少公开头文件 astrolog_lib.h"; exit 1; }
       echo "头文件: $HDR"
 
-      # 3) 覆盖率/单测：若日后 CMakeLists 定义了对应目标则执行，未定义则跳过（非错误）
+      # 4) 覆盖率/单测：CMakeLists 未定义则跳过（非错误）
       COVBIN=$(find _verify -name 'test_astro_lib_coverage' | head -1)
       if [ -n "$COVBIN" ]; then
         echo "发现覆盖率测试程序，执行中..."
@@ -157,26 +188,75 @@ default:
         echo "注: 项目 CMakeLists 未定义覆盖率/单测目标，跳过（非错误）"
       fi
 
-      echo "VERIFY PASSED"
+      echo "VERIFY PASSED (${PLATFORM})"
   allow_failure: false   # 质量门禁，不允许静默失败
 
-# 开发环境构建
-build_dev:
+# ============================================================
+# 开发环境（develop 分支）—— 双平台
+# ============================================================
+build_dev_glibc:
   <<: *build_definition
   variables:
-    <<: *variables_definition
+    BUILD_DIR: "build"
+    PLATFORM: "linux-glibc"
+    BUILD_IMAGE: "gcc:12"
     ENVIRONMENT: "development"
   tags:
     - docker
   rules:
-    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"  
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
     - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
 
-# 测试环境构建
-build_test:
+build_dev_musl:
   <<: *build_definition
   variables:
-    <<: *variables_definition
+    BUILD_DIR: "build"
+    PLATFORM: "linux-musl"
+    BUILD_IMAGE: "alpine:latest"
+    ENVIRONMENT: "development"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
+
+verify_dev_glibc:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "linux-glibc"
+  needs:
+    - job: build_dev_glibc
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
+
+verify_dev_musl:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "linux-musl"
+  needs:
+    - job: build_dev_musl
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
+
+# ============================================================
+# 测试环境（test 分支）—— 双平台
+# ============================================================
+build_test_glibc:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "linux-glibc"
+    BUILD_IMAGE: "gcc:12"
     ENVIRONMENT: "testing"
   tags:
     - docker
@@ -184,11 +264,56 @@ build_test:
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
     - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
 
-# 生产环境构建
-build_prod:
+build_test_musl:
   <<: *build_definition
   variables:
-    <<: *variables_definition
+    BUILD_DIR: "build"
+    PLATFORM: "linux-musl"
+    BUILD_IMAGE: "alpine:latest"
+    ENVIRONMENT: "testing"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
+
+verify_test_glibc:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "linux-glibc"
+  needs:
+    - job: build_test_glibc
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
+
+verify_test_musl:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "linux-musl"
+  needs:
+    - job: build_test_musl
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
+
+# ============================================================
+# 生产环境（main 分支 / tag）—— 双平台
+# ============================================================
+build_prod_glibc:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "linux-glibc"
+    BUILD_IMAGE: "gcc:12"
     ENVIRONMENT: "production"
   tags:
     - docker
@@ -197,47 +322,51 @@ build_prod:
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
     - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
 
-# 开发环境验证（质量门禁：校验 build_dev 产出的制品）
-verify_dev:
-  <<: *verify_definition
-  needs:
-    - job: build_dev
-      artifacts: true
+build_prod_musl:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "linux-musl"
+    BUILD_IMAGE: "alpine:latest"
+    ENVIRONMENT: "production"
   tags:
     - docker
   rules:
-    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
-    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
-
-# 测试环境验证（质量门禁：校验 build_test 产出的制品）
-verify_test:
-  <<: *verify_definition
-  needs:
-    - job: build_test
-      artifacts: true
-  tags:
-    - docker
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
-    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
-
-# 生产环境验证（质量门禁：校验 build_prod 产出的制品）
-verify_prod:
-  <<: *verify_definition
-  needs:
-    - job: build_prod
-      artifacts: true
-  tags:
-    - docker
-  rules:
-    # 关键修复：原规则缺少 $CI_COMMIT_TAG，导致打 tag 发布生产时
-    # 验证作业不运行，而 deploy_to_prod 又 needs 它 —— 生产链路要么断裂、
-    # 要么绕过质量门禁。补上 tag 规则，确保发布前必过验证。
     - if: $CI_COMMIT_TAG
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
     - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
 
-# 在新建一个合并请求的时候，自动生成合并请求页面概览和描述
+verify_prod_glibc:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "linux-glibc"
+  needs:
+    - job: build_prod_glibc
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    # 关键：必须含 $CI_COMMIT_TAG，确保打 tag 发布生产前必过验证（质量门禁）
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+
+verify_prod_musl:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "linux-musl"
+  needs:
+    - job: build_prod_musl
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+
 gene_mrdesc:
   stage: prepare   # 原为 build，语义不符：这是协作自动化，不是构建
   image: curlimages/curl:latest
@@ -303,60 +432,107 @@ add_mr_note:
   image: curlimages/curl:latest
   before_script: []   # 发布产物不需要构建工具链
   script:
-    - echo "Deploying to ${ENVIRONMENT} environment"
     - |
+      set -e
+      export ARCH=$(uname -m)
+      export ARTIFACT_NAME="astroproject-${PLATFORM}-${ARCH}.tar.gz"
       # 适配说明：docker executor 的容器是临时的，原设计"解压到 runner 本机 $HOME"
       # 在容器里没有意义（job 结束即销毁）。改为发布到 GitLab Generic Package
-      # Registry 做持久化保存；如需真正落到某台环境机，用 SSH 方式另行部署。
+      # Registry 做持久化保存；包名带平台标识（astroproject-linux-glibc 等），
+      # 用户可在 Packages 页面按平台/版本辨识下载。
       ARTIFACT="astroproject/${BUILD_DIR}/${ARTIFACT_NAME}"
-      ls -l "$ARTIFACT"
+      test -f "$ARTIFACT" || { echo "FAIL: 未找到制品 $ARTIFACT"; exit 1; }
+      echo "Publishing ${PLATFORM} -> packages/generic/${PACKAGE_NAME}/${ENVIRONMENT}-${CI_COMMIT_SHORT_SHA}/${ARTIFACT_NAME}"
       curl --fail --silent --show-error \
         --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
         --upload-file "$ARTIFACT" \
         "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${ENVIRONMENT}-${CI_COMMIT_SHORT_SHA}/${ARTIFACT_NAME}"
-      echo "Published -> ${ENVIRONMENT}-${CI_COMMIT_SHORT_SHA}/${ARTIFACT_NAME}"
+      echo "Published OK: ${ARTIFACT_NAME}"
   # 注：GitLab 19.2 有 bug —— deploy 阶段 job 带 environment 会导致 script 校验失败，
   #     故本平台统一不在 deploy job 上使用 environment 关键字。
 
-# 开发环境部署
-deploy_to_dev:
+# ================= 开发环境部署（develop 分支，双平台） =================
+deploy_to_dev_glibc:
   <<: *deploy_definition
   needs:
-    - job: build_dev
+    - job: build_dev_glibc
       artifacts: true
-    - job: verify_dev
+    - job: verify_dev_glibc
       artifacts: true
   variables:
+    BUILD_DIR: "build"
+    PLATFORM: "linux-glibc"
+    PACKAGE_NAME: "astroproject-linux-glibc"
     ENVIRONMENT: "development"
   tags:
     - docker
   rules:
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
 
-# 测试环境部署
-deploy_to_test:
+deploy_to_dev_musl:
   <<: *deploy_definition
   needs:
-    - job: build_test
+    - job: build_dev_musl
       artifacts: true
-    - job: verify_test
+    - job: verify_dev_musl
       artifacts: true
   variables:
+    BUILD_DIR: "build"
+    PLATFORM: "linux-musl"
+    PACKAGE_NAME: "astroproject-linux-musl"
+    ENVIRONMENT: "development"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+
+# ================= 测试环境部署（test 分支，双平台） =================
+deploy_to_test_glibc:
+  <<: *deploy_definition
+  needs:
+    - job: build_test_glibc
+      artifacts: true
+    - job: verify_test_glibc
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "linux-glibc"
+    PACKAGE_NAME: "astroproject-linux-glibc"
     ENVIRONMENT: "testing"
   tags:
     - docker
   rules:
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
 
-# 生产环境部署
-deploy_to_prod:
+deploy_to_test_musl:
   <<: *deploy_definition
   needs:
-    - job: build_prod
+    - job: build_test_musl
       artifacts: true
-    - job: verify_prod
+    - job: verify_test_musl
       artifacts: true
   variables:
+    BUILD_DIR: "build"
+    PLATFORM: "linux-musl"
+    PACKAGE_NAME: "astroproject-linux-musl"
+    ENVIRONMENT: "testing"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+
+# ================= 生产环境部署（main 分支 / tag，双平台） =================
+deploy_to_prod_glibc:
+  <<: *deploy_definition
+  needs:
+    - job: build_prod_glibc
+      artifacts: true
+    - job: verify_prod_glibc
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "linux-glibc"
+    PACKAGE_NAME: "astroproject-linux-glibc"
     ENVIRONMENT: "production"
   tags:
     - docker
@@ -364,7 +540,27 @@ deploy_to_prod:
     - if: $CI_COMMIT_TAG
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
 
-# 创建 Release 并上传构建产物
+deploy_to_prod_musl:
+  <<: *deploy_definition
+  needs:
+    - job: build_prod_musl
+      artifacts: true
+    - job: verify_prod_musl
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "linux-musl"
+    PACKAGE_NAME: "astroproject-linux-musl"
+    ENVIRONMENT: "production"
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+
+# ============================================================
+# 创建 Release（tag 时触发）：assets 挂双平台产物链接
+# ============================================================
 create_release:
   stage: release
   rules:
@@ -384,44 +580,55 @@ create_release:
   script:
     - |
       echo "Creating release for $PACKAGE_VERSION"
-      
-      # 创建发布说明（使用 shell 方式构造 JSON，避免依赖 jq）
+      export ARCH=$(uname -m)
+      # 双平台资产链接（glibc + musl）
       cat > release_data.json <<EOF
       {
         "tag_name": "$CI_COMMIT_TAG",
         "ref": "$CI_COMMIT_SHA",
         "name": "Release $PACKAGE_VERSION",
-        "description": "Release created by GitLab CI/CD pipeline for AstroProject",
+        "description": "Release created by GitLab CI/CD for AstroProject (multi-platform)",
         "assets": {
           "links": [
             {
-              "name": "$ARTIFACT_NAME",
-              "url": "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/jobs/artifacts/${CI_COMMIT_REF_NAME}/raw/${ARTIFACT_NAME}?job=build_prod"
+              "name": "astroproject-linux-glibc-${ARCH}.tar.gz",
+              "url": "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/jobs/artifacts/${CI_COMMIT_REF_NAME}/raw/astroproject/build/astroproject-linux-glibc-${ARCH}.tar.gz?job=build_prod_glibc"
+            },
+            {
+              "name": "astroproject-linux-musl-${ARCH}.tar.gz",
+              "url": "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/jobs/artifacts/${CI_COMMIT_REF_NAME}/raw/astroproject/build/astroproject-linux-musl-${ARCH}.tar.gz?job=build_prod_musl"
             }
           ]
         }
       }EOF
-      
-      # 使用 GitLab API 创建 Release，使用 JOB-TOKEN 而不是 PRIVATE-TOKEN
+      cat release_data.json
       curl --request POST \
            --header "PRIVATE-TOKEN: $PERSONAL_ACCESS_TOKEN" \
            --header "Content-Type: application/json" \
            --data @release_data.json \
            "$CI_API_V4_URL/projects/$CI_PROJECT_ID/releases"
   dependencies:
-    - build_prod
+    - build_prod_glibc
+    - build_prod_musl
   needs:
-    - job: build_prod
+    - job: build_prod_glibc
+      artifacts: true
+    - job: build_prod_musl
       artifacts: true
 
-# 发布到 Package Registry
-publish_package:
+# ============================================================
+# 发布到 Package Registry（tag 时触发，双平台分 job，版本带平台）
+# ============================================================
+publish_package_glibc:
   stage: release
   tags:
     - docker
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "linux-glibc"
+    PACKAGE_NAME: "astroproject-linux-glibc"
   before_script:
     - |
-      # 确定版本号
       if [ -n "$CI_COMMIT_TAG" ]; then
         PACKAGE_VERSION="$CI_COMMIT_TAG"
       else
@@ -431,20 +638,55 @@ publish_package:
       echo "Determined package version: $PACKAGE_VERSION"
   script:
     - |
-      # 确保变量正确设置
-      echo "Uploading artifact to GitLab Package Registry"
-      echo "API URL: ${CI_API_V4_URL}"
-      echo "Project ID: ${CI_PROJECT_ID}"
-      echo "Package Name: ${PACKAGE_NAME}"
-      echo "Package Version: ${PACKAGE_VERSION}"
-      echo "Artifact Name: ${ARTIFACT_NAME}"
-      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
-           --upload-file ${ARTIFACT_NAME} \
-           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/${ARTIFACT_NAME}"
+      export ARCH=$(uname -m)
+      export ARTIFACT_NAME="astroproject-${PLATFORM}-${ARCH}.tar.gz"
+      echo "Uploading ${PLATFORM} artifact to GitLab Package Registry"
+      echo "Package: ${PACKAGE_NAME} / ${PACKAGE_VERSION} / ${ARTIFACT_NAME}"
+      curl --fail --silent --show-error \
+        --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+        --upload-file "astroproject/${BUILD_DIR}/${ARTIFACT_NAME}" \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/${ARTIFACT_NAME}"
+      echo "Published OK: ${ARTIFACT_NAME}"
   rules:
     - if: $CI_COMMIT_TAG
   dependencies:
-    - build_prod
+    - build_prod_glibc
   needs:
-    - job: build_prod
+    - job: build_prod_glibc
+      artifacts: true
+
+publish_package_musl:
+  stage: release
+  tags:
+    - docker
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "linux-musl"
+    PACKAGE_NAME: "astroproject-linux-musl"
+  before_script:
+    - |
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        PACKAGE_VERSION="$CI_COMMIT_TAG"
+      else
+        PACKAGE_VERSION="v${CI_COMMIT_SHORT_SHA}"
+      fi
+      export PACKAGE_VERSION
+      echo "Determined package version: $PACKAGE_VERSION"
+  script:
+    - |
+      export ARCH=$(uname -m)
+      export ARTIFACT_NAME="astroproject-${PLATFORM}-${ARCH}.tar.gz"
+      echo "Uploading ${PLATFORM} artifact to GitLab Package Registry"
+      echo "Package: ${PACKAGE_NAME} / ${PACKAGE_VERSION} / ${ARTIFACT_NAME}"
+      curl --fail --silent --show-error \
+        --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+        --upload-file "astroproject/${BUILD_DIR}/${ARTIFACT_NAME}" \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/${ARTIFACT_NAME}"
+      echo "Published OK: ${ARTIFACT_NAME}"
+  rules:
+    - if: $CI_COMMIT_TAG
+  dependencies:
+    - build_prod_musl
+  needs:
+    - job: build_prod_musl
       artifacts: true
