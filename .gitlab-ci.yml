@@ -141,21 +141,31 @@ default:
     - cd astroproject/${BUILD_DIR}
     - cmake ../ -DCMAKE_BUILD_TYPE=Debug
     - cmake --build .
-    - cd bin
     - |
-      if [ -f "./test_astro_lib_coverage" ]; then
+      # 修正说明：
+      #  - CMake 的输出目录是 ../bin/linux/Debug/ 与 ../lib/linux/Debug/，
+      #    原脚本 `cd bin` 会因 build 目录下没有 bin 而直接失败
+      #  - 项目 CMakeLists 未定义覆盖率目标(test_astro_lib_coverage)，故如实跳过，
+      #    并补充产物冒烟校验，保证 test 阶段有真实断言
+      echo "== Debug 构建产物检查 =="
+      ls -l ../lib/linux/Debug/ ../bin/linux/Debug/
+      COVBIN="../bin/linux/Debug/test_astro_lib_coverage"
+      if [ -f "$COVBIN" ]; then
         echo "运行代码覆盖率测试..."
-        ./test_astro_lib_coverage
-        lcov --capture --directory . --output-file coverage.info
+        (cd ../bin/linux/Debug && ./test_astro_lib_coverage)
+        lcov --capture --directory ../lib/linux/Debug --output-file coverage.info
         genhtml coverage.info --output-directory ../../coverage-report
       else
-        echo "未找到代码覆盖率测试程序，跳过代码覆盖率测试"
+        echo "未找到覆盖率测试程序(项目 CMakeLists 未定义该目标)，跳过覆盖率报告生成"
       fi
+      test -f ../lib/linux/Debug/libastrolog32.a || { echo "FAIL: 静态库未生成"; exit 1; }
+      OBJCNT=$(ar t ../lib/linux/Debug/libastrolog32.a | wc -l)
+      echo "静态库包含目标文件数: $OBJCNT"
+      test "$OBJCNT" -gt 0 || { echo "FAIL: 静态库为空"; exit 1; }
+      echo "OK: libastrolog32.a 校验通过"
   artifacts:
-    reports:
-      junit: astroproject/${BUILD_DIR}/bin/test_results.xml
     paths:
-      - astroproject/${BUILD_DIR}/bin/test_results.xml
+      - astroproject/lib/linux/Debug/
       - coverage-report/
     expire_in: 1 week
   allow_failure: true
