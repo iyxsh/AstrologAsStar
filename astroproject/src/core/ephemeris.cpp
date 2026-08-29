@@ -34,7 +34,7 @@ void SetEphemerisPath(void)
 	// Build an ephemeris path in the same way as FileOpen() in io.c 
 	// searchs for a file. First look in the current directory, then 
 	// in the executable directory, and finally in the ephemeris directory.
-	sprintf(path, "." ";" "%s" ";" "%s",
+	snprintf(path, sizeof(path), "." ";" "%s" ";" "%s",
 		dirs.executable.dir, dirs.ephemeris.dir);
 
 	// now set the directory

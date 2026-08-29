@@ -101,13 +101,13 @@ bool FileFind(const char* szFile, char* szDir, char* path_found)
 	if (!file)
 	{
 		// Next look in the executable directory
-		sprintf(file_name, "%s\\%s", dirs.executable.dir, szFile);
+		snprintf(file_name, sizeof(file_name), "%s\\%s", dirs.executable.dir, szFile);
 		file = fopen(file_name, mode);
 
 		if (!file)
 		{
 			// Finally look in the directory passed as parameter
-			sprintf(file_name, "%s\\%s", szDir, szFile);
+			snprintf(file_name, sizeof(file_name), "%s\\%s", szDir, szFile);
 			file = fopen(file_name, mode);
 
 			if (!file)

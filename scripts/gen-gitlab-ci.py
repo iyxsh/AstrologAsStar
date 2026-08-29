@@ -320,7 +320,9 @@ default:
                 's|http://deb.debian.org/debian|http://mirrors.tuna.tsinghua.edu.cn/debian|g; s|https://deb.debian.org/debian|http://mirrors.tuna.tsinghua.edu.cn/debian|g; s|http://security.debian.org/debian-security|http://mirrors.tuna.tsinghua.edu.cn/debian-security|g; s|https://security.debian.org/debian-security|http://mirrors.tuna.tsinghua.edu.cn/debian-security|g; s|http://archive.ubuntu.com/ubuntu|http://mirrors.tuna.tsinghua.edu.cn/ubuntu|g; s|https://archive.ubuntu.com/ubuntu|http://mirrors.tuna.tsinghua.edu.cn/ubuntu|g; s|http://security.ubuntu.com/ubuntu|http://mirrors.tuna.tsinghua.edu.cn/ubuntu|g; s|https://security.ubuntu.com/ubuntu|http://mirrors.tuna.tsinghua.edu.cn/ubuntu|g' "$_f"
             done || true
           fi
-          $SUDO apt-get update -qq && $SUDO apt-get install -y -qq cmake make g++ \
+          # DEBIAN_FRONTEND=noninteractive 消除 debconf 交互前端警告
+          # （apt-utils/Dialog/Readline/TERM 未设置等噪音，CI 无交互环境）
+          $SUDO apt-get update -qq && DEBIAN_FRONTEND=noninteractive $SUDO apt-get install -y -qq cmake make g++ \
             || echo "WARN: 构建工具链安装失败(权限或网络)，继续尝试"
         elif command -v apk >/dev/null 2>&1; then
           # Alpine 也用 TUNA 加速（默认 dl-cdn.alpinelinux.org 慢；alpine 基础镜像自带 ca-certificates）
