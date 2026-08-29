@@ -12,6 +12,27 @@ stages:
 variables:
   <<: *variables_definition
 
+# ==== 本平台适配：单一共享 docker runner ====
+# 原设计依赖「每台环境机一个 runner」+ 在真实 OS 上 sudo 装依赖。
+# 本平台宿主机仅 16GB，无法同时跑多台环境机，故改为：
+#   一台 docker runner + 镜像提供构建环境，dev/test/prod 由分支规则区分。
+default:
+  image: gcc:12
+  before_script:
+    - |
+      # 容器内是 root，无需 sudo；若将来跑在真实机器上则自动补 sudo
+      if [ "$(id -u)" = "0" ]; then SUDO=""; else SUDO="sudo"; fi
+      if ! command -v cmake >/dev/null 2>&1; then
+        if command -v apt-get >/dev/null 2>&1; then
+          $SUDO apt-get update -qq && $SUDO apt-get install -y -qq cmake make g++
+        elif command -v apk >/dev/null 2>&1; then
+          $SUDO apk add --no-cache cmake make g++
+        elif command -v yum >/dev/null 2>&1; then
+          $SUDO yum install -y cmake make gcc-c++
+        fi
+      fi
+      cmake --version || true
+
 # 构建作业模板 
 .build_template: &build_definition
   stage: build
@@ -20,21 +41,21 @@ variables:
       # 检查并安装构建依赖 其中没有权限需要检查使用的Runner在哪个用户下运行看是否需要添加sudo权限安装依赖
       if command -v apt-get >/dev/null 2>&1; then
         # Debian/Ubuntu
-        sudo apt-get update
-        sudo apt-get install -y cmake g++ make
+        apt-get update
+        apt-get install -y cmake g++ make
       elif command -v yum >/dev/null 2>&1; then
         # CentOS/RHEL
-        sudo yum install -y cmake gcc-c++ make
+        yum install -y cmake gcc-c++ make
       elif command -v dnf >/dev/null 2>&1; then
         # Fedora
-        sudo dnf install -y cmake gcc-c++ make
+        dnf install -y cmake gcc-c++ make
       elif command -v apk >/dev/null 2>&1; then
         # Alpine
-        sudo apk update
-        sudo apk add --no-cache cmake g++ make
+        apk update
+        apk add --no-cache cmake g++ make
       elif command -v pkg >/dev/null 2>&1; then
         # FreeBSD
-        sudo pkg install -y cmake gmake gcc
+        pkg install -y cmake gmake gcc
       elif command -v brew >/dev/null 2>&1; then
         # macOS
         brew install cmake
@@ -84,14 +105,14 @@ variables:
     - |
       # 安装lcov工具以生成代码覆盖率报告
       if command -v apt-get >/dev/null 2>&1; then
-        sudo apt-get update
-        sudo apt-get install -y lcov
+        apt-get update
+        apt-get install -y lcov cmake make g++
       elif command -v yum >/dev/null 2>&1; then
-        sudo yum install -y lcov
+        yum install -y lcov
       elif command -v dnf >/dev/null 2>&1; then
-        sudo dnf install -y lcov
+        dnf install -y lcov
       elif command -v pkg >/dev/null 2>&1; then
-        sudo pkg install -y lcov
+        pkg install -y lcov
       else
         echo "无法安装lcov，跳过代码覆盖率报告生成"
       fi
@@ -126,13 +147,10 @@ build_dev:
     <<: *variables_definition
     ENVIRONMENT: "development"
   tags:
-    - FreeBSD14.3
-    - Dev
+    - docker
   rules:
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"  
     - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
-  environment:
-    name: "development"
 
 # 测试环境构建
 build_test:
@@ -141,13 +159,10 @@ build_test:
     <<: *variables_definition
     ENVIRONMENT: "testing"
   tags:
-    - FreeBSD14.3
-    - ProdTest
+    - docker
   rules:
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
     - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
-  environment:
-    name: "testing"
 
 # 生产环境构建
 build_prod:
@@ -156,50 +171,38 @@ build_prod:
     <<: *variables_definition
     ENVIRONMENT: "production"
   tags:
-    - FreeBSD14.3
-    - Prod
+    - docker
   rules:
     - if: $CI_COMMIT_TAG
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
     - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
-  environment:
-    name: "production"
 
 # 开发环境单元测试（含代码覆盖率）
 unit_test_dev:
   <<: *coverage_definition
   tags:
-    - FreeBSD14.3
-    - Dev
+    - docker
   rules:
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
     - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
-  environment:
-    name: "development"
 
 # 测试环境单元测试
 unit_test_test:
   <<: *test_definition
   tags:
-    - FreeBSD14.3
-    - ProdTest
+    - docker
   rules:
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
     - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
-  environment:
-    name: "testing"
 
 # 生产环境单元测试
 unit_test_prod:
   <<: *test_definition
   tags:
-    - FreeBSD14.3
-    - Prod
+    - docker
   rules:
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
     - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
-  environment:
-    name: "production"
 
 # 在新建一个合并请求的时候，自动生成合并请求页面概览和描述
 gene_mrdesc:
@@ -210,8 +213,8 @@ gene_mrdesc:
     - 'echo "HOME directory: $HOME"'
     - 'echo "CI_PROJECT_DIR: $CI_PROJECT_DIR"'
     - 'echo "Checking and installing required tools..."'
-    - if ! command -v jq &> /dev/null; then echo "jq not found, attempting to install..."; if command -v apk &> /dev/null; then sudo apk add --no-cache jq; elif command -v apt-get &> /dev/null; then sudo apt-get update && sudo apt-get install -y jq; elif command -v yum &> /dev/null; then sudo yum install -y jq; elif command -v dnf &> /dev/null; then sudo dnf install -y jq; elif command -v pkg &> /dev/null; then sudo pkg install -y jq; elif command -v zypper &> /dev/null; then sudo zypper install -y jq; else echo "Package manager not found. Please install jq manually."; exit 1; fi; else echo "jq is already installed"; jq --version; fi
-    - if ! command -v bash &> /dev/null; then echo "bash not found, attempting to install..."; if command -v apk &> /dev/null; then sudo apk add --no-cache bash; elif command -v apt-get &> /dev/null; then sudo apt-get update && sudo apt-get install -y bash; elif command -v yum &> /dev/null; then sudo yum install -y bash; elif command -v dnf &> /dev/null; then sudo dnf install -y bash; elif command -v pkg &> /dev/null; then sudo pkg install -y bash; elif command -v zypper &> /dev/null; then sudo zypper install -y bash; else echo "Package manager not found. Please install bash manually."; exit 1; fi; else echo "bash is already installed"; bash --version; fi
+    - if ! command -v jq &> /dev/null; then echo "jq not found, attempting to install..."; if command -v apk &> /dev/null; then apk add --no-cache jq; elif command -v apt-get &> /dev/null; then apt-get update && apt-get install -y jq; elif command -v yum &> /dev/null; then yum install -y jq; elif command -v dnf &> /dev/null; then dnf install -y jq; elif command -v pkg &> /dev/null; then pkg install -y jq; elif command -v zypper &> /dev/null; then zypper install -y jq; else echo "Package manager not found. Please install jq manually."; exit 1; fi; else echo "jq is already installed"; jq --version; fi
+    - if ! command -v bash &> /dev/null; then echo "bash not found, attempting to install..."; if command -v apk &> /dev/null; then apk add --no-cache bash; elif command -v apt-get &> /dev/null; then apt-get update && apt-get install -y bash; elif command -v yum &> /dev/null; then yum install -y bash; elif command -v dnf &> /dev/null; then dnf install -y bash; elif command -v pkg &> /dev/null; then pkg install -y bash; elif command -v zypper &> /dev/null; then zypper install -y bash; else echo "Package manager not found. Please install bash manually."; exit 1; fi; else echo "bash is already installed"; bash --version; fi
   script:
     - 'echo "正在为合并请求生成描述内容..."'
     - pwd
@@ -223,7 +226,7 @@ gene_mrdesc:
     - chmod +x "$PROJECT_DIR/scripts/add_mr_note.sh"
     - /usr/local/bin/bash "$PROJECT_DIR/scripts/generate_mr_description.sh"
   tags:
-    - FreeBSD14.3
+    - docker
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   variables:
@@ -249,7 +252,7 @@ add_mr_note:
     - chmod +x "$PROJECT_DIR/scripts/add_mr_note.sh"
     - bash "$PROJECT_DIR/scripts/add_mr_note.sh" "$MR_IID"
   tags:
-    - FreeBSD14.3
+    - docker
   rules:
     # 在 develop 分支上推送时运行（合并到 develop）
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_MESSAGE =~ /^Merge branch.*/
@@ -264,18 +267,22 @@ add_mr_note:
 # 部署作业模板
 .deploy_template: &deploy_definition
   stage: deploy
+  image: curlimages/curl:latest
   script:
     - echo "Deploying to ${ENVIRONMENT} environment"
-    - echo "Extracting artifact to user home directory..."
     - |
-      # Create directory in user home
-      mkdir -p $HOME/app/astroproject
-      # Extract artifact to user home directory
-      tar -xzvf astroproject/${BUILD_DIR}/${ARTIFACT_NAME} -C $HOME/app/astroproject
-      echo "Static libraries and headers extracted to $HOME/app/astroproject"
-    - echo "Deployment completed successfully."
-  environment:
-    name: "${ENVIRONMENT}"
+      # 适配说明：docker executor 的容器是临时的，原设计"解压到 runner 本机 $HOME"
+      # 在容器里没有意义（job 结束即销毁）。改为发布到 GitLab Generic Package
+      # Registry 做持久化保存；如需真正落到某台环境机，用 SSH 方式另行部署。
+      ARTIFACT="astroproject/${BUILD_DIR}/${ARTIFACT_NAME}"
+      ls -l "$ARTIFACT"
+      curl --fail --silent --show-error \
+        --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+        --upload-file "$ARTIFACT" \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${ENVIRONMENT}-${CI_COMMIT_SHORT_SHA}/${ARTIFACT_NAME}"
+      echo "Published -> ${ENVIRONMENT}-${CI_COMMIT_SHORT_SHA}/${ARTIFACT_NAME}"
+  # 注：GitLab 19.2 有 bug —— deploy 阶段 job 带 environment 会导致 script 校验失败，
+  #     故本平台统一不在 deploy job 上使用 environment 关键字。
 
 # 开发环境部署
 deploy_to_dev:
@@ -288,12 +295,9 @@ deploy_to_dev:
   variables:
     ENVIRONMENT: "development"
   tags:
-    - FreeBSD14.3
-    - Dev
+    - docker
   rules:
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
-  environment:
-    name: "development"
 
 # 测试环境部署
 deploy_to_test:
@@ -306,12 +310,9 @@ deploy_to_test:
   variables:
     ENVIRONMENT: "testing"
   tags:
-    - FreeBSD14.3
-    - ProdTest
+    - docker
   rules:
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
-  environment:
-    name: "testing"
 
 # 生产环境部署
 deploy_to_prod:
@@ -324,13 +325,10 @@ deploy_to_prod:
   variables:
     ENVIRONMENT: "production"
   tags:
-    - FreeBSD14.3
-    - Prod
+    - docker
   rules:
     - if: $CI_COMMIT_TAG
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
-  environment:
-    name: "production"
 
 # 创建 Release 并上传构建产物
 create_release:
@@ -338,8 +336,7 @@ create_release:
   rules:
     - if: $CI_COMMIT_TAG
   tags:
-    - FreeBSD14.3
-    - Prod
+    - docker
   before_script:
     - |
       # 确定版本号
@@ -379,8 +376,6 @@ create_release:
            "$CI_API_V4_URL/projects/$CI_PROJECT_ID/releases"
   dependencies:
     - build_prod
-  environment:
-    name: "production"
   needs:
     - job: build_prod
       artifacts: true
@@ -389,8 +384,7 @@ create_release:
 publish_package:
   stage: release
   tags:
-    - FreeBSD14.3
-    - Prod
+    - docker
   before_script:
     - |
       # 确定版本号
@@ -415,8 +409,6 @@ publish_package:
            "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/${ARTIFACT_NAME}"
   rules:
     - if: $CI_COMMIT_TAG
-  environment:
-    name: "production"
   dependencies:
     - build_prod
   needs:
