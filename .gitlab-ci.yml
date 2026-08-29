@@ -20,18 +20,28 @@ default:
   image: gcc:12
   before_script:
     - |
-      # 容器内是 root，无需 sudo；若将来跑在真实机器上则自动补 sudo
+      # 尽力而为的依赖安装：
+      #  - 有的镜像以 root 跑(无 sudo)，有的以普通用户跑且没有 sudo -> 无 sudo 则置空
+      #  - 有的镜像没有包管理器(curlimages/curl 等) -> 跳过即可
+      #  - 任何情况下都不得让 job 失败，非构建类 job 请用 before_script: [] 直接跳过
       if [ "$(id -u)" = "0" ]; then SUDO=""; else SUDO="sudo"; fi
+      command -v sudo >/dev/null 2>&1 || SUDO=""
       if ! command -v cmake >/dev/null 2>&1; then
+        echo "cmake 缺失，尝试安装构建工具链..."
         if command -v apt-get >/dev/null 2>&1; then
-          $SUDO apt-get update -qq && $SUDO apt-get install -y -qq cmake make g++
+          $SUDO apt-get update -qq && $SUDO apt-get install -y -qq cmake make g++ \
+            || echo "WARN: 构建工具链安装失败(权限或网络)，继续尝试"
         elif command -v apk >/dev/null 2>&1; then
-          $SUDO apk add --no-cache cmake make g++
+          $SUDO apk add --no-cache cmake make g++ \
+            || echo "WARN: 构建工具链安装失败(权限或网络)，继续尝试"
         elif command -v yum >/dev/null 2>&1; then
-          $SUDO yum install -y cmake make gcc-c++
+          $SUDO yum install -y cmake make gcc-c++ \
+            || echo "WARN: 构建工具链安装失败(权限或网络)，继续尝试"
+        else
+          echo "WARN: 未找到受支持的包管理器，跳过依赖安装"
         fi
       fi
-      cmake --version || true
+      cmake --version || echo "WARN: 本镜像无 cmake，需要编译的 job 会失败"
 
 # 构建作业模板 
 .build_template: &build_definition
@@ -298,6 +308,7 @@ add_mr_note:
 .deploy_template: &deploy_definition
   stage: deploy
   image: curlimages/curl:latest
+  before_script: []   # 发布产物不需要构建工具链
   script:
     - echo "Deploying to ${ENVIRONMENT} environment"
     - |
