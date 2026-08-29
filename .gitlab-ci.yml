@@ -61,7 +61,9 @@ default:
           # 加速：默认源 deb.debian.org 在本网络下极慢（8.6MB 的 cmake 要数分钟），
           # 且每个 job 都是全新容器、都要重装一遍。改用国内镜像可把安装压到数秒。
           if [ "$(id -u)" = "0" ]; then
-            sed -i 's|deb.debian.org|mirrors.aliyun.com|g; s|security.debian.org|mirrors.aliyun.com|g'               /etc/apt/sources.list /etc/apt/sources.list.d/*.list 2>/dev/null || true
+            for _f in /etc/apt/sources.list /etc/apt/sources.list.d/*.list; do
+              [ -f "$_f" ] && sed -i 's|deb.debian.org|mirrors.aliyun.com|g; s|security.debian.org|mirrors.aliyun.com|g' "$_f"
+            done || true
           fi
           $SUDO apt-get update -qq && $SUDO apt-get install -y -qq cmake make g++ \
             || echo "WARN: 构建工具链安装失败(权限或网络)，继续尝试"
@@ -80,35 +82,8 @@ default:
 # 构建作业模板 
 .build_template: &build_definition
   stage: build
-  before_script:
-    - |
-      # 检查并安装构建依赖 其中没有权限需要检查使用的Runner在哪个用户下运行看是否需要添加sudo权限安装依赖
-      if command -v apt-get >/dev/null 2>&1; then
-        # Debian/Ubuntu
-        apt-get update
-        apt-get install -y cmake g++ make
-      elif command -v yum >/dev/null 2>&1; then
-        # CentOS/RHEL
-        yum install -y cmake gcc-c++ make
-      elif command -v dnf >/dev/null 2>&1; then
-        # Fedora
-        dnf install -y cmake gcc-c++ make
-      elif command -v apk >/dev/null 2>&1; then
-        # Alpine
-        apk update
-        apk add --no-cache cmake g++ make
-      elif command -v pkg >/dev/null 2>&1; then
-        # FreeBSD
-        pkg install -y cmake gmake gcc
-      elif command -v brew >/dev/null 2>&1; then
-        # macOS
-        brew install cmake
-      else
-        echo "Unsupported OS for automatic dependency installation"
-        exit 1
-      fi
-      # 验证CMake是否正确安装
-      cmake --version
+  # 不定义 before_script -> 继承 default.before_script（含 apt 镜像加速 + cmake 安装）
+  # 原模板自带一份重复的多 OS 依赖安装逻辑，且会覆盖 default，导致镜像加速失效，已移除
   script:
     - mkdir -p astroproject/${BUILD_DIR}
     - cd astroproject/${BUILD_DIR}
