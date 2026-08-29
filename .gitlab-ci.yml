@@ -91,8 +91,12 @@ default:
       cp -r ../include/. pkg/include/
       tar -czvf ${ARTIFACT_NAME} -C pkg lib include
       ls -alrt ${ARTIFACT_NAME}
-      echo "打包内容清单:"
-      tar -tzf ${ARTIFACT_NAME} | head -20
+      # 注意：不要写成 tar -tzf x | head -20 —— head 提前关闭管道会让 tar 收到
+      # SIGPIPE(退出码 141)，runner 开了 pipefail 会把整个 job 判失败。
+      echo "打包内容清单(前 20 项):"
+      tar -tzf ${ARTIFACT_NAME} > /tmp/_pkg_list.txt
+      head -20 /tmp/_pkg_list.txt
+      echo "包内文件总数: $(wc -l < /tmp/_pkg_list.txt)"
   artifacts:
     paths:
       - astroproject/${BUILD_DIR}/$ARTIFACT_NAME
