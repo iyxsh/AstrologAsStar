@@ -70,9 +70,19 @@ default:
     - cd astroproject/${BUILD_DIR}
     - cmake ../ -DCMAKE_BUILD_TYPE=Release
     - cmake --build .
-    - cp ../src/astro_lib.h lib/
-    - tar -czvf ${ARTIFACT_NAME} lib/*.a lib/astro_lib.h
-    - ls -alrt ${ARTIFACT_NAME}
+    - |
+      # 打包（已修正）：
+      #  - CMakeLists 的 CMAKE_ARCHIVE_OUTPUT_DIRECTORY_RELEASE 指向
+      #    astroproject/lib/linux/Release/ ，原脚本按 build/lib/*.a 取，路径不符
+      #  - 原脚本引用的 astro_lib.h 全项目不存在，真实头文件是 include/astrolog_lib.h
+      #  - 改为打包整个 include/ 目录树，避免只拷一个头文件导致子目录依赖缺失
+      mkdir -p pkg/lib pkg/include
+      cp ../lib/linux/Release/*.a pkg/lib/
+      cp -r ../include/. pkg/include/
+      tar -czvf ${ARTIFACT_NAME} -C pkg lib include
+      ls -alrt ${ARTIFACT_NAME}
+      echo "打包内容清单:"
+      tar -tzf ${ARTIFACT_NAME} | head -20
   artifacts:
     paths:
       - astroproject/${BUILD_DIR}/$ARTIFACT_NAME
@@ -87,14 +97,24 @@ default:
     - cd astroproject/${BUILD_DIR}
     - cmake ../ -DCMAKE_BUILD_TYPE=Debug
     - cmake --build .
-    - cd bin
-    - ./test_astro_lib_debugd
-    # 注意测试作业中名称不一样的 test_astro_lib_debugd 而不是 test_astro_lib_debug
+    - |
+      # 说明：本项目 CMakeLists 目前未定义任何单元测试目标
+      # （无 gtest/catch，也没有 test_astro_lib_debugd 这个可执行程序），
+      # 原脚本直接执行该二进制必然失败。这里改为「产物冒烟校验」：
+      # 确认静态库与可执行程序确实构建成功、静态库含有效目标文件。
+      # 若日后在 CMakeLists 中加入测试目标，把下面的冒烟校验替换为真实测试即可。
+      echo "== Debug 构建产物检查 =="
+      ls -l ../lib/linux/Debug/
+      ls -l ../bin/linux/Debug/
+      test -f ../lib/linux/Debug/libastrolog32.a || { echo "FAIL: 静态库未生成"; exit 1; }
+      echo "OK: libastrolog32.a 已生成"
+      OBJCNT=$(ar t ../lib/linux/Debug/libastrolog32.a | wc -l)
+      echo "静态库包含目标文件数: $OBJCNT"
+      test "$OBJCNT" -gt 0 || { echo "FAIL: 静态库为空"; exit 1; }
+      echo "SMOKE TEST PASSED"
   artifacts:
-    reports:
-      junit: astroproject/${BUILD_DIR}/bin/test_results.xml
     paths:
-      - astroproject/${BUILD_DIR}/bin/test_results.xml
+      - astroproject/${BUILD_DIR}/../lib/linux/Debug/
     expire_in: 1 week
   allow_failure: false
 
