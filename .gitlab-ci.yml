@@ -145,7 +145,7 @@ default:
         echo "ARCH=${ARCH}"
         if [ -f /etc/alpine-release ]; then LIBC=musl; else LIBC=glibc; fi
         echo "LIBC=${LIBC}"
-        echo "GCC=$(gcc --version | head -1 | awk '{print $3}')"
+        echo "GCC=$(gcc --version | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
         echo "COMMIT=${CI_COMMIT_SHORT_SHA}"
         echo "REF=${CI_COMMIT_REF_NAME}"
         echo "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
