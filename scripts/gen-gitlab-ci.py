@@ -336,7 +336,10 @@ default:
           #              download.example 占位符，靠 metalink 解析，替换占位符并禁 metalink）
           if [ "$(id -u)" = "0" ]; then
             sed -i 's|^mirrorlist=|#mirrorlist=|g; s|^metalink=|#metalink=|g' /etc/yum.repos.d/*.repo 2>/dev/null || true
-            sed -i 's|^#baseurl=http://dl.rockylinux.org/\$contentdir|baseurl=https://mirrors.ustc.edu.cn/rocky|g; s|^#baseurl=http://download.example/pub/fedora|baseurl=https://mirrors.ustc.edu.cn/fedora/linux|g; s|^baseurl=http://download.example/pub/fedora|baseurl=https://mirrors.ustc.edu.cn/fedora/linux|g' /etc/yum.repos.d/*.repo 2>/dev/null || true
+            # 注意：fedora 官方 baseurl 是 download.example 占位符(靠 metalink 解析)，
+            # 且路径为 /pub/fedora/linux/...，替换时吃 /pub/fedora 且 replacement 不要再带 /linux
+            # （否则会变成 /fedora/linux/linux/... 双路径）。
+            sed -i 's|^#baseurl=http://dl.rockylinux.org/\$contentdir|baseurl=https://mirrors.ustc.edu.cn/rocky|g; s|^#baseurl=http://download.example/pub/fedora|baseurl=https://mirrors.ustc.edu.cn/fedora|g; s|^baseurl=http://download.example/pub/fedora|baseurl=https://mirrors.ustc.edu.cn/fedora|g' /etc/yum.repos.d/*.repo 2>/dev/null || true
           fi
           $SUDO dnf install -y -q cmake make gcc-c++ \
             || echo "WARN: 构建工具链安装失败(权限或网络)，继续尝试"
