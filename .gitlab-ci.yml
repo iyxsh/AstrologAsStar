@@ -61,9 +61,12 @@ default:
           # 加速：默认源 deb.debian.org 在本网络下极慢（8.6MB 的 cmake 要数分钟），
           # 且每个 job 都是全新容器、都要重装一遍。改用国内镜像可把安装压到数秒。
           if [ "$(id -u)" = "0" ]; then
-            # 注意：本网络实测 mirrors.aliyun.com 不可达(HTTP 000)，用清华 TUNA
-            for _f in /etc/apt/sources.list /etc/apt/sources.list.d/*.list; do
-              [ -f "$_f" ] && sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g; s|security.debian.org|mirrors.tuna.tsinghua.edu.cn|g' "$_f"
+            # 注意：本网络实测 mirrors.aliyun.com 不可达(HTTP 000)，用清华 TUNA。
+            # gcc:12(Debian 12) 的源是 deb822 格式：/etc/apt/sources.list.d/debian.sources
+            # （URIs: http://deb.debian.org/debian），必须同时处理 .list 与 .sources。
+            # 强制替换为 https://mirrors.tuna.tsinghua.edu.cn 避免 http 301 重定向的不确定性。
+            for _f in /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
+              [ -f "$_f" ] && sed -i                 's|http://deb.debian.org|https://mirrors.tuna.tsinghua.edu.cn|g; s|https://deb.debian.org|https://mirrors.tuna.tsinghua.edu.cn|g; s|http://security.debian.org|https://mirrors.tuna.tsinghua.edu.cn|g; s|https://security.debian.org|https://mirrors.tuna.tsinghua.edu.cn|g' "$_f"
             done || true
           fi
           $SUDO apt-get update -qq && $SUDO apt-get install -y -qq cmake make g++ \
