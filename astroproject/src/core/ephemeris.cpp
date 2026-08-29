@@ -29,7 +29,7 @@ global_directories_t dirs =
 
 void SetEphemerisPath(void)
 {
-	file_name_t path;
+	char path[2 * MAX_FILE_NAME + 8];	// 两个目录 + 分隔符，避免拼接截断
 
 	// Build an ephemeris path in the same way as FileOpen() in io.c 
 	// searchs for a file. First look in the current directory, then 

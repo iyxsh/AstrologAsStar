@@ -89,7 +89,7 @@ double  rStarBright[cStar + 1] = { 0,
 /* index list based on what order the stars are supposed to be printed in.	*/
 bool FileFind(const char* szFile, char* szDir, char* path_found)
 {
-	file_name_t file_name;
+	char file_name[2 * MAX_FILE_NAME + 8];	// 目录+文件名拼接，避免截断
 	const char* mode = "r";
 	FILE* file;
 

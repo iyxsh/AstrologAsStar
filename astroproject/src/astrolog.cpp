@@ -1071,7 +1071,7 @@ wchar_t *SzDate(int mon, int day, int yea, int nFormat)
 /* on whether the "European" time format flag is set or not.          */
 char *SzTime(int hr, int min, int sec)
 {
-	static char szTim[12];
+	static char szTim[16];
 
 	while (min >= 60)
 	{
@@ -1209,7 +1209,7 @@ wchar_t *SzTimW(double tim)
 /* having the hours before GMT in the integer part and minutes fractionally. */
 char *SzZone(double zon)
 {
-	static char szZon[10];
+	static char szZon[16];
 	int mini, seci;
 	double rMin;
 
