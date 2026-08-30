@@ -29,7 +29,7 @@ echo "==> 同步 Release ${TAG} 到 Atomgit ${ATOMGIT_OWNER}/${ATOMGIT_REPO}"
 BODY=$(jq -n \
   --arg tag "$TAG" \
   --arg name "Release $TAG" \
-  --arg body "AstroProject $TAG 正式版（多系统矩阵 6 平台：ubuntu-22.04/24.04、debian-12、alpine-3.20、rockylinux-9、fedora-40）。产物为静态库 + include 树 + MANIFEST，由 GitLab CI 构建并同步。功能一致性：与旧预编译版本输出逐字节一致。" \
+  --arg body "AstroProject $TAG 正式版（多系统矩阵：6 个 Linux 发行版 + Windows(MinGW) + Android(NDK)）。产物为静态库 + include 树 + MANIFEST，由 GitLab CI 交叉/原生构建并同步。功能一致性：与旧预编译版本输出逐字节一致。" \
   '{tag_name: $tag, name: $name, body: $body, release_status: "latest"}')
 
 # 2. Release 已存在则 PATCH，否则 POST
