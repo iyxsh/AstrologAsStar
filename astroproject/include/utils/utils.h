@@ -3,7 +3,11 @@
 
 #if defined(_WIN32)
 	#include "windows.h"
-	#include "../../swe/swisseph/swedll.h"
+	/* 2026-08-30 修复：swisseph 以静态库构建（add_library(swe STATIC)），须用 swephexp.h
+	 * （声明普通函数符号）；swedll.h 是 DLL 导入头（__declspec(dllimport)），
+	 * 用了会产生 __imp_swe_* 未定义链接错误。 */
+	#include "../../swe/swisseph/swephexp.h"
+	#include <string.h>
     #define STR_CMPI _stricmp
 	#define MEM_CCPY _memccpy
 	#define STR_DUP _strdup

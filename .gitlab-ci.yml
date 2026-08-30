@@ -146,6 +146,9 @@ default:
         DEBIAN_FRONTEND=noninteractive $SUDO apt-get install -y -qq mingw-w64
         export CC=x86_64-w64-mingw32-gcc
         export CXX=x86_64-w64-mingw32-g++
+        # 2026-08-30 修复：不设 CMAKE_SYSTEM_NAME 时 CMake 在 Linux 宿主上不把 mingw 识别为
+        # Windows 目标（WIN32=FALSE）→ PLATFORM_DIR=linux、产物落 lib/linux 与打包目录不符
+        EXTRA_CMAKE="${EXTRA_CMAKE} -DCMAKE_SYSTEM_NAME=Windows"
       elif [ "${CROSS}" = "android" ]; then
         echo ">>> 安装 Android NDK 并配置 toolchain (arm64-v8a, API24)"
         $SUDO apt-get update -qq
