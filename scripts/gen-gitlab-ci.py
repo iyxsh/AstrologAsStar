@@ -494,9 +494,24 @@ default:
         $SUDO apt-get update -qq
         DEBIAN_FRONTEND=noninteractive $SUDO apt-get install -y -qq wget unzip
         NDK_VER=r25b
-        wget -q "https://dl.google.com/android/repository/android-ndk-${NDK_VER}-linux.zip" -O /tmp/ndk.zip
-        unzip -q /tmp/ndk.zip -d /opt
-        export ANDROID_NDK_HOME=/opt/android-ndk-${NDK_VER}
+        # NDK 压缩包约 600MB，而每个 job 都是全新容器 —— 逐次重下是最慢的一环。
+        # 优化：优先复用 runner 宿主预置的 NDK（config.toml 挂 /opt/ci-cache 卷）；
+        #       未预置时回退下载，保证换 runner/新环境仍可跑（可移植性不丢）。
+        NDK_HOST="/opt/ci-cache/ndk/android-ndk-${NDK_VER}"
+        if [ -x "${NDK_HOST}/toolchains/llvm/prebuilt/linux-x86_64/bin/clang" ]; then
+          echo ">>> 命中 runner 宿主 NDK 缓存: ${NDK_HOST}"
+          export ANDROID_NDK_HOME="${NDK_HOST}"
+        else
+          echo ">>> 宿主无 NDK 缓存，回退下载 r25b（约 600MB，仅首次）"
+          export ANDROID_NDK_HOME="/opt/android-ndk-${NDK_VER}"
+          # 下载源优先级：腾讯云镜像(国内直连，实测 200) -> 官方 dl.google.com。
+          # 注意官方域名在本网络下**只解析到 AAAA(IPv6)**，而容器无 IPv6 路由 —— 依赖
+          # runner config 的 dns=["223.5.5.5","114.114.114.114"] 才能拿到 A 记录（见 OPS-GUIDE §4.9b）。
+          wget -q "https://mirrors.cloud.tencent.com/AndroidSDK/android-ndk-${NDK_VER}-linux.zip" -O /tmp/ndk.zip \
+            || wget -q "https://dl.google.com/android/repository/android-ndk-${NDK_VER}-linux.zip" -O /tmp/ndk.zip
+          unzip -q /tmp/ndk.zip -d /opt
+          rm -f /tmp/ndk.zip
+        fi
         export CC=${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/clang
         export CXX=${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++
         EXTRA_CMAKE="-DCMAKE_TOOLCHAIN_FILE=${ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-24"
