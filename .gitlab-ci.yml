@@ -1,217 +1,347 @@
+# ============================================================
+# 阶段（stage）设计 —— 遵循 GitLab CE 惯例，并按职责重新命名/归位
+#
+#   prepare  准备与协作自动化：MR 描述生成、合并后回写 MR 备注
+#   build    构建：编译源码并打包成可分发制品
+#   verify   验证：校验 build 产出的制品（质量门禁）
+#   deploy   部署：按环境发布制品（dev / test / prod）
+#   release  发布：创建 GitLab Release 并发布软件包
+#
+# 相比原配置的修正：
+#   1. 原 gene_mrdesc（生成 MR 描述）被塞在 build 阶段、
+#      add_mr_note（MR 备注）被塞在 deploy 阶段，语义完全不符，
+#      现统一归入新增的 prepare 阶段。
+#   2. 原 test 阶段下挂着 unit_test_* 作业，但本项目 CMakeLists
+#      并未定义任何单元测试目标（无 gtest/catch，也没有
+#      test_astro_lib_debugd），实际做的是产物校验，名不副实；
+#      故更名为 verify。日后若在 CMakeLists 中加入真实单测，
+#      可再拆出独立的 test 阶段。
+# ============================================================
 stages:
+  - prepare
   - build
-  - test
+  - verify
   - deploy
   - release
 
+# 防止 push 与 merge_request 触发重复流水线（GitLab 官方推荐写法）
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH
+
 .variables_template: &variables_definition
   BUILD_DIR: "build"
-  ARTIFACT_NAME: "astroproject.tar.gz"
-  PACKAGE_NAME: "astroproject"
+  # 注：ARTIFACT_NAME/PACKAGE_NAME 已改为按平台动态生成（见各 job），
+  #     不再提供全局默认值，避免与平台化命名混淆。
 
 variables:
   <<: *variables_definition
+  # SWE 为 git submodule（astroproject/swe/swisseph），job 前必须拉取
+  GIT_SUBMODULE_STRATEGY: recursive
 
-# 构建作业模板 
+# ==== 本平台适配：单一共享 docker runner ====
+# 原设计依赖「每台环境机一个 runner」+ 在真实 OS 上 sudo 装依赖。
+# 本平台宿主机仅 16GB，无法同时跑多台环境机，故改为：
+#   一台 docker runner + 镜像提供构建环境，dev/test/prod 由分支规则区分。
+default:
+  image: gcc:12
+  before_script:
+    - |
+      # 尽力而为的依赖安装：
+      #  - 有的镜像以 root 跑(无 sudo)，有的以普通用户跑且没有 sudo -> 无 sudo 则置空
+      #  - 有的镜像没有包管理器(curlimages/curl 等) -> 跳过即可
+      #  - 任何情况下都不得让 job 失败，非构建类 job 请用 before_script: [] 直接跳过
+      if [ "$(id -u)" = "0" ]; then SUDO=""; else SUDO="sudo"; fi
+      command -v sudo >/dev/null 2>&1 || SUDO=""
+      if ! command -v cmake >/dev/null 2>&1; then
+        echo "cmake 缺失，尝试安装构建工具链..."
+        if command -v apt-get >/dev/null 2>&1; then
+          # 加速：默认源(deb.debian.org / archive.ubuntu.com)在本网络下极慢，
+          # 且每个 job 都是全新容器、都要重装一遍。改用清华 TUNA。
+          # 要点：
+          #  - 基础镜像无 ca-certificates，https 源会 update 失败，故统一用 http
+          #  - 源 URL 自带路径后缀(如 /ubuntu、/debian)，替换时必须一并吃掉，
+          #    否则会变成 /ubuntu/ubuntu 双路径
+          #  - Debian 12 / Ubuntu 24.04 是 deb822(.sources)，Ubuntu 22.04 是 .list，都要处理
+          if [ "$(id -u)" = "0" ]; then
+            for _f in /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
+              [ -f "$_f" ] && sed -i \
+                's|http://deb.debian.org/debian|http://mirrors.tuna.tsinghua.edu.cn/debian|g; s|https://deb.debian.org/debian|http://mirrors.tuna.tsinghua.edu.cn/debian|g; s|http://security.debian.org/debian-security|http://mirrors.tuna.tsinghua.edu.cn/debian-security|g; s|https://security.debian.org/debian-security|http://mirrors.tuna.tsinghua.edu.cn/debian-security|g; s|http://archive.ubuntu.com/ubuntu|http://mirrors.tuna.tsinghua.edu.cn/ubuntu|g; s|https://archive.ubuntu.com/ubuntu|http://mirrors.tuna.tsinghua.edu.cn/ubuntu|g; s|http://security.ubuntu.com/ubuntu|http://mirrors.tuna.tsinghua.edu.cn/ubuntu|g; s|https://security.ubuntu.com/ubuntu|http://mirrors.tuna.tsinghua.edu.cn/ubuntu|g' "$_f"
+            done || true
+          fi
+          # DEBIAN_FRONTEND=noninteractive 消除 debconf 交互前端警告
+          # （apt-utils/Dialog/Readline/TERM 未设置等噪音，CI 无交互环境）
+          $SUDO apt-get update -qq && DEBIAN_FRONTEND=noninteractive $SUDO apt-get install -y -qq cmake make g++ \
+            || echo "WARN: 构建工具链安装失败(权限或网络)，继续尝试"
+        elif command -v apk >/dev/null 2>&1; then
+          # Alpine 也用 TUNA 加速（默认 dl-cdn.alpinelinux.org 慢；alpine 基础镜像自带 ca-certificates）
+          if [ "$(id -u)" = "0" ]; then
+            sed -i 's|dl-cdn.alpinelinux.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apk/repositories 2>/dev/null || true
+          fi
+          $SUDO apk add --no-cache cmake make g++ \
+            || echo "WARN: 构建工具链安装失败(权限或网络)，继续尝试"
+        elif command -v dnf >/dev/null 2>&1; then
+          # Rocky/Fedora 用 dnf。镜像选型（实测）：
+          #   rocky   -> 中科大 USTC（TUNA 不镜像 Rocky；baseurl 含 $contentdir 要吃掉）
+          #   fedora  -> 阿里云 aliyun（USTC/TUNA 的 fedora 缺 Everything 仓库 404；
+          #              aliyun 路径无 /linux/ 层：/fedora/releases/40/...；
+          #              官方 baseurl 是 download.example 占位符，替换时吃 /pub/fedora/linux）
+          if [ "$(id -u)" = "0" ]; then
+            sed -i 's|^mirrorlist=|#mirrorlist=|g; s|^metalink=|#metalink=|g' /etc/yum.repos.d/*.repo 2>/dev/null || true
+            sed -i 's|^#baseurl=http://dl.rockylinux.org/\$contentdir|baseurl=https://mirrors.ustc.edu.cn/rocky|g; s|^#baseurl=http://download.example/pub/fedora/linux|baseurl=http://mirrors.aliyun.com/fedora|g; s|^baseurl=http://download.example/pub/fedora/linux|baseurl=http://mirrors.aliyun.com/fedora|g' /etc/yum.repos.d/*.repo 2>/dev/null || true
+          fi
+          $SUDO dnf install -y -q cmake make gcc-c++ \
+            || echo "WARN: 构建工具链安装失败(权限或网络)，继续尝试"
+        elif command -v yum >/dev/null 2>&1; then
+          $SUDO yum install -y cmake make gcc-c++ \
+            || echo "WARN: 构建工具链安装失败(权限或网络)，继续尝试"
+        else
+          echo "WARN: 未找到受支持的包管理器，跳过依赖安装"
+        fi
+      fi
+      cmake --version || echo "WARN: 本镜像无 cmake，需要编译的 job 会失败"
+
+# 构建作业模板
+# ============================================================
+# 多系统构建矩阵（由 scripts/gen-gitlab-ci.py 生成，改平台矩阵请改该脚本）
+# ------------------------------------------------------------
+# docker runner 运行 Linux 系镜像，原生构建的系统为：
+#   ubuntu-22.04 / ubuntu-24.04 / debian-12  —— Debian 系(apt, glibc, gcc 11/13/12)
+#   alpine-3.20                              —— Alpine(apk, musl libc)
+#   rockylinux-9 / fedora-40                 —— RHEL 系(dnf, glibc, gcc 11/14)
+# 另有两个交叉编译目标，在 docker runner 内用工具链构建（无需额外 OS runner）：
+#   windows  —— MinGW-w64 交叉编译（ubuntu 镜像装 mingw-w64，产出 lib/windows/Release）
+#   android  —— Android NDK 交叉编译（ubuntu 镜像装 NDK，产出 lib/android/Release，arm64-v8a）
+# 产物与发布包名均带「系统-架构-档位」标识（如 astroproject-ubuntu-22.04-x86_64-prod.tar.gz、
+# astroproject-ubuntu-22.04-x86_64-dev.tar.gz、astroproject-windows-x86_64-prod.tar.gz、
+# astroproject-android-aarch64-prod.tar.gz），档位 = dev/test/prod 区分开发/测试/生产构建；
+# 包内附 MANIFEST 说明系统名/版本/架构/libc/工具链/档位/优化档/加固/剥离/gcc/commit/构建时间，
+# 用户解包即可辨识来源与所用的编译优化。
+#
+# FreeBSD / macOS：CMakeLists 已完整支持(PLATFORM_DIR 分支)，但无法从 Linux 交叉编译，
+# 需对应 OS 的真实主机/runner（FreeBSD 机或 Mac），后续可在环境机挂 runner 扩展 —— 见 OPS-GUIDE §4.14。
+# ============================================================
+
+# ---- 构建模板：按平台 + 档位实例化（PLATFORM/BUILD_IMAGE/TIER/CMAKE_BUILD_TYPE/TIER_CFLAGS/DO_STRIP/COVERAGE 由 job variables 注入）----
+# 分档编译优化：dev=Debug(-O0 -g3) / test=RelWithDebInfo(-O2 -g --coverage) / prod=Release(-O3 -DNDEBUG)+加固+fat-LTO+剥离
 .build_template: &build_definition
   stage: build
-  before_script:
-    - |
-      # 检查并安装构建依赖 其中没有权限需要检查使用的Runner在哪个用户下运行看是否需要添加sudo权限安装依赖
-      if command -v apt-get >/dev/null 2>&1; then
-        # Debian/Ubuntu
-        sudo apt-get update
-        sudo apt-get install -y cmake g++ make
-      elif command -v yum >/dev/null 2>&1; then
-        # CentOS/RHEL
-        sudo yum install -y cmake gcc-c++ make
-      elif command -v dnf >/dev/null 2>&1; then
-        # Fedora
-        sudo dnf install -y cmake gcc-c++ make
-      elif command -v apk >/dev/null 2>&1; then
-        # Alpine
-        sudo apk update
-        sudo apk add --no-cache cmake g++ make
-      elif command -v pkg >/dev/null 2>&1; then
-        # FreeBSD
-        sudo pkg install -y cmake gmake gcc
-      elif command -v brew >/dev/null 2>&1; then
-        # macOS
-        brew install cmake
-      else
-        echo "Unsupported OS for automatic dependency installation"
-        exit 1
-      fi
-      # 验证CMake是否正确安装
-      cmake --version
+  image: ${BUILD_IMAGE}
   script:
-    - mkdir -p astroproject/${BUILD_DIR}
-    - cd astroproject/${BUILD_DIR}
-    - cmake ../ -DCMAKE_BUILD_TYPE=Release
-    - cmake --build .
-    - cp ../src/astro_lib.h lib/
-    - tar -czvf ${ARTIFACT_NAME} lib/*.a lib/astro_lib.h
-    - ls -alrt ${ARTIFACT_NAME}
+    - |
+      set -e
+      export ARTIFACT_NAME="astroproject-${PLATFORM}-${ARCH}-${TIER}.tar.gz"
+      echo ">>> [build:${TIER}] platform=${PLATFORM} os=${OS_NAME} ${OS_VERSION} arch=${ARCH} libc=${LIBC} cross=${CROSS}"
+      echo ">>> build_type=${CMAKE_BUILD_TYPE} cflags_base='${TIER_CFLAGS}' strip=${DO_STRIP} coverage=${COVERAGE}"
+
+      # ---- 交叉编译工具链（按需安装并注入 cmake 参数）----
+      EXTRA_CMAKE=""
+      if [ "${CROSS}" = "mingw" ]; then
+        echo ">>> 安装 MinGW-w64 交叉编译工具链 (x86_64-w64-mingw32)"
+        $SUDO apt-get update -qq
+        DEBIAN_FRONTEND=noninteractive $SUDO apt-get install -y -qq mingw-w64
+        export CC=x86_64-w64-mingw32-gcc
+        export CXX=x86_64-w64-mingw32-g++
+        # 2026-08-30 修复：不设 CMAKE_SYSTEM_NAME 时 CMake 在 Linux 宿主上不把 mingw 识别为
+        # Windows 目标（WIN32=FALSE）→ PLATFORM_DIR=linux、产物落 lib/linux 与打包目录不符
+        EXTRA_CMAKE="${EXTRA_CMAKE} -DCMAKE_SYSTEM_NAME=Windows"
+      elif [ "${CROSS}" = "android" ]; then
+        echo ">>> 安装 Android NDK 并配置 toolchain (arm64-v8a, API24)"
+        $SUDO apt-get update -qq
+        DEBIAN_FRONTEND=noninteractive $SUDO apt-get install -y -qq wget unzip
+        NDK_VER=r25b
+        wget -q "https://dl.google.com/android/repository/android-ndk-${NDK_VER}-linux.zip" -O /tmp/ndk.zip
+        unzip -q /tmp/ndk.zip -d /opt
+        export ANDROID_NDK_HOME=/opt/android-ndk-${NDK_VER}
+        export CC=${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/clang
+        export CXX=${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++
+        EXTRA_CMAKE="-DCMAKE_TOOLCHAIN_FILE=${ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-24"
+      fi
+
+      # ---- 分档编译优化：基于 TIER_CFLAGS + 档位开关，组装编译/链接标志 ----
+      # dev : 零优化+完整调试符号（TIER_CFLAGS 已含 -O0 -g3）
+      # test: 优化+调试符号+覆盖率插桩（TIER_CFLAGS 已含 --coverage）
+      # prod: 最高优化；原生 ELF 追加加固(-fstack-protector-strong/_FORTIFY_SOURCE/PIE)+fat-LTO+relro；交叉仅 -O3+剥离
+      EFF_CFLAGS="${TIER_CFLAGS}"
+      EFF_LDFLAGS=""
+      if [ "${COVERAGE}" = "yes" ]; then
+        EFF_LDFLAGS="${EFF_LDFLAGS} --coverage"
+      fi
+      if [ "${DO_STRIP}" = "yes" ]; then
+        if [ -z "${CROSS}" ]; then
+          # 原生 ELF：安全加固 + fat-LTO（消费者可选 LTO，且未开 -flto 也能正常链接）
+          # -ffat-lto-objects：同时产出 LTO 字节码与普通目标文件，
+          #   避免下游链接方未用 -flto 时因只剩 LTO 字节码而链接失败（分布式静态库关键坑）
+          EFF_CFLAGS="${EFF_CFLAGS} -ffat-lto-objects -D_FORTIFY_SOURCE=2 -fstack-protector-strong -fPIE"
+          EFF_LDFLAGS="${EFF_LDFLAGS} -ffat-lto-objects -Wl,-z,relro,-z,now"
+        fi
+        # 交叉编译：仅 -O3(已含) + 剥离，避免 LTO 对下游链接造成不确定性
+      fi
+      HARDENING="no"; [ "${DO_STRIP}" = "yes" ] && [ -z "${CROSS}" ] && HARDENING="yes"
+      SANITIZE="none"; [ "${COVERAGE}" = "yes" ] && SANITIZE="coverage"
+      echo ">>> 生效编译标志: ${EFF_CFLAGS}"
+      echo ">>> 生效链接标志: ${EFF_LDFLAGS}"
+
+      mkdir -p astroproject/${BUILD_DIR}
+      cd astroproject/${BUILD_DIR}
+      cmake ../ \
+        -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} \
+        -DCMAKE_C_FLAGS="${EFF_CFLAGS}" \
+        -DCMAKE_CXX_FLAGS="${EFF_CFLAGS}" \
+        -DCMAKE_EXE_LINKER_FLAGS="${EFF_LDFLAGS}" \
+        -DCMAKE_SHARED_LINKER_FLAGS="${EFF_LDFLAGS}" \
+        ${EXTRA_CMAKE}
+      # 并行构建（提速，其他相关优化之一）
+      cmake --build . --parallel "$(nproc 2>/dev/null || echo 2)"
+
+      # 打包：CMakeLists 按构建类型输出到 lib/${LIB_DIR}/<Debug|Release>
+      case "${CMAKE_BUILD_TYPE}" in
+        Debug) OUT_SUBDIR=Debug ;;
+        *)     OUT_SUBDIR=Release ;;
+      esac
+      mkdir -p pkg/lib pkg/include
+      cp ../lib/${LIB_DIR}/${OUT_SUBDIR}/*.a pkg/lib/
+      cp -r ../include/. pkg/include/
+
+      # prod：剥离调试符号（保留符号表，供链接用），减小体积
+      if [ "${DO_STRIP}" = "yes" ]; then
+        echo ">>> 剥离调试符号 (strip --strip-debug)"
+        find pkg/lib -name '*.a' -exec strip --strip-debug {} +
+      fi
+
+      # 生成 MANIFEST：用户解包即知系统/版本/架构/libc/工具链/优化档/来源
+      {
+        echo "PROJECT=astroproject"
+        echo "PLATFORM=${PLATFORM}"
+        echo "OS_NAME=${OS_NAME}"
+        echo "OS_VERSION=${OS_VERSION}"
+        echo "ARCH=${ARCH}"
+        if [ -z "${LIBC}" ]; then
+          if [ -f /etc/alpine-release ]; then LIBC=musl; else LIBC=glibc; fi
+        fi
+        echo "LIBC=${LIBC}"
+        echo "TOOLCHAIN=${CROSS:-native}"
+        echo "CHANNEL=${TIER}"
+        echo "ENVIRONMENT=${ENVIRONMENT}"
+        echo "BUILD_TYPE=${CMAKE_BUILD_TYPE}"
+        echo "OPT_FLAGS=${EFF_CFLAGS}"
+        echo "LINK_FLAGS=${EFF_LDFLAGS}"
+        echo "COVERAGE=${COVERAGE}"
+        echo "SANITIZE=${SANITIZE}"
+        echo "HARDENING=${HARDENING}"
+        echo "STRIPPED=${DO_STRIP}"
+        echo "GCC=$(${CC:-gcc} --version | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
+        echo "COMMIT=${CI_COMMIT_SHORT_SHA}"
+        echo "REF=${CI_COMMIT_REF_NAME}"
+        echo "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+      } > pkg/MANIFEST
+      tar -czvf ${ARTIFACT_NAME} -C pkg lib include MANIFEST
+      ls -l ${ARTIFACT_NAME}
+      # 清单(先写文件再 head，避免 tar|head 的 SIGPIPE 被 pipefail 判失败)
+      echo "打包内容清单(前 20 项):"
+      tar -tzf ${ARTIFACT_NAME} > /tmp/_pkg_list.txt
+      head -20 /tmp/_pkg_list.txt
+      echo "包内文件总数: $(wc -l < /tmp/_pkg_list.txt)"
+      # 回显 MANIFEST
+      echo "--- MANIFEST ---"
+      tar -xzf ${ARTIFACT_NAME} -O MANIFEST
   artifacts:
     paths:
-      - astroproject/${BUILD_DIR}/$ARTIFACT_NAME
+      - astroproject/${BUILD_DIR}/astroproject-*.tar.gz
     expire_in: 1 week
-    name: "astroproject-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHORT_SHA}"
+    name: "astroproject-${PLATFORM}-${TIER}-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHORT_SHA}"
 
-# 测试作业模板
-.test_template: &test_definition
-  stage: test
+# ---- 验证模板（质量门禁，按平台校验制品 + MANIFEST）----
+.verify_template: &verify_definition
+  stage: verify
+  image: gcc:12
+  before_script: []   # 仅校验制品，不需要 cmake
   script:
-    - mkdir -p astroproject/${BUILD_DIR}
-    - cd astroproject/${BUILD_DIR}
-    - cmake ../ -DCMAKE_BUILD_TYPE=Debug
-    - cmake --build .
-    - cd bin
-    - ./test_astro_lib_debugd
-    # 注意测试作业中名称不一样的 test_astro_lib_debugd 而不是 test_astro_lib_debug
-  artifacts:
-    reports:
-      junit: astroproject/${BUILD_DIR}/bin/test_results.xml
-    paths:
-      - astroproject/${BUILD_DIR}/bin/test_results.xml
-    expire_in: 1 week
-  allow_failure: false
-
-# 代码覆盖率测试模板
-.coverage_template: &coverage_definition
-  stage: test
-  before_script:
     - |
-      # 安装lcov工具以生成代码覆盖率报告
-      if command -v apt-get >/dev/null 2>&1; then
-        sudo apt-get update
-        sudo apt-get install -y lcov
-      elif command -v yum >/dev/null 2>&1; then
-        sudo yum install -y lcov
-      elif command -v dnf >/dev/null 2>&1; then
-        sudo dnf install -y lcov
-      elif command -v pkg >/dev/null 2>&1; then
-        sudo pkg install -y lcov
+      set -e
+      ARTIFACT=$(ls astroproject/${BUILD_DIR}/astroproject-${PLATFORM}-${ARCH}-${TIER}.tar.gz 2>/dev/null | head -1)
+      echo "== 校验 build 阶段产出(${PLATFORM} / tier=${TIER}) =="
+      test -n "$ARTIFACT" || { echo "FAIL: 未找到 ${PLATFORM} 平台制品 (期望 astroproject-${PLATFORM}-${ARCH}-${TIER}.tar.gz)"; exit 1; }
+      ls -l "$ARTIFACT"
+
+      rm -rf _verify && mkdir -p _verify
+      tar -xzf "$ARTIFACT" -C _verify
+
+      # 1) MANIFEST 必须存在且平台/档位标识正确
+      MF=$(find _verify -name MANIFEST | head -1)
+      test -n "$MF" || { echo "FAIL: 制品缺少 MANIFEST"; exit 1; }
+      grep -q "PLATFORM=${PLATFORM}" "$MF" || { echo "FAIL: MANIFEST 平台标识不符"; cat "$MF"; exit 1; }
+      grep -q "CHANNEL=${TIER}" "$MF" || { echo "FAIL: MANIFEST 档位(CHANNEL)不符，期望 ${TIER}"; cat "$MF"; exit 1; }
+      echo "MANIFEST: $(cat "$MF" | tr '\n' ';')"
+
+      # 2) 必须包含静态库，且非空
+      LIB=$(find _verify -name '*.a' | head -1)
+      test -n "$LIB" || { echo "FAIL: 制品中没有静态库(.a)"; exit 1; }
+      OBJCNT=$(ar t "$LIB" | wc -l)
+      echo "静态库: $LIB  目标文件数: $OBJCNT"
+      test "$OBJCNT" -gt 0 || { echo "FAIL: 静态库为空"; exit 1; }
+
+      # 3) 必须包含公开头文件
+      HDR=$(find _verify -name 'astrolog_lib.h' | head -1)
+      test -n "$HDR" || { echo "FAIL: 制品缺少公开头文件 astrolog_lib.h"; exit 1; }
+      echo "头文件: $HDR"
+
+      # 4) 覆盖率/单测：CMakeLists 未定义则跳过（非错误）
+      COVBIN=$(find _verify -name 'test_astro_lib_coverage' | head -1)
+      if [ -n "$COVBIN" ]; then
+        echo "发现覆盖率测试程序，执行中..."
+        "$COVBIN"
       else
-        echo "无法安装lcov，跳过代码覆盖率报告生成"
+        echo "注: 项目 CMakeLists 未定义覆盖率/单测目标，跳过（非错误）"
       fi
+
+      echo "VERIFY PASSED (${PLATFORM})"
+  allow_failure: false   # 质量门禁，不允许静默失败
+
+# 部署作业模板
+.deploy_template: &deploy_definition
+  stage: deploy
+  image: curlimages/curl:latest
+  before_script: []   # 发布产物不需要构建工具链
   script:
-    - mkdir -p astroproject/${BUILD_DIR}
-    - cd astroproject/${BUILD_DIR}
-    - cmake ../ -DCMAKE_BUILD_TYPE=Debug
-    - cmake --build .
-    - cd bin
     - |
-      if [ -f "./test_astro_lib_coverage" ]; then
-        echo "运行代码覆盖率测试..."
-        ./test_astro_lib_coverage
-        lcov --capture --directory . --output-file coverage.info
-        genhtml coverage.info --output-directory ../../coverage-report
-      else
-        echo "未找到代码覆盖率测试程序，跳过代码覆盖率测试"
-      fi
-  artifacts:
-    reports:
-      junit: astroproject/${BUILD_DIR}/bin/test_results.xml
-    paths:
-      - astroproject/${BUILD_DIR}/bin/test_results.xml
-      - coverage-report/
-    expire_in: 1 week
-  allow_failure: true
+      set -e
+      export ARTIFACT_NAME="astroproject-${PLATFORM}-${ARCH}-${TIER}.tar.gz"
+      # 适配说明：docker executor 的容器是临时的，原设计"解压到 runner 本机 $HOME"
+      # 在容器里没有意义（job 结束即销毁）。改为发布到 GitLab Generic Package
+      # Registry 做持久化保存；包名带系统标识（astroproject-ubuntu-22.04 等），
+      # 文件名带档位(-dev/-test/-prod)，用户可在 Packages 页面按系统/版本/档位辨识下载。
+      ARTIFACT="astroproject/${BUILD_DIR}/${ARTIFACT_NAME}"
+      test -f "$ARTIFACT" || { echo "FAIL: 未找到制品 $ARTIFACT"; exit 1; }
+      # 版本：tag 触发用 tag 本身（如 v0.2.0），否则用 环境前缀-短SHA（development-/testing-/production-）
+      PACKAGE_VERSION="${CI_COMMIT_TAG:-${ENVIRONMENT}-${CI_COMMIT_SHORT_SHA}}"
+      echo "Publishing ${PLATFORM} (${TIER}) -> packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/${ARTIFACT_NAME}"
+      curl --fail --silent --show-error \
+        --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+        --upload-file "$ARTIFACT" \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/${ARTIFACT_NAME}"
+      echo "Published OK: ${ARTIFACT_NAME}"
+  # 注：GitLab 19.2 有 bug —— deploy 阶段 job 带 environment 会导致 script 校验失败，
+  #     故本平台统一不在 deploy job 上使用 environment 关键字。
 
-# 开发环境构建
-build_dev:
-  <<: *build_definition
-  variables:
-    <<: *variables_definition
-    ENVIRONMENT: "development"
-  tags:
-    - FreeBSD14.3
-    - Dev
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"  
-    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
-  environment:
-    name: "development"
 
-# 测试环境构建
-build_test:
-  <<: *build_definition
-  variables:
-    <<: *variables_definition
-    ENVIRONMENT: "testing"
-  tags:
-    - FreeBSD14.3
-    - ProdTest
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
-    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
-  environment:
-    name: "testing"
-
-# 生产环境构建
-build_prod:
-  <<: *build_definition
-  variables:
-    <<: *variables_definition
-    ENVIRONMENT: "production"
-  tags:
-    - FreeBSD14.3
-    - Prod
-  rules:
-    - if: $CI_COMMIT_TAG
-    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
-    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
-  environment:
-    name: "production"
-
-# 开发环境单元测试（含代码覆盖率）
-unit_test_dev:
-  <<: *coverage_definition
-  tags:
-    - FreeBSD14.3
-    - Dev
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
-    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
-  environment:
-    name: "development"
-
-# 测试环境单元测试
-unit_test_test:
-  <<: *test_definition
-  tags:
-    - FreeBSD14.3
-    - ProdTest
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
-    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
-  environment:
-    name: "testing"
-
-# 生产环境单元测试
-unit_test_prod:
-  <<: *test_definition
-  tags:
-    - FreeBSD14.3
-    - Prod
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
-    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
-  environment:
-    name: "production"
-
-# 在新建一个合并请求的时候，自动生成合并请求页面概览和描述
+# ============================================================
+# 协作自动化（prepare 阶段）
+# ============================================================
 gene_mrdesc:
-  stage: build
+  stage: prepare   # 原为 build，语义不符：这是协作自动化，不是构建
   image: curlimages/curl:latest
   before_script:
     - 'echo "Current directory: $(pwd)"'
     - 'echo "HOME directory: $HOME"'
     - 'echo "CI_PROJECT_DIR: $CI_PROJECT_DIR"'
     - 'echo "Checking and installing required tools..."'
-    - if ! command -v jq &> /dev/null; then echo "jq not found, attempting to install..."; if command -v apk &> /dev/null; then sudo apk add --no-cache jq; elif command -v apt-get &> /dev/null; then sudo apt-get update && sudo apt-get install -y jq; elif command -v yum &> /dev/null; then sudo yum install -y jq; elif command -v dnf &> /dev/null; then sudo dnf install -y jq; elif command -v pkg &> /dev/null; then sudo pkg install -y jq; elif command -v zypper &> /dev/null; then sudo zypper install -y jq; else echo "Package manager not found. Please install jq manually."; exit 1; fi; else echo "jq is already installed"; jq --version; fi
-    - if ! command -v bash &> /dev/null; then echo "bash not found, attempting to install..."; if command -v apk &> /dev/null; then sudo apk add --no-cache bash; elif command -v apt-get &> /dev/null; then sudo apt-get update && sudo apt-get install -y bash; elif command -v yum &> /dev/null; then sudo yum install -y bash; elif command -v dnf &> /dev/null; then sudo dnf install -y bash; elif command -v pkg &> /dev/null; then sudo pkg install -y bash; elif command -v zypper &> /dev/null; then sudo zypper install -y bash; else echo "Package manager not found. Please install bash manually."; exit 1; fi; else echo "bash is already installed"; bash --version; fi
+    - if ! command -v jq &> /dev/null; then echo "jq not found, attempting to install..."; if command -v apk &> /dev/null; then apk add --no-cache jq; elif command -v apt-get &> /dev/null; then apt-get update && apt-get install -y jq; elif command -v yum &> /dev/null; then yum install -y jq; elif command -v dnf &> /dev/null; then dnf install -y jq; elif command -v pkg &> /dev/null; then pkg install -y jq; elif command -v zypper &> /dev/null; then zypper install -y jq; else echo "Package manager not found. Please install jq manually."; exit 1; fi; else echo "jq is already installed"; jq --version; fi
+    - if ! command -v bash &> /dev/null; then echo "bash not found, attempting to install..."; if command -v apk &> /dev/null; then apk add --no-cache bash; elif command -v apt-get &> /dev/null; then apt-get update && apt-get install -y bash; elif command -v yum &> /dev/null; then yum install -y bash; elif command -v dnf &> /dev/null; then dnf install -y bash; elif command -v pkg &> /dev/null; then pkg install -y bash; elif command -v zypper &> /dev/null; then zypper install -y bash; else echo "Package manager not found. Please install bash manually."; exit 1; fi; else echo "bash is already installed"; bash --version; fi
   script:
     - 'echo "正在为合并请求生成描述内容..."'
     - pwd
@@ -223,22 +353,19 @@ gene_mrdesc:
     - chmod +x "$PROJECT_DIR/scripts/add_mr_note.sh"
     - /usr/local/bin/bash "$PROJECT_DIR/scripts/generate_mr_description.sh"
   tags:
-    - FreeBSD14.3
+    - docker
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   variables:
-    # 注意在GitlabCE中设置好个人访问令牌后立马复制，并在添加PERSONAL_ACCESS_TOKEN时注意受保护选择是否勾选，类似于 create_release 作业
     GITLAB_TOKEN: $PERSONAL_ACCESS_TOKEN
-
 
 # 当点击合并，合并代码成功后会提交到目标分支，触发deploy 作业，并添加注释
 add_mr_note:
-  stage: deploy
+  stage: prepare   # 原为 deploy，语义不符：这是 MR 通知，不是部署
   script:
     - 'echo "正在为合并请求添加注释..."'
     - PROJECT_DIR="$HOME/$CI_PROJECT_DIR"
     - 'echo "Project directory: $PROJECT_DIR"'
-    # 提取合并请求 IID ，基于合并请求，在点击合并时会生成一个提交，提交信息CI_COMMIT_MESSAGE中包含合并请求的 IID，详情可以在GitlabCE页面项目中“提交”下查看，生成的CI_COMMIT_MESSAGE
     - |
       if echo "$CI_COMMIT_MESSAGE" | grep -q "See merge request"; then
         MR_IID=$(echo "$CI_COMMIT_MESSAGE" | grep "See merge request" | grep -o "!.*" | sed 's/!//')
@@ -249,151 +376,1482 @@ add_mr_note:
     - chmod +x "$PROJECT_DIR/scripts/add_mr_note.sh"
     - bash "$PROJECT_DIR/scripts/add_mr_note.sh" "$MR_IID"
   tags:
-    - FreeBSD14.3
+    - docker
   rules:
-    # 在 develop 分支上推送时运行（合并到 develop）
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_MESSAGE =~ /^Merge branch.*/
-    # 在 test 分支上推送时运行（合并到 test）
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test" && $CI_COMMIT_MESSAGE =~ /^Merge branch.*/
-    # 在 main 分支上推送时运行（合并到 main）
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main" && $CI_COMMIT_MESSAGE =~ /^Merge branch.*/
   variables:
-    # 注意在GitlabCE中设置好个人访问令牌后立马复制，并在添加PERSONAL_ACCESS_TOKEN时注意受保护选择是否勾选，类似于 create_release 作业
     GITLAB_TOKEN: $PERSONAL_ACCESS_TOKEN
 
-# 部署作业模板
-.deploy_template: &deploy_definition
-  stage: deploy
-  script:
-    - echo "Deploying to ${ENVIRONMENT} environment"
-    - echo "Extracting artifact to user home directory..."
-    - |
-      # Create directory in user home
-      mkdir -p $HOME/app/astroproject
-      # Extract artifact to user home directory
-      tar -xzvf astroproject/${BUILD_DIR}/${ARTIFACT_NAME} -C $HOME/app/astroproject
-      echo "Static libraries and headers extracted to $HOME/app/astroproject"
-    - echo "Deployment completed successfully."
-  environment:
-    name: "${ENVIRONMENT}"
+# ============================================================
+# 开发环境（develop 分支）—— 全系统矩阵
+# ============================================================
 
-# 开发环境部署
-deploy_to_dev:
-  <<: *deploy_definition
-  needs:
-    - job: build_dev
-      artifacts: true
-    - job: unit_test_dev
-      artifacts: true
+build_dev_ubuntu_22_04:
+  <<: *build_definition
   variables:
+    BUILD_DIR: "build"
+    PLATFORM: "ubuntu-22.04"
+    OS_NAME: "Ubuntu"
+    OS_VERSION: "22.04"
+    BUILD_IMAGE: "ubuntu:22.04"
     ENVIRONMENT: "development"
+    TIER: "dev"
+    ARCH: "x86_64"
+    LIB_DIR: "linux"
+    LIBC: ""
+    CROSS: ""
+    CMAKE_BUILD_TYPE: "Debug"
+    TIER_CFLAGS: "-O0 -g3 -fno-omit-frame-pointer"
+    DO_STRIP: "no"
+    COVERAGE: "no"
   tags:
-    - FreeBSD14.3
-    - Dev
+    - docker
   rules:
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
-  environment:
-    name: "development"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
 
-# 测试环境部署
-deploy_to_test:
-  <<: *deploy_definition
-  needs:
-    - job: build_test
-      artifacts: true
-    - job: unit_test_test
-      artifacts: true
+build_dev_ubuntu_24_04:
+  <<: *build_definition
   variables:
-    ENVIRONMENT: "testing"
+    BUILD_DIR: "build"
+    PLATFORM: "ubuntu-24.04"
+    OS_NAME: "Ubuntu"
+    OS_VERSION: "24.04"
+    BUILD_IMAGE: "ubuntu:24.04"
+    ENVIRONMENT: "development"
+    TIER: "dev"
+    ARCH: "x86_64"
+    LIB_DIR: "linux"
+    LIBC: ""
+    CROSS: ""
+    CMAKE_BUILD_TYPE: "Debug"
+    TIER_CFLAGS: "-O0 -g3 -fno-omit-frame-pointer"
+    DO_STRIP: "no"
+    COVERAGE: "no"
   tags:
-    - FreeBSD14.3
-    - ProdTest
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
+
+build_dev_debian_12:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "debian-12"
+    OS_NAME: "Debian"
+    OS_VERSION: "12"
+    BUILD_IMAGE: "debian:12"
+    ENVIRONMENT: "development"
+    TIER: "dev"
+    ARCH: "x86_64"
+    LIB_DIR: "linux"
+    LIBC: ""
+    CROSS: ""
+    CMAKE_BUILD_TYPE: "Debug"
+    TIER_CFLAGS: "-O0 -g3 -fno-omit-frame-pointer"
+    DO_STRIP: "no"
+    COVERAGE: "no"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
+
+build_dev_alpine_3_20:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "alpine-3.20"
+    OS_NAME: "Alpine"
+    OS_VERSION: "3.20"
+    BUILD_IMAGE: "alpine:3.20"
+    ENVIRONMENT: "development"
+    TIER: "dev"
+    ARCH: "x86_64"
+    LIB_DIR: "linux"
+    LIBC: ""
+    CROSS: ""
+    CMAKE_BUILD_TYPE: "Debug"
+    TIER_CFLAGS: "-O0 -g3 -fno-omit-frame-pointer"
+    DO_STRIP: "no"
+    COVERAGE: "no"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
+
+build_dev_rockylinux_9:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "rockylinux-9"
+    OS_NAME: "Rocky Linux"
+    OS_VERSION: "9"
+    BUILD_IMAGE: "rockylinux:9"
+    ENVIRONMENT: "development"
+    TIER: "dev"
+    ARCH: "x86_64"
+    LIB_DIR: "linux"
+    LIBC: ""
+    CROSS: ""
+    CMAKE_BUILD_TYPE: "Debug"
+    TIER_CFLAGS: "-O0 -g3 -fno-omit-frame-pointer"
+    DO_STRIP: "no"
+    COVERAGE: "no"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
+
+build_dev_fedora_40:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "fedora-40"
+    OS_NAME: "Fedora"
+    OS_VERSION: "40"
+    BUILD_IMAGE: "fedora:40"
+    ENVIRONMENT: "development"
+    TIER: "dev"
+    ARCH: "x86_64"
+    LIB_DIR: "linux"
+    LIBC: ""
+    CROSS: ""
+    CMAKE_BUILD_TYPE: "Debug"
+    TIER_CFLAGS: "-O0 -g3 -fno-omit-frame-pointer"
+    DO_STRIP: "no"
+    COVERAGE: "no"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
+
+build_dev_windows:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "windows"
+    OS_NAME: "Windows"
+    OS_VERSION: "10"
+    BUILD_IMAGE: "ubuntu:22.04"
+    ENVIRONMENT: "development"
+    TIER: "dev"
+    ARCH: "x86_64"
+    LIB_DIR: "windows"
+    LIBC: "mingw-w64"
+    CROSS: "mingw"
+    CMAKE_BUILD_TYPE: "Debug"
+    TIER_CFLAGS: "-O0 -g3 -fno-omit-frame-pointer"
+    DO_STRIP: "no"
+    COVERAGE: "no"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
+
+build_dev_android:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "android"
+    OS_NAME: "Android"
+    OS_VERSION: "API24"
+    BUILD_IMAGE: "ubuntu:22.04"
+    ENVIRONMENT: "development"
+    TIER: "dev"
+    ARCH: "aarch64"
+    LIB_DIR: "android"
+    LIBC: "bionic"
+    CROSS: "android"
+    CMAKE_BUILD_TYPE: "Debug"
+    TIER_CFLAGS: "-O0 -g3 -fno-omit-frame-pointer"
+    DO_STRIP: "no"
+    COVERAGE: "no"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
+
+build_test_ubuntu_22_04:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "ubuntu-22.04"
+    OS_NAME: "Ubuntu"
+    OS_VERSION: "22.04"
+    BUILD_IMAGE: "ubuntu:22.04"
+    ENVIRONMENT: "testing"
+    TIER: "test"
+    ARCH: "x86_64"
+    LIB_DIR: "linux"
+    LIBC: ""
+    CROSS: ""
+    CMAKE_BUILD_TYPE: "RelWithDebInfo"
+    TIER_CFLAGS: "-O2 -g2 -fno-omit-frame-pointer --coverage"
+    DO_STRIP: "no"
+    COVERAGE: "yes"
+  tags:
+    - docker
   rules:
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
-  environment:
-    name: "testing"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
 
-# 生产环境部署
-deploy_to_prod:
-  <<: *deploy_definition
-  needs:
-    - job: build_prod
-      artifacts: true
-    - job: unit_test_prod
-      artifacts: true
+build_test_ubuntu_24_04:
+  <<: *build_definition
   variables:
-    ENVIRONMENT: "production"
+    BUILD_DIR: "build"
+    PLATFORM: "ubuntu-24.04"
+    OS_NAME: "Ubuntu"
+    OS_VERSION: "24.04"
+    BUILD_IMAGE: "ubuntu:24.04"
+    ENVIRONMENT: "testing"
+    TIER: "test"
+    ARCH: "x86_64"
+    LIB_DIR: "linux"
+    LIBC: ""
+    CROSS: ""
+    CMAKE_BUILD_TYPE: "RelWithDebInfo"
+    TIER_CFLAGS: "-O2 -g2 -fno-omit-frame-pointer --coverage"
+    DO_STRIP: "no"
+    COVERAGE: "yes"
   tags:
-    - FreeBSD14.3
-    - Prod
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
+
+build_test_debian_12:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "debian-12"
+    OS_NAME: "Debian"
+    OS_VERSION: "12"
+    BUILD_IMAGE: "debian:12"
+    ENVIRONMENT: "testing"
+    TIER: "test"
+    ARCH: "x86_64"
+    LIB_DIR: "linux"
+    LIBC: ""
+    CROSS: ""
+    CMAKE_BUILD_TYPE: "RelWithDebInfo"
+    TIER_CFLAGS: "-O2 -g2 -fno-omit-frame-pointer --coverage"
+    DO_STRIP: "no"
+    COVERAGE: "yes"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
+
+build_test_alpine_3_20:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "alpine-3.20"
+    OS_NAME: "Alpine"
+    OS_VERSION: "3.20"
+    BUILD_IMAGE: "alpine:3.20"
+    ENVIRONMENT: "testing"
+    TIER: "test"
+    ARCH: "x86_64"
+    LIB_DIR: "linux"
+    LIBC: ""
+    CROSS: ""
+    CMAKE_BUILD_TYPE: "RelWithDebInfo"
+    TIER_CFLAGS: "-O2 -g2 -fno-omit-frame-pointer --coverage"
+    DO_STRIP: "no"
+    COVERAGE: "yes"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
+
+build_test_rockylinux_9:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "rockylinux-9"
+    OS_NAME: "Rocky Linux"
+    OS_VERSION: "9"
+    BUILD_IMAGE: "rockylinux:9"
+    ENVIRONMENT: "testing"
+    TIER: "test"
+    ARCH: "x86_64"
+    LIB_DIR: "linux"
+    LIBC: ""
+    CROSS: ""
+    CMAKE_BUILD_TYPE: "RelWithDebInfo"
+    TIER_CFLAGS: "-O2 -g2 -fno-omit-frame-pointer --coverage"
+    DO_STRIP: "no"
+    COVERAGE: "yes"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
+
+build_test_fedora_40:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "fedora-40"
+    OS_NAME: "Fedora"
+    OS_VERSION: "40"
+    BUILD_IMAGE: "fedora:40"
+    ENVIRONMENT: "testing"
+    TIER: "test"
+    ARCH: "x86_64"
+    LIB_DIR: "linux"
+    LIBC: ""
+    CROSS: ""
+    CMAKE_BUILD_TYPE: "RelWithDebInfo"
+    TIER_CFLAGS: "-O2 -g2 -fno-omit-frame-pointer --coverage"
+    DO_STRIP: "no"
+    COVERAGE: "yes"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
+
+build_test_windows:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "windows"
+    OS_NAME: "Windows"
+    OS_VERSION: "10"
+    BUILD_IMAGE: "ubuntu:22.04"
+    ENVIRONMENT: "testing"
+    TIER: "test"
+    ARCH: "x86_64"
+    LIB_DIR: "windows"
+    LIBC: "mingw-w64"
+    CROSS: "mingw"
+    CMAKE_BUILD_TYPE: "RelWithDebInfo"
+    TIER_CFLAGS: "-O2 -g2 -fno-omit-frame-pointer --coverage"
+    DO_STRIP: "no"
+    COVERAGE: "yes"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
+
+build_test_android:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "android"
+    OS_NAME: "Android"
+    OS_VERSION: "API24"
+    BUILD_IMAGE: "ubuntu:22.04"
+    ENVIRONMENT: "testing"
+    TIER: "test"
+    ARCH: "aarch64"
+    LIB_DIR: "android"
+    LIBC: "bionic"
+    CROSS: "android"
+    CMAKE_BUILD_TYPE: "RelWithDebInfo"
+    TIER_CFLAGS: "-O2 -g2 -fno-omit-frame-pointer --coverage"
+    DO_STRIP: "no"
+    COVERAGE: "yes"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
+
+build_prod_ubuntu_22_04:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "ubuntu-22.04"
+    OS_NAME: "Ubuntu"
+    OS_VERSION: "22.04"
+    BUILD_IMAGE: "ubuntu:22.04"
+    ENVIRONMENT: "production"
+    TIER: "prod"
+    ARCH: "x86_64"
+    LIB_DIR: "linux"
+    LIBC: ""
+    CROSS: ""
+    CMAKE_BUILD_TYPE: "Release"
+    TIER_CFLAGS: "-O3 -DNDEBUG"
+    DO_STRIP: "yes"
+    COVERAGE: "no"
+  tags:
+    - docker
   rules:
     - if: $CI_COMMIT_TAG
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
-  environment:
-    name: "production"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
 
-# 创建 Release 并上传构建产物
+build_prod_ubuntu_24_04:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "ubuntu-24.04"
+    OS_NAME: "Ubuntu"
+    OS_VERSION: "24.04"
+    BUILD_IMAGE: "ubuntu:24.04"
+    ENVIRONMENT: "production"
+    TIER: "prod"
+    ARCH: "x86_64"
+    LIB_DIR: "linux"
+    LIBC: ""
+    CROSS: ""
+    CMAKE_BUILD_TYPE: "Release"
+    TIER_CFLAGS: "-O3 -DNDEBUG"
+    DO_STRIP: "yes"
+    COVERAGE: "no"
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+
+build_prod_debian_12:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "debian-12"
+    OS_NAME: "Debian"
+    OS_VERSION: "12"
+    BUILD_IMAGE: "debian:12"
+    ENVIRONMENT: "production"
+    TIER: "prod"
+    ARCH: "x86_64"
+    LIB_DIR: "linux"
+    LIBC: ""
+    CROSS: ""
+    CMAKE_BUILD_TYPE: "Release"
+    TIER_CFLAGS: "-O3 -DNDEBUG"
+    DO_STRIP: "yes"
+    COVERAGE: "no"
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+
+build_prod_alpine_3_20:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "alpine-3.20"
+    OS_NAME: "Alpine"
+    OS_VERSION: "3.20"
+    BUILD_IMAGE: "alpine:3.20"
+    ENVIRONMENT: "production"
+    TIER: "prod"
+    ARCH: "x86_64"
+    LIB_DIR: "linux"
+    LIBC: ""
+    CROSS: ""
+    CMAKE_BUILD_TYPE: "Release"
+    TIER_CFLAGS: "-O3 -DNDEBUG"
+    DO_STRIP: "yes"
+    COVERAGE: "no"
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+
+build_prod_rockylinux_9:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "rockylinux-9"
+    OS_NAME: "Rocky Linux"
+    OS_VERSION: "9"
+    BUILD_IMAGE: "rockylinux:9"
+    ENVIRONMENT: "production"
+    TIER: "prod"
+    ARCH: "x86_64"
+    LIB_DIR: "linux"
+    LIBC: ""
+    CROSS: ""
+    CMAKE_BUILD_TYPE: "Release"
+    TIER_CFLAGS: "-O3 -DNDEBUG"
+    DO_STRIP: "yes"
+    COVERAGE: "no"
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+
+build_prod_fedora_40:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "fedora-40"
+    OS_NAME: "Fedora"
+    OS_VERSION: "40"
+    BUILD_IMAGE: "fedora:40"
+    ENVIRONMENT: "production"
+    TIER: "prod"
+    ARCH: "x86_64"
+    LIB_DIR: "linux"
+    LIBC: ""
+    CROSS: ""
+    CMAKE_BUILD_TYPE: "Release"
+    TIER_CFLAGS: "-O3 -DNDEBUG"
+    DO_STRIP: "yes"
+    COVERAGE: "no"
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+
+build_prod_windows:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "windows"
+    OS_NAME: "Windows"
+    OS_VERSION: "10"
+    BUILD_IMAGE: "ubuntu:22.04"
+    ENVIRONMENT: "production"
+    TIER: "prod"
+    ARCH: "x86_64"
+    LIB_DIR: "windows"
+    LIBC: "mingw-w64"
+    CROSS: "mingw"
+    CMAKE_BUILD_TYPE: "Release"
+    TIER_CFLAGS: "-O3 -DNDEBUG"
+    DO_STRIP: "yes"
+    COVERAGE: "no"
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+
+build_prod_android:
+  <<: *build_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "android"
+    OS_NAME: "Android"
+    OS_VERSION: "API24"
+    BUILD_IMAGE: "ubuntu:22.04"
+    ENVIRONMENT: "production"
+    TIER: "prod"
+    ARCH: "aarch64"
+    LIB_DIR: "android"
+    LIBC: "bionic"
+    CROSS: "android"
+    CMAKE_BUILD_TYPE: "Release"
+    TIER_CFLAGS: "-O3 -DNDEBUG"
+    DO_STRIP: "yes"
+    COVERAGE: "no"
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+
+
+# ============================================================
+# 验证（质量门禁）—— 全系统矩阵
+# ============================================================
+
+verify_dev_ubuntu_22_04:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "ubuntu-22.04"
+    TIER: "dev"
+    ARCH: "x86_64"
+  needs:
+    - job: build_dev_ubuntu_22_04
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
+
+verify_dev_ubuntu_24_04:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "ubuntu-24.04"
+    TIER: "dev"
+    ARCH: "x86_64"
+  needs:
+    - job: build_dev_ubuntu_24_04
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
+
+verify_dev_debian_12:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "debian-12"
+    TIER: "dev"
+    ARCH: "x86_64"
+  needs:
+    - job: build_dev_debian_12
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
+
+verify_dev_alpine_3_20:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "alpine-3.20"
+    TIER: "dev"
+    ARCH: "x86_64"
+  needs:
+    - job: build_dev_alpine_3_20
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
+
+verify_dev_rockylinux_9:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "rockylinux-9"
+    TIER: "dev"
+    ARCH: "x86_64"
+  needs:
+    - job: build_dev_rockylinux_9
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
+
+verify_dev_fedora_40:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "fedora-40"
+    TIER: "dev"
+    ARCH: "x86_64"
+  needs:
+    - job: build_dev_fedora_40
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
+
+verify_dev_windows:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "windows"
+    TIER: "dev"
+    ARCH: "x86_64"
+  needs:
+    - job: build_dev_windows
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
+
+verify_dev_android:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "android"
+    TIER: "dev"
+    ARCH: "aarch64"
+  needs:
+    - job: build_dev_android
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"
+
+verify_test_ubuntu_22_04:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "ubuntu-22.04"
+    TIER: "test"
+    ARCH: "x86_64"
+  needs:
+    - job: build_test_ubuntu_22_04
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
+
+verify_test_ubuntu_24_04:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "ubuntu-24.04"
+    TIER: "test"
+    ARCH: "x86_64"
+  needs:
+    - job: build_test_ubuntu_24_04
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
+
+verify_test_debian_12:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "debian-12"
+    TIER: "test"
+    ARCH: "x86_64"
+  needs:
+    - job: build_test_debian_12
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
+
+verify_test_alpine_3_20:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "alpine-3.20"
+    TIER: "test"
+    ARCH: "x86_64"
+  needs:
+    - job: build_test_alpine_3_20
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
+
+verify_test_rockylinux_9:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "rockylinux-9"
+    TIER: "test"
+    ARCH: "x86_64"
+  needs:
+    - job: build_test_rockylinux_9
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
+
+verify_test_fedora_40:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "fedora-40"
+    TIER: "test"
+    ARCH: "x86_64"
+  needs:
+    - job: build_test_fedora_40
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
+
+verify_test_windows:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "windows"
+    TIER: "test"
+    ARCH: "x86_64"
+  needs:
+    - job: build_test_windows
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
+
+verify_test_android:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "android"
+    TIER: "test"
+    ARCH: "aarch64"
+  needs:
+    - job: build_test_android
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "test"
+
+verify_prod_ubuntu_22_04:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "ubuntu-22.04"
+    TIER: "prod"
+    ARCH: "x86_64"
+  needs:
+    - job: build_prod_ubuntu_22_04
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+
+verify_prod_ubuntu_24_04:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "ubuntu-24.04"
+    TIER: "prod"
+    ARCH: "x86_64"
+  needs:
+    - job: build_prod_ubuntu_24_04
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+
+verify_prod_debian_12:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "debian-12"
+    TIER: "prod"
+    ARCH: "x86_64"
+  needs:
+    - job: build_prod_debian_12
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+
+verify_prod_alpine_3_20:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "alpine-3.20"
+    TIER: "prod"
+    ARCH: "x86_64"
+  needs:
+    - job: build_prod_alpine_3_20
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+
+verify_prod_rockylinux_9:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "rockylinux-9"
+    TIER: "prod"
+    ARCH: "x86_64"
+  needs:
+    - job: build_prod_rockylinux_9
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+
+verify_prod_fedora_40:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "fedora-40"
+    TIER: "prod"
+    ARCH: "x86_64"
+  needs:
+    - job: build_prod_fedora_40
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+
+verify_prod_windows:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "windows"
+    TIER: "prod"
+    ARCH: "x86_64"
+  needs:
+    - job: build_prod_windows
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+
+verify_prod_android:
+  <<: *verify_definition
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "android"
+    TIER: "prod"
+    ARCH: "aarch64"
+  needs:
+    - job: build_prod_android
+      artifacts: true
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+    - if: ($CI_PIPELINE_SOURCE == "merge_request_event" || $CI_MERGE_REQUEST_ID ) && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+
+
+# ============================================================
+# 部署（按环境发布）—— 全系统矩阵
+# ============================================================
+
+deploy_to_dev_ubuntu_22_04:
+  <<: *deploy_definition
+  needs:
+    - job: build_dev_ubuntu_22_04
+      artifacts: true
+    - job: verify_dev_ubuntu_22_04
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "ubuntu-22.04"
+    PACKAGE_NAME: "astroproject-ubuntu-22.04"
+    ENVIRONMENT: "development"
+    TIER: "dev"
+    ARCH: "x86_64"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+
+deploy_to_dev_ubuntu_24_04:
+  <<: *deploy_definition
+  needs:
+    - job: build_dev_ubuntu_24_04
+      artifacts: true
+    - job: verify_dev_ubuntu_24_04
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "ubuntu-24.04"
+    PACKAGE_NAME: "astroproject-ubuntu-24.04"
+    ENVIRONMENT: "development"
+    TIER: "dev"
+    ARCH: "x86_64"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+
+deploy_to_dev_debian_12:
+  <<: *deploy_definition
+  needs:
+    - job: build_dev_debian_12
+      artifacts: true
+    - job: verify_dev_debian_12
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "debian-12"
+    PACKAGE_NAME: "astroproject-debian-12"
+    ENVIRONMENT: "development"
+    TIER: "dev"
+    ARCH: "x86_64"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+
+deploy_to_dev_alpine_3_20:
+  <<: *deploy_definition
+  needs:
+    - job: build_dev_alpine_3_20
+      artifacts: true
+    - job: verify_dev_alpine_3_20
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "alpine-3.20"
+    PACKAGE_NAME: "astroproject-alpine-3.20"
+    ENVIRONMENT: "development"
+    TIER: "dev"
+    ARCH: "x86_64"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+
+deploy_to_dev_rockylinux_9:
+  <<: *deploy_definition
+  needs:
+    - job: build_dev_rockylinux_9
+      artifacts: true
+    - job: verify_dev_rockylinux_9
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "rockylinux-9"
+    PACKAGE_NAME: "astroproject-rockylinux-9"
+    ENVIRONMENT: "development"
+    TIER: "dev"
+    ARCH: "x86_64"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+
+deploy_to_dev_fedora_40:
+  <<: *deploy_definition
+  needs:
+    - job: build_dev_fedora_40
+      artifacts: true
+    - job: verify_dev_fedora_40
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "fedora-40"
+    PACKAGE_NAME: "astroproject-fedora-40"
+    ENVIRONMENT: "development"
+    TIER: "dev"
+    ARCH: "x86_64"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+
+deploy_to_dev_windows:
+  <<: *deploy_definition
+  needs:
+    - job: build_dev_windows
+      artifacts: true
+    - job: verify_dev_windows
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "windows"
+    PACKAGE_NAME: "astroproject-windows"
+    ENVIRONMENT: "development"
+    TIER: "dev"
+    ARCH: "x86_64"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+
+deploy_to_dev_android:
+  <<: *deploy_definition
+  needs:
+    - job: build_dev_android
+      artifacts: true
+    - job: verify_dev_android
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "android"
+    PACKAGE_NAME: "astroproject-android"
+    ENVIRONMENT: "development"
+    TIER: "dev"
+    ARCH: "aarch64"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+
+deploy_to_test_ubuntu_22_04:
+  <<: *deploy_definition
+  needs:
+    - job: build_test_ubuntu_22_04
+      artifacts: true
+    - job: verify_test_ubuntu_22_04
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "ubuntu-22.04"
+    PACKAGE_NAME: "astroproject-ubuntu-22.04"
+    ENVIRONMENT: "testing"
+    TIER: "test"
+    ARCH: "x86_64"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+
+deploy_to_test_ubuntu_24_04:
+  <<: *deploy_definition
+  needs:
+    - job: build_test_ubuntu_24_04
+      artifacts: true
+    - job: verify_test_ubuntu_24_04
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "ubuntu-24.04"
+    PACKAGE_NAME: "astroproject-ubuntu-24.04"
+    ENVIRONMENT: "testing"
+    TIER: "test"
+    ARCH: "x86_64"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+
+deploy_to_test_debian_12:
+  <<: *deploy_definition
+  needs:
+    - job: build_test_debian_12
+      artifacts: true
+    - job: verify_test_debian_12
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "debian-12"
+    PACKAGE_NAME: "astroproject-debian-12"
+    ENVIRONMENT: "testing"
+    TIER: "test"
+    ARCH: "x86_64"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+
+deploy_to_test_alpine_3_20:
+  <<: *deploy_definition
+  needs:
+    - job: build_test_alpine_3_20
+      artifacts: true
+    - job: verify_test_alpine_3_20
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "alpine-3.20"
+    PACKAGE_NAME: "astroproject-alpine-3.20"
+    ENVIRONMENT: "testing"
+    TIER: "test"
+    ARCH: "x86_64"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+
+deploy_to_test_rockylinux_9:
+  <<: *deploy_definition
+  needs:
+    - job: build_test_rockylinux_9
+      artifacts: true
+    - job: verify_test_rockylinux_9
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "rockylinux-9"
+    PACKAGE_NAME: "astroproject-rockylinux-9"
+    ENVIRONMENT: "testing"
+    TIER: "test"
+    ARCH: "x86_64"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+
+deploy_to_test_fedora_40:
+  <<: *deploy_definition
+  needs:
+    - job: build_test_fedora_40
+      artifacts: true
+    - job: verify_test_fedora_40
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "fedora-40"
+    PACKAGE_NAME: "astroproject-fedora-40"
+    ENVIRONMENT: "testing"
+    TIER: "test"
+    ARCH: "x86_64"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+
+deploy_to_test_windows:
+  <<: *deploy_definition
+  needs:
+    - job: build_test_windows
+      artifacts: true
+    - job: verify_test_windows
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "windows"
+    PACKAGE_NAME: "astroproject-windows"
+    ENVIRONMENT: "testing"
+    TIER: "test"
+    ARCH: "x86_64"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+
+deploy_to_test_android:
+  <<: *deploy_definition
+  needs:
+    - job: build_test_android
+      artifacts: true
+    - job: verify_test_android
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "android"
+    PACKAGE_NAME: "astroproject-android"
+    ENVIRONMENT: "testing"
+    TIER: "test"
+    ARCH: "aarch64"
+  tags:
+    - docker
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "test"
+
+deploy_to_prod_ubuntu_22_04:
+  <<: *deploy_definition
+  needs:
+    - job: build_prod_ubuntu_22_04
+      artifacts: true
+    - job: verify_prod_ubuntu_22_04
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "ubuntu-22.04"
+    PACKAGE_NAME: "astroproject-ubuntu-22.04"
+    ENVIRONMENT: "production"
+    TIER: "prod"
+    ARCH: "x86_64"
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+
+deploy_to_prod_ubuntu_24_04:
+  <<: *deploy_definition
+  needs:
+    - job: build_prod_ubuntu_24_04
+      artifacts: true
+    - job: verify_prod_ubuntu_24_04
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "ubuntu-24.04"
+    PACKAGE_NAME: "astroproject-ubuntu-24.04"
+    ENVIRONMENT: "production"
+    TIER: "prod"
+    ARCH: "x86_64"
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+
+deploy_to_prod_debian_12:
+  <<: *deploy_definition
+  needs:
+    - job: build_prod_debian_12
+      artifacts: true
+    - job: verify_prod_debian_12
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "debian-12"
+    PACKAGE_NAME: "astroproject-debian-12"
+    ENVIRONMENT: "production"
+    TIER: "prod"
+    ARCH: "x86_64"
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+
+deploy_to_prod_alpine_3_20:
+  <<: *deploy_definition
+  needs:
+    - job: build_prod_alpine_3_20
+      artifacts: true
+    - job: verify_prod_alpine_3_20
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "alpine-3.20"
+    PACKAGE_NAME: "astroproject-alpine-3.20"
+    ENVIRONMENT: "production"
+    TIER: "prod"
+    ARCH: "x86_64"
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+
+deploy_to_prod_rockylinux_9:
+  <<: *deploy_definition
+  needs:
+    - job: build_prod_rockylinux_9
+      artifacts: true
+    - job: verify_prod_rockylinux_9
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "rockylinux-9"
+    PACKAGE_NAME: "astroproject-rockylinux-9"
+    ENVIRONMENT: "production"
+    TIER: "prod"
+    ARCH: "x86_64"
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+
+deploy_to_prod_fedora_40:
+  <<: *deploy_definition
+  needs:
+    - job: build_prod_fedora_40
+      artifacts: true
+    - job: verify_prod_fedora_40
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "fedora-40"
+    PACKAGE_NAME: "astroproject-fedora-40"
+    ENVIRONMENT: "production"
+    TIER: "prod"
+    ARCH: "x86_64"
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+
+deploy_to_prod_windows:
+  <<: *deploy_definition
+  needs:
+    - job: build_prod_windows
+      artifacts: true
+    - job: verify_prod_windows
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "windows"
+    PACKAGE_NAME: "astroproject-windows"
+    ENVIRONMENT: "production"
+    TIER: "prod"
+    ARCH: "x86_64"
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+
+deploy_to_prod_android:
+  <<: *deploy_definition
+  needs:
+    - job: build_prod_android
+      artifacts: true
+    - job: verify_prod_android
+      artifacts: true
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "android"
+    PACKAGE_NAME: "astroproject-android"
+    ENVIRONMENT: "production"
+    TIER: "prod"
+    ARCH: "aarch64"
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+
+
+# ============================================================
+# 创建 Release（tag 时触发）：assets 挂全部系统平台产物链接
+# ============================================================
+
 create_release:
   stage: release
   rules:
     - if: $CI_COMMIT_TAG
   tags:
-    - FreeBSD14.3
-    - Prod
+    - docker
   before_script:
     - |
-      # 确定版本号
-      if [ -n "$CI_COMMIT_TAG" ]; then
-        PACKAGE_VERSION="v$CI_COMMIT_TAG"
-      else
-        PACKAGE_VERSION="v${CI_COMMIT_SHORT_SHA}"
-      fi
-      export PACKAGE_VERSION
-      echo "Determined package version: $PACKAGE_VERSION"
-  script:
-    - |
-      echo "Creating release for $PACKAGE_VERSION"
-      
-      # 创建发布说明（使用 shell 方式构造 JSON，避免依赖 jq）
-      cat > release_data.json <<EOF
-      {
-        "tag_name": "$CI_COMMIT_TAG",
-        "ref": "$CI_COMMIT_SHA",
-        "name": "Release $PACKAGE_VERSION",
-        "description": "Release created by GitLab CI/CD pipeline for AstroProject",
-        "assets": {
-          "links": [
-            {
-              "name": "$ARTIFACT_NAME",
-              "url": "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/jobs/artifacts/${CI_COMMIT_REF_NAME}/raw/${ARTIFACT_NAME}?job=build_prod"
-            }
-          ]
-        }
-      }EOF
-      
-      # 使用 GitLab API 创建 Release，使用 JOB-TOKEN 而不是 PRIVATE-TOKEN
-      curl --request POST \
-           --header "PRIVATE-TOKEN: $PERSONAL_ACCESS_TOKEN" \
-           --header "Content-Type: application/json" \
-           --data @release_data.json \
-           "$CI_API_V4_URL/projects/$CI_PROJECT_ID/releases"
-  dependencies:
-    - build_prod
-  environment:
-    name: "production"
-  needs:
-    - job: build_prod
-      artifacts: true
-
-# 发布到 Package Registry
-publish_package:
-  stage: release
-  tags:
-    - FreeBSD14.3
-    - Prod
-  before_script:
-    - |
-      # 确定版本号
+      # 注意：CI_COMMIT_TAG 已含 v 前缀(如 v0.1.0)，不要再加 v
       if [ -n "$CI_COMMIT_TAG" ]; then
         PACKAGE_VERSION="$CI_COMMIT_TAG"
       else
@@ -403,22 +1861,419 @@ publish_package:
       echo "Determined package version: $PACKAGE_VERSION"
   script:
     - |
-      # 确保变量正确设置
-      echo "Uploading artifact to GitLab Package Registry"
-      echo "API URL: ${CI_API_V4_URL}"
-      echo "Project ID: ${CI_PROJECT_ID}"
-      echo "Package Name: ${PACKAGE_NAME}"
-      echo "Package Version: ${PACKAGE_VERSION}"
-      echo "Artifact Name: ${ARTIFACT_NAME}"
-      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
-           --upload-file ${ARTIFACT_NAME} \
-           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/${ARTIFACT_NAME}"
+      set -e
+      echo "Creating release for $PACKAGE_VERSION"
+      # 用 printf 构造 release JSON（避免 heredoc 缩进陷阱；双引号使变量展开）
+      # 资产链接覆盖全部 8 个系统平台
+      printf '%s\n' \
+        "{" \
+        "  \"tag_name\": \"$CI_COMMIT_TAG\"," \
+        "  \"ref\": \"$CI_COMMIT_TAG\"," \
+        "  \"name\": \"Release $PACKAGE_VERSION\"," \
+        "  \"description\": \"Release created by GitLab CI/CD for AstroProject (8 platforms: 6 Linux distros + Windows(MinGW) + Android(NDK))\", " \
+        "  \"assets\": {" \
+        "    \"links\": [" \
+        "      {" \
+        "        \"name\": \"astroproject-ubuntu-22.04-${ARCH}-prod.tar.gz\"," \
+        "        \"url\": \"${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/jobs/artifacts/${CI_COMMIT_REF_NAME}/raw/astroproject/build/astroproject-ubuntu-22.04-x86_64-prod.tar.gz?job=build_prod_ubuntu_22_04\"" \
+        "      }," \
+        "      {" \
+        "        \"name\": \"astroproject-ubuntu-24.04-${ARCH}-prod.tar.gz\"," \
+        "        \"url\": \"${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/jobs/artifacts/${CI_COMMIT_REF_NAME}/raw/astroproject/build/astroproject-ubuntu-24.04-x86_64-prod.tar.gz?job=build_prod_ubuntu_24_04\"" \
+        "      }," \
+        "      {" \
+        "        \"name\": \"astroproject-debian-12-${ARCH}-prod.tar.gz\"," \
+        "        \"url\": \"${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/jobs/artifacts/${CI_COMMIT_REF_NAME}/raw/astroproject/build/astroproject-debian-12-x86_64-prod.tar.gz?job=build_prod_debian_12\"" \
+        "      }," \
+        "      {" \
+        "        \"name\": \"astroproject-alpine-3.20-${ARCH}-prod.tar.gz\"," \
+        "        \"url\": \"${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/jobs/artifacts/${CI_COMMIT_REF_NAME}/raw/astroproject/build/astroproject-alpine-3.20-x86_64-prod.tar.gz?job=build_prod_alpine_3_20\"" \
+        "      }," \
+        "      {" \
+        "        \"name\": \"astroproject-rockylinux-9-${ARCH}-prod.tar.gz\"," \
+        "        \"url\": \"${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/jobs/artifacts/${CI_COMMIT_REF_NAME}/raw/astroproject/build/astroproject-rockylinux-9-x86_64-prod.tar.gz?job=build_prod_rockylinux_9\"" \
+        "      }," \
+        "      {" \
+        "        \"name\": \"astroproject-fedora-40-${ARCH}-prod.tar.gz\"," \
+        "        \"url\": \"${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/jobs/artifacts/${CI_COMMIT_REF_NAME}/raw/astroproject/build/astroproject-fedora-40-x86_64-prod.tar.gz?job=build_prod_fedora_40\"" \
+        "      }," \
+        "      {" \
+        "        \"name\": \"astroproject-windows-${ARCH}-prod.tar.gz\"," \
+        "        \"url\": \"${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/jobs/artifacts/${CI_COMMIT_REF_NAME}/raw/astroproject/build/astroproject-windows-x86_64-prod.tar.gz?job=build_prod_windows\"" \
+        "      }," \
+        "      {" \
+        "        \"name\": \"astroproject-android-${ARCH}-prod.tar.gz\"," \
+        "        \"url\": \"${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/jobs/artifacts/${CI_COMMIT_REF_NAME}/raw/astroproject/build/astroproject-android-aarch64-prod.tar.gz?job=build_prod_android\"" \
+        "      }" \
+        "    ]" \
+        "  }" \
+        "}" > release_data.json
+      cat release_data.json
+      curl --request POST \
+           --header "PRIVATE-TOKEN: $PERSONAL_ACCESS_TOKEN" \
+           --header "Content-Type: application/json" \
+           --data @release_data.json \
+           "$CI_API_V4_URL/projects/$CI_PROJECT_ID/releases"
+      echo "RELEASE_CREATED"
+  dependencies:
+    - build_prod_ubuntu_22_04
+    - build_prod_ubuntu_24_04
+    - build_prod_debian_12
+    - build_prod_alpine_3_20
+    - build_prod_rockylinux_9
+    - build_prod_fedora_40
+    - build_prod_windows
+    - build_prod_android
+  needs:
+    - job: build_prod_ubuntu_22_04
+      artifacts: true
+    - job: build_prod_ubuntu_24_04
+      artifacts: true
+    - job: build_prod_debian_12
+      artifacts: true
+    - job: build_prod_alpine_3_20
+      artifacts: true
+    - job: build_prod_rockylinux_9
+      artifacts: true
+    - job: build_prod_fedora_40
+      artifacts: true
+    - job: build_prod_windows
+      artifacts: true
+    - job: build_prod_android
+      artifacts: true
+
+
+# ============================================================
+# 同步 Release 到 Atomgit（tag 时触发）：发行版元数据 + 产物附件
+# ============================================================
+
+sync_release_atomgit:
+  stage: release
   rules:
     - if: $CI_COMMIT_TAG
-  environment:
-    name: "production"
+  tags:
+    - docker
+  image: alpine:3.20
+  before_script:
+    - apk add --no-cache curl jq
+  script:
+    - sh scripts/sync-atomgit-release.sh
   dependencies:
-    - build_prod
+    - build_prod_ubuntu_22_04
+    - build_prod_ubuntu_24_04
+    - build_prod_debian_12
+    - build_prod_alpine_3_20
+    - build_prod_rockylinux_9
+    - build_prod_fedora_40
+    - build_prod_windows
+    - build_prod_android
   needs:
-    - job: build_prod
+    - job: build_prod_ubuntu_22_04
+      artifacts: true
+    - job: build_prod_ubuntu_24_04
+      artifacts: true
+    - job: build_prod_debian_12
+      artifacts: true
+    - job: build_prod_alpine_3_20
+      artifacts: true
+    - job: build_prod_rockylinux_9
+      artifacts: true
+    - job: build_prod_fedora_40
+      artifacts: true
+    - job: build_prod_windows
+      artifacts: true
+    - job: build_prod_android
+      artifacts: true
+
+
+# ============================================================
+# 发布到 Package Registry（tag 时触发，按系统分 job，版本带系统）
+# ============================================================
+
+publish_package_ubuntu_22_04:
+  stage: release
+  tags:
+    - docker
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "ubuntu-22.04"
+    PACKAGE_NAME: "astroproject-ubuntu-22.04"
+    ARCH: "x86_64"
+  before_script:
+    - |
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        PACKAGE_VERSION="$CI_COMMIT_TAG"
+      else
+        PACKAGE_VERSION="v${CI_COMMIT_SHORT_SHA}"
+      fi
+      export PACKAGE_VERSION
+      echo "Determined package version: $PACKAGE_VERSION"
+  script:
+    - |
+      export ARTIFACT_NAME="astroproject-${PLATFORM}-${ARCH}-prod.tar.gz"
+      echo "Uploading ${PLATFORM} artifact to GitLab Package Registry"
+      echo "Package: ${PACKAGE_NAME} / ${PACKAGE_VERSION} / ${ARTIFACT_NAME}"
+      curl --fail --silent --show-error \
+        --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+        --upload-file "astroproject/${BUILD_DIR}/${ARTIFACT_NAME}" \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/${ARTIFACT_NAME}"
+      echo "Published OK: ${ARTIFACT_NAME}"
+  rules:
+    - if: $CI_COMMIT_TAG
+  dependencies:
+    - build_prod_ubuntu_22_04
+  needs:
+    - job: build_prod_ubuntu_22_04
+      artifacts: true
+
+publish_package_ubuntu_24_04:
+  stage: release
+  tags:
+    - docker
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "ubuntu-24.04"
+    PACKAGE_NAME: "astroproject-ubuntu-24.04"
+    ARCH: "x86_64"
+  before_script:
+    - |
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        PACKAGE_VERSION="$CI_COMMIT_TAG"
+      else
+        PACKAGE_VERSION="v${CI_COMMIT_SHORT_SHA}"
+      fi
+      export PACKAGE_VERSION
+      echo "Determined package version: $PACKAGE_VERSION"
+  script:
+    - |
+      export ARTIFACT_NAME="astroproject-${PLATFORM}-${ARCH}-prod.tar.gz"
+      echo "Uploading ${PLATFORM} artifact to GitLab Package Registry"
+      echo "Package: ${PACKAGE_NAME} / ${PACKAGE_VERSION} / ${ARTIFACT_NAME}"
+      curl --fail --silent --show-error \
+        --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+        --upload-file "astroproject/${BUILD_DIR}/${ARTIFACT_NAME}" \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/${ARTIFACT_NAME}"
+      echo "Published OK: ${ARTIFACT_NAME}"
+  rules:
+    - if: $CI_COMMIT_TAG
+  dependencies:
+    - build_prod_ubuntu_24_04
+  needs:
+    - job: build_prod_ubuntu_24_04
+      artifacts: true
+
+publish_package_debian_12:
+  stage: release
+  tags:
+    - docker
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "debian-12"
+    PACKAGE_NAME: "astroproject-debian-12"
+    ARCH: "x86_64"
+  before_script:
+    - |
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        PACKAGE_VERSION="$CI_COMMIT_TAG"
+      else
+        PACKAGE_VERSION="v${CI_COMMIT_SHORT_SHA}"
+      fi
+      export PACKAGE_VERSION
+      echo "Determined package version: $PACKAGE_VERSION"
+  script:
+    - |
+      export ARTIFACT_NAME="astroproject-${PLATFORM}-${ARCH}-prod.tar.gz"
+      echo "Uploading ${PLATFORM} artifact to GitLab Package Registry"
+      echo "Package: ${PACKAGE_NAME} / ${PACKAGE_VERSION} / ${ARTIFACT_NAME}"
+      curl --fail --silent --show-error \
+        --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+        --upload-file "astroproject/${BUILD_DIR}/${ARTIFACT_NAME}" \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/${ARTIFACT_NAME}"
+      echo "Published OK: ${ARTIFACT_NAME}"
+  rules:
+    - if: $CI_COMMIT_TAG
+  dependencies:
+    - build_prod_debian_12
+  needs:
+    - job: build_prod_debian_12
+      artifacts: true
+
+publish_package_alpine_3_20:
+  stage: release
+  tags:
+    - docker
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "alpine-3.20"
+    PACKAGE_NAME: "astroproject-alpine-3.20"
+    ARCH: "x86_64"
+  before_script:
+    - |
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        PACKAGE_VERSION="$CI_COMMIT_TAG"
+      else
+        PACKAGE_VERSION="v${CI_COMMIT_SHORT_SHA}"
+      fi
+      export PACKAGE_VERSION
+      echo "Determined package version: $PACKAGE_VERSION"
+  script:
+    - |
+      export ARTIFACT_NAME="astroproject-${PLATFORM}-${ARCH}-prod.tar.gz"
+      echo "Uploading ${PLATFORM} artifact to GitLab Package Registry"
+      echo "Package: ${PACKAGE_NAME} / ${PACKAGE_VERSION} / ${ARTIFACT_NAME}"
+      curl --fail --silent --show-error \
+        --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+        --upload-file "astroproject/${BUILD_DIR}/${ARTIFACT_NAME}" \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/${ARTIFACT_NAME}"
+      echo "Published OK: ${ARTIFACT_NAME}"
+  rules:
+    - if: $CI_COMMIT_TAG
+  dependencies:
+    - build_prod_alpine_3_20
+  needs:
+    - job: build_prod_alpine_3_20
+      artifacts: true
+
+publish_package_rockylinux_9:
+  stage: release
+  tags:
+    - docker
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "rockylinux-9"
+    PACKAGE_NAME: "astroproject-rockylinux-9"
+    ARCH: "x86_64"
+  before_script:
+    - |
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        PACKAGE_VERSION="$CI_COMMIT_TAG"
+      else
+        PACKAGE_VERSION="v${CI_COMMIT_SHORT_SHA}"
+      fi
+      export PACKAGE_VERSION
+      echo "Determined package version: $PACKAGE_VERSION"
+  script:
+    - |
+      export ARTIFACT_NAME="astroproject-${PLATFORM}-${ARCH}-prod.tar.gz"
+      echo "Uploading ${PLATFORM} artifact to GitLab Package Registry"
+      echo "Package: ${PACKAGE_NAME} / ${PACKAGE_VERSION} / ${ARTIFACT_NAME}"
+      curl --fail --silent --show-error \
+        --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+        --upload-file "astroproject/${BUILD_DIR}/${ARTIFACT_NAME}" \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/${ARTIFACT_NAME}"
+      echo "Published OK: ${ARTIFACT_NAME}"
+  rules:
+    - if: $CI_COMMIT_TAG
+  dependencies:
+    - build_prod_rockylinux_9
+  needs:
+    - job: build_prod_rockylinux_9
+      artifacts: true
+
+publish_package_fedora_40:
+  stage: release
+  tags:
+    - docker
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "fedora-40"
+    PACKAGE_NAME: "astroproject-fedora-40"
+    ARCH: "x86_64"
+  before_script:
+    - |
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        PACKAGE_VERSION="$CI_COMMIT_TAG"
+      else
+        PACKAGE_VERSION="v${CI_COMMIT_SHORT_SHA}"
+      fi
+      export PACKAGE_VERSION
+      echo "Determined package version: $PACKAGE_VERSION"
+  script:
+    - |
+      export ARTIFACT_NAME="astroproject-${PLATFORM}-${ARCH}-prod.tar.gz"
+      echo "Uploading ${PLATFORM} artifact to GitLab Package Registry"
+      echo "Package: ${PACKAGE_NAME} / ${PACKAGE_VERSION} / ${ARTIFACT_NAME}"
+      curl --fail --silent --show-error \
+        --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+        --upload-file "astroproject/${BUILD_DIR}/${ARTIFACT_NAME}" \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/${ARTIFACT_NAME}"
+      echo "Published OK: ${ARTIFACT_NAME}"
+  rules:
+    - if: $CI_COMMIT_TAG
+  dependencies:
+    - build_prod_fedora_40
+  needs:
+    - job: build_prod_fedora_40
+      artifacts: true
+
+publish_package_windows:
+  stage: release
+  tags:
+    - docker
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "windows"
+    PACKAGE_NAME: "astroproject-windows"
+    ARCH: "x86_64"
+  before_script:
+    - |
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        PACKAGE_VERSION="$CI_COMMIT_TAG"
+      else
+        PACKAGE_VERSION="v${CI_COMMIT_SHORT_SHA}"
+      fi
+      export PACKAGE_VERSION
+      echo "Determined package version: $PACKAGE_VERSION"
+  script:
+    - |
+      export ARTIFACT_NAME="astroproject-${PLATFORM}-${ARCH}-prod.tar.gz"
+      echo "Uploading ${PLATFORM} artifact to GitLab Package Registry"
+      echo "Package: ${PACKAGE_NAME} / ${PACKAGE_VERSION} / ${ARTIFACT_NAME}"
+      curl --fail --silent --show-error \
+        --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+        --upload-file "astroproject/${BUILD_DIR}/${ARTIFACT_NAME}" \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/${ARTIFACT_NAME}"
+      echo "Published OK: ${ARTIFACT_NAME}"
+  rules:
+    - if: $CI_COMMIT_TAG
+  dependencies:
+    - build_prod_windows
+  needs:
+    - job: build_prod_windows
+      artifacts: true
+
+publish_package_android:
+  stage: release
+  tags:
+    - docker
+  variables:
+    BUILD_DIR: "build"
+    PLATFORM: "android"
+    PACKAGE_NAME: "astroproject-android"
+    ARCH: "aarch64"
+  before_script:
+    - |
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        PACKAGE_VERSION="$CI_COMMIT_TAG"
+      else
+        PACKAGE_VERSION="v${CI_COMMIT_SHORT_SHA}"
+      fi
+      export PACKAGE_VERSION
+      echo "Determined package version: $PACKAGE_VERSION"
+  script:
+    - |
+      export ARTIFACT_NAME="astroproject-${PLATFORM}-${ARCH}-prod.tar.gz"
+      echo "Uploading ${PLATFORM} artifact to GitLab Package Registry"
+      echo "Package: ${PACKAGE_NAME} / ${PACKAGE_VERSION} / ${ARTIFACT_NAME}"
+      curl --fail --silent --show-error \
+        --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+        --upload-file "astroproject/${BUILD_DIR}/${ARTIFACT_NAME}" \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${PACKAGE_NAME}/${PACKAGE_VERSION}/${ARTIFACT_NAME}"
+      echo "Published OK: ${ARTIFACT_NAME}"
+  rules:
+    - if: $CI_COMMIT_TAG
+  dependencies:
+    - build_prod_android
+  needs:
+    - job: build_prod_android
       artifacts: true
