@@ -146,6 +146,9 @@ default:
         DEBIAN_FRONTEND=noninteractive $SUDO apt-get install -y -qq mingw-w64
         export CC=x86_64-w64-mingw32-gcc
         export CXX=x86_64-w64-mingw32-g++
+        # 必须显式声明目标系统，否则 CMake 按宿主(Linux)判定 → WIN32=FALSE → PLATFORM_DIR=linux
+        # （android 分支靠 toolchain 文件内声明 CMAKE_SYSTEM_NAME，故无需此处设置）
+        EXTRA_CMAKE="-DCMAKE_SYSTEM_NAME=Windows"
       elif [ "${CROSS}" = "android" ]; then
         echo ">>> 安装 Android NDK 并配置 toolchain (arm64-v8a, API24)"
         $SUDO apt-get update -qq
