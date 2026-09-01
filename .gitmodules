@@ -1,0 +1,6 @@
+[submodule "astroproject/swe/swisseph"]
+	path = astroproject/swe/swisseph
+	# 相对 URL（官方推荐）：git 去掉主仓库 URL 最后一级路径(AstrologAsStar.git)后拼接，
+	# 实现同平台自动解析 —— GitLab -> iyxsh/swisseph，Atomgit -> iyxsh/swisseph。
+	# 注意必须用 ../ 而非 ./（实测 ./ 会解析成 AstrologAsStar.git/swisseph.git 错误路径）
+	url = ../swisseph.git

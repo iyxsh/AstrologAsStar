@@ -84,147 +84,102 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${EXEC_OUTPUT_DIR}/Release)
 set(DLL_OUTPUT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/bin/${PLATFORM_DIR})
 set(DLL_OUTPUT_DIR_DEBUG ${DLL_OUTPUT_DIR}/Debug)
 set(DLL_OUTPUT_DIR_RELEASE ${DLL_OUTPUT_DIR}/Release)
+# ============================================================
+# SWE (Swiss Ephemeris) —— 源码构建（替代预编译 libswe.a）
+# ------------------------------------------------------------
+# SWE 以 git submodule 引入（astroproject/swe/swisseph，GitHub 官方原版）。
+# 不再依赖预编译库：源码随仓库构建，避免平台/ABI 不匹配
+# （此前预编译库在 musl 下缺 fseeko64 符号即为此类问题）。
+# 官方 Makefile 的 SWEOBJ 即为下列 9 个源文件。
+# ============================================================
+set(SWE_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/swe/swisseph)
 
-# 包含目录
+set(SWE_LIB_SRCS
+    ${SWE_SOURCE_DIR}/swedate.c
+    ${SWE_SOURCE_DIR}/swehouse.c
+    ${SWE_SOURCE_DIR}/swejpl.c
+    ${SWE_SOURCE_DIR}/swemmoon.c
+    ${SWE_SOURCE_DIR}/swemplan.c
+    ${SWE_SOURCE_DIR}/sweph.c
+    ${SWE_SOURCE_DIR}/swephlib.c
+    ${SWE_SOURCE_DIR}/swecl.c
+    ${SWE_SOURCE_DIR}/swehel.c
+)
+
+# SWE 静态库（源码构建）
+add_library(swe STATIC ${SWE_LIB_SRCS})
+target_include_directories(swe PUBLIC ${SWE_SOURCE_DIR})
+
+if(WIN32)
+    # MSVC 下 SWE 需 MSDOS 宏以启用 _fseeki64（见 swejpl.c）
+    target_compile_definitions(swe PRIVATE MSDOS)
+else()
+    # Unix 系：64 位文件偏移（swejpl.c 亦自带 _FILE_OFFSET_BITS 64）
+    target_compile_definitions(swe PRIVATE _FILE_OFFSET_BITS=64)
+endif()
+
+# 官方 Makefile: LIBS = -lm -ldl (Linux)
+if(UNIX AND NOT APPLE)
+    target_link_libraries(swe PUBLIC m)
+    find_library(SWE_DL_LIB dl)
+    if(SWE_DL_LIB)
+        target_link_libraries(swe PUBLIC ${SWE_DL_LIB})
+    endif()
+endif()
+
+# ============================================================
+# 项目静态库 astrolog32
+# ============================================================
 include_directories(include)
 include_directories(include/core)
 include_directories(include/models)
 include_directories(include/data)
 include_directories(include/utils)
-include_directories(swe/inc)
+include_directories(swe)                   # 自定义补丁头（swe_sidtime_args.h）
+include_directories(${SWE_SOURCE_DIR})      # SWE 官方源码头文件
 
 # 查找所有源文件
 file(GLOB_RECURSE SOURCES "src/*.cpp")
 
-# 创建静态库
-add_library(astrolog32 STATIC ${SOURCES})
+# 创建静态库（含 SWE 自定义补丁 swe_sidtime_args.c）
+add_library(astrolog32 STATIC ${SOURCES}
+    ${CMAKE_CURRENT_SOURCE_DIR}/swe/swe_sidtime_args.c)
 
 # 设置包含目录
-target_include_directories(astrolog32 PUBLIC 
+target_include_directories(astrolog32 PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/swe/inc
+    ${CMAKE_CURRENT_SOURCE_DIR}/swe
+    ${SWE_SOURCE_DIR}
 )
 
 # 添加预处理器定义，表示我们正在构建静态库
 target_compile_definitions(astrolog32 PUBLIC ASTROLOG32_STATIC_LIB)
 
-# 查找并链接SWE库
-if(WIN32) # windows
-    set(SWE_LIB_PATH "${CMAKE_CURRENT_SOURCE_DIR}/swe/lib/windows")
-    # 强制使用x86版本的SWE库
-    find_library(SWE_LIB NAMES swedll32 PATHS ${SWE_LIB_PATH} PATH_SUFFIXES x86 NO_DEFAULT_PATH)
-    set(SWE_DLL_PATH "${SWE_LIB_PATH}/x86/swedll32.dll")
-    
-    # 在MSVC环境下，同时链接导入库和运行时DLL
-    if(MSVC)
-        # 确保DLL在运行时可以被找到
-        target_compile_definitions(astrolog32 PRIVATE _CRT_SECURE_NO_WARNINGS)
-    endif()
-    
-    target_link_libraries(astrolog32 ${SWE_LIB})
-elseif(APPLE) #macos
-    set(SWE_LIB_PATH "${CMAKE_CURRENT_SOURCE_DIR}/swe/lib/macos")
-    find_library(SWE_LIB NAMES swedll32 PATHS ${SWE_LIB_PATH})
-    target_link_libraries(astrolog32 ${SWE_LIB})
-elseif(UNIX AND NOT APPLE)
-    if(CMAKE_SYSTEM_NAME MATCHES "Android")
-        set(SWE_LIB_PATH "${CMAKE_CURRENT_SOURCE_DIR}/swe/lib/android")
-        find_library(SWE_LIB NAMES swe PATHS ${SWE_LIB_PATH})
-        target_link_libraries(astrolog32 ${SWE_LIB})
-    elseif(CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
-        set(SWE_LIB_PATH "${CMAKE_CURRENT_SOURCE_DIR}/swe/lib/FreeBSD")
-        find_library(SWE_LIB NAMES swe PATHS ${SWE_LIB_PATH})
-        target_link_libraries(astrolog32 ${SWE_LIB})
-    else()    # linux
-        set(SWE_LIB_PATH "${CMAKE_CURRENT_SOURCE_DIR}/swe/lib/linux")
-        find_library(SWE_LIB NAMES swe PATHS ${SWE_LIB_PATH})
-        target_link_libraries(astrolog32 ${SWE_LIB})
-    endif()
-endif()
+# 链接 SWE（PUBLIC 传递到可执行文件）
+target_link_libraries(astrolog32 PUBLIC swe)
 
-# 创建可执行文件用于测试
+# ============================================================
+# 测试可执行文件
+# ============================================================
 add_executable(astrolog32_oldmain test/oldmain.cpp)
-# 链接静态库和SWE库
-target_link_libraries(astrolog32_oldmain astrolog32 ${SWE_LIB})
+target_link_libraries(astrolog32_oldmain astrolog32)
 
-# 添加Windows平台特定的链接选项
 if(WIN32 AND MSVC)
-    # 确保测试可执行文件也能正确链接
     target_compile_definitions(astrolog32_oldmain PRIVATE _CRT_SECURE_NO_WARNINGS)
-    
-    # 为测试可执行文件显式链接SWE库
-    target_link_libraries(astrolog32_oldmain ${SWE_LIB})
-    
-    # 将SWE DLL文件复制到可执行文件目录
-    add_custom_command(TARGET astrolog32_oldmain POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${SWE_DLL_PATH}"
-        $<TARGET_FILE_DIR:astrolog32_oldmain>)
-        
-    # 将SWE DLL文件同时复制到可执行文件输出目录下对应的目录中
-    add_custom_command(TARGET astrolog32_oldmain POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory
-        "$<IF:$<CONFIG:Debug>,${DLL_OUTPUT_DIR_DEBUG},${DLL_OUTPUT_DIR_RELEASE}>")
-    add_custom_command(TARGET astrolog32_oldmain POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${SWE_DLL_PATH}"
-        "$<IF:$<CONFIG:Debug>,${DLL_OUTPUT_DIR_DEBUG},${DLL_OUTPUT_DIR_RELEASE}>")
 endif()
 
 add_executable(astrolog32_apimainchart test/apimainchart.cpp)
-# 链接静态库和SWE库
-target_link_libraries(astrolog32_apimainchart astrolog32 ${SWE_LIB})
+target_link_libraries(astrolog32_apimainchart astrolog32)
 
-# 添加Windows平台特定的链接选项
 if(WIN32 AND MSVC)
-    # 确保测试可执行文件也能正确链接
     target_compile_definitions(astrolog32_apimainchart PRIVATE _CRT_SECURE_NO_WARNINGS)
-    
-    # 为测试可执行文件显式链接SWE库
-    target_link_libraries(astrolog32_apimainchart ${SWE_LIB})
-    
-    # 将SWE DLL文件复制到可执行文件目录
-    add_custom_command(TARGET astrolog32_apimainchart POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${SWE_DLL_PATH}"
-        $<TARGET_FILE_DIR:astrolog32_apimainchart>)
-        
-    # 将SWE DLL文件同时复制到可执行文件输出目录下对应的目录中
-    add_custom_command(TARGET astrolog32_apimainchart POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory
-        "$<IF:$<CONFIG:Debug>,${DLL_OUTPUT_DIR_DEBUG},${DLL_OUTPUT_DIR_RELEASE}>")
-    add_custom_command(TARGET astrolog32_apimainchart POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${SWE_DLL_PATH}"
-        "$<IF:$<CONFIG:Debug>,${DLL_OUTPUT_DIR_DEBUG},${DLL_OUTPUT_DIR_RELEASE}>")
 endif()
 
 add_executable(astrolog32_apichart2 test/apichart2.cpp)
-# 链接静态库和SWE库
-target_link_libraries(astrolog32_apichart2 astrolog32 ${SWE_LIB})
+target_link_libraries(astrolog32_apichart2 astrolog32)
 
-# 添加Windows平台特定的链接选项
 if(WIN32 AND MSVC)
-    # 确保测试可执行文件也能正确链接
     target_compile_definitions(astrolog32_apichart2 PRIVATE _CRT_SECURE_NO_WARNINGS)
-    
-    # 为测试可执行文件显式链接SWE库
-    target_link_libraries(astrolog32_apichart2 ${SWE_LIB})
-    
-    # 将SWE DLL文件复制到可执行文件目录
-    add_custom_command(TARGET astrolog32_apichart2 POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${SWE_DLL_PATH}"
-        $<TARGET_FILE_DIR:astrolog32_apichart2>)
-        
-    # 将SWE DLL文件同时复制到可执行文件输出目录下对应的目录中
-    add_custom_command(TARGET astrolog32_apichart2 POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory
-        "$<IF:$<CONFIG:Debug>,${DLL_OUTPUT_DIR_DEBUG},${DLL_OUTPUT_DIR_RELEASE}>")
-    add_custom_command(TARGET astrolog32_apichart2 POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${SWE_DLL_PATH}"
-        "$<IF:$<CONFIG:Debug>,${DLL_OUTPUT_DIR_DEBUG},${DLL_OUTPUT_DIR_RELEASE}>")
 endif()
 
 # 安装规则

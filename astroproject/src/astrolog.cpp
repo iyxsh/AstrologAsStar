@@ -1071,7 +1071,7 @@ wchar_t *SzDate(int mon, int day, int yea, int nFormat)
 /* on whether the "European" time format flag is set or not.          */
 char *SzTime(int hr, int min, int sec)
 {
-	static char szTim[12];
+	static char szTim[48];
 
 	while (min >= 60)
 	{
@@ -1086,17 +1086,17 @@ char *SzTime(int hr, int min, int sec)
 	if (us.fEuroTime)
 	{
 		if (sec == -1)
-			sprintf(szTim, "%2d:%02d", hr, min);
+			snprintf(szTim, sizeof(szTim), "%2d:%02d", hr, min);
 		else
-			sprintf(szTim, "%2d:%02d:%02d", hr, min, sec);
+			snprintf(szTim, sizeof(szTim), "%2d:%02d:%02d", hr, min, sec);
 	}
 	else
 	{
 		if (sec == -1)
-			//sprintf(szTim, "%2d:%02d%ls", Mod12(hr), min, hr < 12 ? L"AM" : L"PM");
-			sprintf(szTim, "%2d:%02d%s", Mod12(hr), min, hr < 12 ? AmPm[0] : AmPm[1]);
+			//snprintf(szTim, sizeof(szTim), "%2d:%02d%ls", Mod12(hr), min, hr < 12 ? L"AM" : L"PM");
+			snprintf(szTim, sizeof(szTim), "%2d:%02d%s", Mod12(hr), min, hr < 12 ? AmPm[0] : AmPm[1]);
 		else
-			sprintf(szTim, "%2d:%02d:%02d%s", Mod12(hr), min, sec, hr < 12 ? AmPm[0] : AmPm[1]);
+			snprintf(szTim, sizeof(szTim), "%2d:%02d:%02d%s", Mod12(hr), min, sec, hr < 12 ? AmPm[0] : AmPm[1]);
 	}
 	return szTim;
 }
@@ -1209,7 +1209,7 @@ wchar_t *SzTimW(double tim)
 /* having the hours before GMT in the integer part and minutes fractionally. */
 char *SzZone(double zon)
 {
-	static char szZon[10];
+	static char szZon[48];
 	int mini, seci;
 	double rMin;
 
@@ -1226,7 +1226,7 @@ char *SzZone(double zon)
 		decToDeg(dlat, &h, &mini, &seci);
 	}
 
-	sprintf(szZon, "%c%d:%02d:%02d", zon > 0.0 ? '-' : '+', (int)fabs(zon),
+	snprintf(szZon, sizeof(szZon), "%c%d:%02d:%02d", zon > 0.0 ? '-' : '+', (int)fabs(zon),
 		(int)(RFract(fabs(zon)) * 100.0 + 0.5 / 60.0), seci);
 	return szZon;
 }

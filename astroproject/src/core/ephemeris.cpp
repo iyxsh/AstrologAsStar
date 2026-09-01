@@ -2,7 +2,7 @@
 #include "../../include/models/chart_data.h"
 #include "../../include/models/settings.h"
 #include "../../include/utils/utils.h"
-#include "../../swe/inc/swephexp.h"
+#include "../../swe/swisseph/swephexp.h"
 #include "../../include/core/planet.h"
 #include <math.h>
 extern US us;
@@ -29,12 +29,12 @@ global_directories_t dirs =
 
 void SetEphemerisPath(void)
 {
-	file_name_t path;
+	char path[2 * MAX_FILE_NAME + 8];	// 两个目录 + 分隔符，避免拼接截断
 
 	// Build an ephemeris path in the same way as FileOpen() in io.c 
 	// searchs for a file. First look in the current directory, then 
 	// in the executable directory, and finally in the ephemeris directory.
-	sprintf(path, "." ";" "%s" ";" "%s",
+	snprintf(path, sizeof(path), "." ";" "%s" ";" "%s",
 		dirs.executable.dir, dirs.ephemeris.dir);
 
 	// now set the directory
