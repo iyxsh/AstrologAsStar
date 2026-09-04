@@ -1,0 +1,39 @@
+AstrologAsStar — NOTICE
+=======================
+
+This product is a refactored, GUI-free, cross-platform derivative of
+**Astrolog32** and the Astrolog program line by Walter D. Pullen
+(<https://www.astrolog.org/>).
+
+Acknowledgments
+---------------
+
+- Astrolog charting/graphics routines and engine heritage:
+  Copyright (C) 1991-1998 Walter D. Pullen (terms of free use/distribution,
+  no selling or profit, notices must remain — see LICENSE section 1).
+- Planetary calculation core: conversion to C of routines by James Neely,
+  from Michael Erlewine's 'Manual of Computer Programming for Astrologers'
+  (Matrix Software). Personal use only; not for sale or profit.
+- PostScript graphics core: Copyright (C) 1992-1993 Brian D. Willoughby.
+- Portions from Astrolog 6.00 and beyond are licensed under the
+  GNU GPL v2-or-later (see LICENSE section 2).
+- Astrolog 5.40 -> 5.41 modifications: Alois Treindl; 5.41 -> 5.41g:
+  Valentin Abramov; Windows 32-bit version: Antonio Ramos.
+- The Chinese-customized "A32_V3_51" build used as the refactoring baseline
+  originates from the community-maintained Astrolog32 Chinese edition
+  (this project's git history retains the provenance of its source files).
+- Swiss Ephemeris: Copyright (C) 1997-2025 Astrodienst AG, under the
+  Swiss Ephemeris Public License (<https://www.astro.com/swisseph/>).
+
+License summary
+---------------
+
+The aggregate project is distributed under **GPL-2.0-or-later** (it links
+GPL-licensed Astrolog 6.00+ portions). Independent new code is additionally
+available under MIT. See the LICENSE file for the full three-part statement.
+
+Contact / maintainer
+--------------------
+
+iyxsh (2025-2026). Repository mirrors: gitlab.local/iyxsh/AstrologAsStar,
+gitcode.com/iyxsh/AstrologAsStar.

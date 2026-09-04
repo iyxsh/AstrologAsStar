@@ -1,21 +1,94 @@
-MIT License
+# LICENSE — AstrologAsStar
 
-Copyright (c) 2025 iyxsh
+AstrologAsStar is a **derivative work** of the classic **Astrolog32** program
+(itself a line of Astrolog 5.40 / 5.41g by Walter D. Pullen with later
+modifications, plus portions originating from Astrolog 6.00 and beyond).
+It was refactored from the source of the "A32_V3_51" Chinese-customized build
+into a GUI-free, cross-platform C++11 engine + static library + CLI.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+Because the source tree mixes code of **different upstream origins**, a single
+one-line license cannot truthfully cover the whole repository. This file
+therefore states the effective license by origin, in descending order of
+restriction. When any doubt exists, the more restrictive license applies to
+the file/portion in question.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+## 1. Code inherited from Astrolog 5.40 / 5.41g (Walter D. Pullen lineage)
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+The original file headers (kept in `astroproject/src/*.cpp`,
+`astroproject/include/**` and `astroproject/include/models/version.h`) state,
+and continue to apply:
+
+> The graphics database and chart display routines used in this program are
+> Copyright (C) 1991-1998 by Walter D. Pullen. Permission is granted to freely
+> use and distribute these routines provided one doesn't sell, restrict, or
+> profit from them in any way. Modification is allowed provided these notices
+> remain with any altered or edited versions of the program.
+>
+> The main planetary calculation routines are a conversion to C of routines
+> created by James Neely as listed in Michael Erlewine's 'Manual of Computer
+> Programming for Astrologers' (Matrix Software). The copyright grants
+> permission for personal use but not to sell or profit from them.
+>
+> This copyright notice must not be changed or removed by any user of this
+> program.
+
+These terms cover all engine logic, tables, and data inherited from that
+lineage (most of `astrolog.cpp`-derived charting, aspects, dignities,
+listing/printing routines, and the corresponding headers).
+
+## 2. Code from Astrolog 6.00 and beyond (GNU GPL)
+
+Portions of the code (including the `CI`/`IS`/`US`/`CP` data model and the
+`CastChart`/`ProcessInput` computation core migrated from Astrolog 6.00+,
+as stated in the retained file headers) are licensed under the
+**GNU General Public License, version 2 or (at your option) any later
+version** — see <https://www.gnu.org/licenses/old-licenses/gpl-2.0.html>.
+
+The **aggregate library and binaries of this project are distributed under
+GPL-2.0-or-later**, because they link GPL-licensed portions together with the
+rest of the engine. Newly written portions (section 3) are offered under the
+same GPL terms when used as part of this aggregate, and additionally under MIT
+when extracted and used standalone outside of this project.
+
+## 3. New / refactored code (MIT, by iyxsh)
+
+Newly written code — build system (`CMakeLists.txt`, `docker/`, `scripts/`),
+cross-platform adaptation layer, tests, documentation, and refactoring glue
+that contains no upstream-derived logic — is additionally available under the
+MIT License:
+
+> MIT License
+>
+> Copyright (c) 2025-2026 iyxsh
+>
+> Permission is hereby granted, free of charge, to any person obtaining a copy
+> of this software and associated documentation files (the "Software"), to deal
+> in the Software without restriction, including without limitation the rights
+> to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+> copies of the Software, and to permit persons to whom the Software is
+> furnished to do so, subject to the following conditions:
+>
+> The above copyright notice and this permission notice shall be included in
+> all copies or substantial portions of the Software.
+>
+> THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+> IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+> FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+> AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+> LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+> OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+> THE SOFTWARE.
+
+## Swiss Ephemeris
+
+The bundled Swiss Ephemeris (git submodule `astroproject/swe/swisseph`) is
+Copyright (C) 1997-2025 Astrodienst AG and is licensed under the
+**Swiss Ephemeris Public License** (see
+`astroproject/swe/swisseph/LICENSE` or <https://www.astro.com/swisseph/>).
+It is not covered by the licenses above.
+
+## Commercial use
+
+Selling or otherwise profiting from the Pullen-lineage portions requires
+permission from the upstream author (Astrolog: <https://www.astrolog.org/>).
+Any GPL-licensed portion carries the normal GPL obligations.
