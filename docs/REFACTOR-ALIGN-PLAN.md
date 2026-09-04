@@ -276,7 +276,14 @@ WinMain（L9780）调 FProcessCommandLine（L18191）→ FProcessSwitchesMain（
   - **引擎修复**：Fortune 昼夜反演重新启用（`chart.cpp` CastChart，原注释掉的 `nArabicNight` 逻辑恢复，`neg`→`negV`），`isDayBirth` 由已有 `computeRiseSet()`（swe_rise_trans）在 CastChart 顶部计算 —— 修后 8 份金样 Fortune 全部对齐（此前恒为 Asc+Moon−Sun，金样 6/8 为夜生式 Asc+Sun−Moon）。
   - 验证：`test/verify_cli.py` 逐字段容差对拍（经度/纬度严格 ≤1e-7°，speed ≤1e-3°，行星/NoN/占位星 distance ≤1e-6）→ **8/8 PASS**，实测 max_lon_err ≤5.2e-10°（9 位小数对齐）。
   - 已知引擎 GAP（#134 追踪，验证脚本显式跳过）：Fortune/宫位 cusp 的 spacex/y/z 未填充 → distance 恒 0（金样为随盘变化的 ~1.0 AU 地日距）。
-- [ ] CTest 接入 + `test/unit`（API 冒烟、输入校验、编码往返）+ CI verify 升级为"运行 CLI → diff 金样"。
+- [x] CTest 接入 + `test/unit`（API 冒烟、输入校验、编码往返）+ CI verify 升级为"运行 CLI → diff 金样"。
+  - CMakeLists：`enable_testing()` + `astrolog32_unit`（`test/unit/unit_smoke.cpp`，无 gtest 依赖纯断言）
+    + `golden_diff` CTest（`Python3 + test/verify_cli.py + $<TARGET_FILE:astrolog32-cli>`）。
+  - `unit_smoke.cpp` 五组：RParseSz 解析、@0203 结构（40 行/占位星/For+cusp speed=360/999）、
+    JSON 形态（40 objects+houses）、非法输入不崩溃、中文名 UTF-8 往返。本地 `ctest` **2/2 PASS**。
+  - CI：`gen-gitlab-ci.py` 新增 `golden_diff_{dev,test,prod}` job（stage verify，needs:[] 与制品解耦，
+    builder-ubuntu-22.04 镜像内 cmake 构建 CLI → `python3 test/verify_cli.py`；CLI 自带 Swiss Moshier
+    回退无需 .se1，已实测 8/8 一致）。重生成 `.gitlab-ci.yml`（+75 行，仅新增 3 job）。
 - [ ] 清理：删 .bak/假桩标注、Kepler 死引擎隔离、stdout 副作用净化（可选回调）。
 - 验收：CI 绿 + 首批金样 diff 全过 + 旧 API 行为不变。
 

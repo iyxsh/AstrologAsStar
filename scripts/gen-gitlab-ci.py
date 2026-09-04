@@ -174,6 +174,41 @@ def gen_verify_jobs():
     return "\n".join(out)
 
 
+def gen_golden_diff_jobs():
+    """P0.4 —— 金样数值对拍（CLI 输出 vs test/golden 8 份 @0203 金样）。
+
+    与 build 制品解耦（needs: []），独立从源码构建 astrolog32-cli（原生 Linux，
+    ubuntu-22.04 builder 镜像）后跑 test/verify_cli.py。CLI 自带 Swiss
+    Moshier 回退（无需 .se1 星历文件，实测 8/8 一致），python3 由 job 内安装
+    （builder 镜像仅预装 cmake/make/g++）。
+    """
+    out = []
+    for env in ENVS:
+        out.append(f"""golden_diff_{env['key']}:
+  stage: verify
+  image: builder-ubuntu-22.04
+  needs: []
+  variables:
+    TIER: "{env['key']}"
+  tags:
+    - docker
+  rules:
+{rules_block(env)}
+  script:
+    - |
+      set -e
+      if ! command -v python3 >/dev/null 2>&1; then
+        apt-get update -qq
+        DEBIAN_FRONTEND=noninteractive apt-get install -y -qq python3
+      fi
+      cd astroproject
+      cmake -S . -B build-golden -DCMAKE_BUILD_TYPE=Debug >/dev/null
+      cmake --build build-golden --target astrolog32-cli -- -j"$(nproc)" >/dev/null
+      python3 ../test/verify_cli.py "$(pwd)/bin/linux/Debug/astrolog32-cli"
+""")
+    return "\n".join(out)
+
+
 def gen_deploy_jobs():
     out = []
     for env in ENVS:
@@ -759,6 +794,8 @@ def main():
     parts.append(gen_build_jobs())
     parts.append("\n# ============================================================\n# 验证（质量门禁）—— 全系统矩阵\n# ============================================================\n")
     parts.append(gen_verify_jobs())
+    parts.append("\n# ============================================================\n# 金样数值对拍（CLI → diff golden，P0.4）\n# ============================================================\n")
+    parts.append(gen_golden_diff_jobs())
     parts.append("\n# ============================================================\n# 部署（按环境发布）—— 全系统矩阵\n# ============================================================\n")
     parts.append(gen_deploy_jobs())
     parts.append("\n# ============================================================\n# 创建 Release（tag 时触发）：assets 挂全部系统平台产物链接\n# ============================================================\n")
