@@ -15,6 +15,16 @@ extern CI ciMain;
 extern IS is;
 extern int cSign;
 
+/* P1.2 A2 fix — Swiss Ephemeris has no mapping for hsEqualMC(10)/hsWhole(12)/
+ * hsNull(14); they fall through to 'A' inside SwissHouse(), and the original
+ * engine then recomputes them with dedicated algorithms (original
+ * ComputeHouses dispatch). Ported verbatim from E:\data\astrolog_golden
+ * astrolog.cpp 71280/71422/71634. */
+void HouseEqualMidheaven(void);
+void HouseWhole(void);
+void HouseNull(void);
+void ComputeHouses(int housesystem);
+
 const char* szHouseSystem[NUMBER_OF_HOUSE_SYSTEMS] = {
 	"Placidus", "Koch", "Equal(Asc)", "Campanus", "Meridian",
 	"Regiomontanus", "Porphyry", "Morinus", "Topocentric", "Alcabitius",
@@ -205,7 +215,94 @@ void SwissHouse(double jd, double lon, double lat, int housesystem, double* asc,
 		housesystem == hsTopocentric) && MinDifference(*mc, *asc) < 0.0)
 		*mc = Mod(*mc + rDegHalf);
 
-	/* Have Astrolog compute the houses if Swiss Ephemeris didn't do so. */
-	//if (ch == 'A')
-		//ComputeHouses(housesystem);
+	/* Have Astrolog compute the houses if Swiss Ephemeris didn't do so.
+	 * (P1.2 A2 fix: this dispatch was commented out in the refactor, which
+	 * silently degraded hsEqualMC/hsWhole/hsNull to the swe 'A' whole-sign
+	 * placeholder. Restored to match the original engine.) */
+	if (ch == 'A')
+		ComputeHouses(housesystem);
+}
+
+/* Equal (MC) houses: 10th cusp on the MC, all houses equal 30-degree wedges
+ * in zodiac order; house 1 cusp is forced to the Ascendant by CastChart()
+ * via the oAsc longitude override. Port of original astrolog.cpp:71280. */
+void HouseEqualMidheaven()
+{
+	int i;
+
+	if (hRevers)
+	{
+		is.Asc = Mod(is.Asc - 180.0);
+		if (PolarMCflip)
+		{
+			hRevers = 2;
+			is.MC = Mod(is.MC - 180.0);
+		}
+	}
+
+	for (i = 1; i <= NUMBER_OF_HOUSES; i++)
+	{
+		if (hRevers && PolarMCflip)
+			cp0.cusp_pos[i] = Mod(is.MC - 90.0 - 30.0 * (double)(i - 1));
+		else
+			cp0.cusp_pos[i] = Mod(is.MC - 270.0 + 30.0 * (double)(i - 1));
+	}
+}
+
+/* Whole-sign houses: house 1 = the zodiac sign containing the Ascendant,
+ * each subsequent house the next whole sign (cusps at 0 degrees). Port of
+ * original astrolog.cpp:71634. */
+void HouseWhole()
+{
+	int i;
+
+	if (hRevers)
+	{
+		is.Asc = Mod(is.Asc - 180.0);
+		if (PolarMCflip)
+			is.MC = Mod(is.MC - 180.0);
+	}
+
+	for (i = 1; i <= NUMBER_OF_HOUSES; i++)
+		cp0.cusp_pos[i] = Mod((double)((Z2Sign(is.Asc) - 1) * 30) + Sign2Z(i));
+}
+
+/* Null house system: no real houses; each cusp simply at the start of the
+ * successive zodiac sign (cusp i = (i-1)*30 degrees). Port of original
+ * astrolog.cpp:71422. */
+void HouseNull()
+{
+	int i;
+
+	if (hRevers)
+	{
+		is.Asc = Mod(is.Asc - 180.0);
+		is.MC = Mod(is.MC - 180.0);
+	}
+
+	for (i = 1; i <= NUMBER_OF_HOUSES; i++)
+		cp0.cusp_pos[i] = Mod(Sign2Z(i));
+}
+
+/* Astrolog-side house recomputation for systems Swiss Ephemeris cannot do.
+ * Only hsEqualMidheaven/hsWhole/hsNull reach here (they are the only ones
+ * mapped to the swe 'A' placeholder in SwissHouse); the extreme-latitude and
+ * Vedic Asc-flip guards of the original dispatch are unreachable on this
+ * path and omitted. */
+void ComputeHouses(int housesystem)
+{
+	switch (housesystem)
+	{
+	case hsEqualMC:
+		HouseEqualMidheaven();
+		break;
+	case hsWhole:
+		HouseWhole();
+		break;
+	case hsNull:
+		HouseNull();
+		break;
+	default:
+		break; /* unreachable — other systems have explicit swe mappings */
+	}
 }

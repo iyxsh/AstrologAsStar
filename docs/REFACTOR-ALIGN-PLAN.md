@@ -301,8 +301,13 @@ WinMain（L9780）调 FProcessCommandLine（L18191）→ FProcessSwitchesMain（
   dat 文件路径与直传 `-c 6` 输出全等；非法参数报 `(file … line N)`。回归：ctest 3/3、
   金样 8/8 不破。注：Options 类（MFC 默认表/显示参数）保持休眠 —— 引擎配置由 `us` 单例 +
   本解释器承担，P1.5 阿拉伯点表头化时再行归并。
-- [ ] A2 宫位三系修正（hsNull 空宫语义）、A3 真节点/真莉莉丝、A5 阿拉伯点 177 表、
-  A4 天体集开关（含恒星加载：数据文件策略）。
+- [x] A2 宫位三系修正（hsNull 空宫语义）—— **2026-09-04 修复**：根因 = houses.cpp SwissHouse 把
+  Swiss 无对应的 hsEqualMC(10)/hsWhole(12)/hsNull(14) 落 `default:'A'` 后，原版的
+  `if (ch=='A') ComputeHouses(housesystem)` 后处理在重构中被**注释删除** → 三系退化为
+  swe 'A' 等宫。修复 = 恢复该分发并移植原版 `HouseEqualMidheaven()`（cusp=MC−270+30(i−1)）/
+  `HouseWhole()`（cusp=整宫 0°，宫 1=Asc 所在星座）/`HouseNull()`（cusp=Sign2Z(i)）三算法。
+  实证：**16/16 宫位系 × 3 盘（bj/bombay/syd）与原版 golden runner 逐位一致**；ctest 3/3 +
+  金样 8/8 回归不破。3D 宫复测归 P1.7 矩阵。
 - [ ] A6 相位集/容许度配置化 + A7 格局识别入口。
 - [ ] 金样：本命盘 × 宫位系(16) × 天体集 × 容许度矩阵。
 - 验收：本命盘数值与金样逐项一致。
