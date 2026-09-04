@@ -39,3 +39,30 @@ zon 东正西负）；`-os <file>` 落文本（UTF-16LE）；数值走 golden_ma
 
 `astrolog32-cli`（或原生 CLI 变体）以 `# cmd` 行同输入运行 → 归一化到同一约定 →
 `diff` 金样。注意：sweph 历元须对齐（金样用原版内嵌 2.10.03 的 .se1 区段 1900–2100）。
+
+## 正确性验证（金样可信度）
+
+金样本质是**原版 `astrolog.cpp` 直接 `#include` 编译**的 console 变体产物——计算代码
+（星历 / 宫位 / 坐标）与原版 100% 同源，仅 I/O 入口壳不同。因此"金样 = 原版行为"在源码
+层面成立。围绕它做了三层验证：
+
+1. **printf 语义 artifact 修复（关键）**：初版 mingw 构建因 `swprintf` 窄串语义，把
+   `@0203  ; A chart positions.`、星座 `C` 等宽串截成首字符。已通过源码级
+   `_stprintf`→`_swprintf`（1690 处）修正为 MSVC 宽串语义，应用名 `Astrolog32` / 星座
+   `Can` 已与原版一致。
+2. **数值稳定性**：修复前后 160 个浮点 token 逐位一致；同输入双跑字节一致。
+3. **独立 oracle（pymeeus，纯 Python 第二实现）交叉验证**：对 8 个场景各 10 主行星做
+   "星座归属一致性" sanity check，**8/8 场景 sign_mismatch=0**，确认无错配 / 乱码 /
+   数量级错误。（pymeeus 返回 J2000/mean 黄经，与金样 of-date tropical/true 存在岁差
+   ~0.6° + Moon/行星 mean-vs-true 差异，度数不逐位相等属预期，非金样错误。）
+
+**精确 oracle = 原版 exe**：原版 GUI 二进制 `A32_V3_51_Proj/int/main/astrolog32.exe`
+本身支持 `-o0 <file>` 开关（写 @0203 位置表），在**有显示会话**中运行即可逐位比对：
+
+```bash
+astrolog32.exe -qb 7 4 1958 12:01 0 8 -116:23 39:54 -o0 out.txt
+# 对比 out.txt 与 bj-1958-1204.golden.txt 的 @0203 主体
+```
+
+（headless 下原版 GUI 进消息循环挂起，无法自动化；本目录 `../oracle_check.py` 为
+ pymeeus 独立 sanity 验证脚本，依赖 `pip install pymeeus`。）

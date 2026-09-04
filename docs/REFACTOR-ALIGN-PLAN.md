@@ -246,14 +246,22 @@ WinMain（L9780）调 FProcessCommandLine（L18191）→ FProcessSwitchesMain（
   std::runtime_error；about_dialog_text 改 extern；min/max 混型补转型；htmlhelp stub）。
 - 产物 `run\astrolog32-golden.exe`（console 全静态）+ `run\ephemeris\*.se1`。
 - **命令行语法（实证）**：`-qb M D Y T dst zon lon lat` 全参（lon 西正东负、zon 东正
-  西负）；`-os <file>` 落文本（UTF-16LE）；**`-o/-o0` 走不通**（case 'o' 不消费文件名
-  token，原版仅菜单 SaveAs 内部路径）；文本输出仅在 is.S!=stdout 走 putwc，故必须 -os
-  且 golden_main 强制 fGraphics=FALSE（原版静态初始化=TRUE）+ `ciNatal=ciCore`（缺则
-  PrintHeader 哨兵 -1 崩溃）。
-- 首批 8 份金样已产：`E:\data\astrolog_golden\goldens\*.golden.txt`（北京/纽约夏令时/
-  格林尼治 1900&2100/悉尼夏令时/北极圈 78N/上海/洛杉矶负时区），同输入双跑字节一致。
-  详见 `E:\data\astrolog_golden\README.md`。待办：归一化规则落地 + 审校入库
-  `AstrologAsStar/test/golden/`（P0.4 接线时一并提交）。
+  西负）；`-os <file>` 落文本（UTF-16LE）；**原版 `case 'o'` 实际消费文件名**
+  （`is.szFileOut=A2U(SzPersist(argv[1]))`），且原生支持 `-o0` 开关
+  （`SwitchF(us.fWritePos)` + `SwitchF(us.fWriteFile)`）。但原版 GUI 的 `Action()` 只在
+  `FRedraw()`（窗口重绘）中被调用，headless 下进消息循环挂起、不自动落盘 → 故用
+  console 变体 `golden_main` 直接驱动 `Action()`；它强制 `fGraphics=FALSE`（原版静态
+  初始化=TRUE→走 FActionX 而非文本 PrintChart）+ `ciNatal=ciCore`（缺则 PrintHeader
+  哨兵 -1 崩溃），并用自有 `--o0 <path>` preswitch 预设 `fWriteFile/fWritePos/is.szFileOut`
+  直驱 `FOutputData` 输出 @0203。
+- **✅ 首批 8 份 @0203 数值金样已归一化入库 `AstrologAsStar/test/golden/`**（北京/纽约
+  夏令时/格林尼治 1900&2100/悉尼夏令时/北极圈 78N/上海/洛杉矶负时区），UTF-8 LF、去 BOM/
+  CRLF/行尾空白/空行，`# golden:`+`# cmd:` 头 + @0203 主体；同输入双跑字节一致。
+- **✅ 金样正确性三层验证已通过**：① printf 语义 artifact 修复（`_stprintf`→`_swprintf`
+  1690 处，还原 MSVC 宽串语义，应用名 `Astrolog32`/星座 `Can` 与原版一致）；② 修复前后
+  160 浮点 token 逐位一致；③ 独立 oracle（pymeeus 纯 Python 第二实现）对 8 场景×10 主
+  行星"星座归属一致性"检查 8/8 sign_mismatch=0，无错配/乱码。详见 `test/golden/README.md`
+  与 `test/oracle_check.py`。
 
 ---
 
