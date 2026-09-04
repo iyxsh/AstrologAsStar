@@ -78,6 +78,14 @@ ASTROLOG32_API void SetChartData(const int ChartMode,const ChartInput& chartInpu
  */
 ASTROLOG32_API std::wstring GetMainChartAspect();
 ASTROLOG32_API std::wstring GetChartAspectRelation();
-ASTROLOG32_API void GetChartResult(CI& ciInput,bool useInput = true); 
+ASTROLOG32_API void GetChartResult(CI& ciInput,bool useInput = true);
+
+/* P0.3 — machine-readable chart output for astrolog32-cli.
+ * GetChartMachineText() reproduces the original @0203 format (9-decimal
+ * positions) so output can be diffed against the original-engine golden
+ * samples. GetChartJSON() emits the same data as JSON. */
+ASTROLOG32_API void SetSilent(bool silent);
+ASTROLOG32_API std::wstring GetChartMachineText(const ChartInput& chartInput);
+ASTROLOG32_API std::string GetChartJSON(const ChartInput& chartInput);
 
 #endif // ASTROLOG_LIB_H

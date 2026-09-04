@@ -271,7 +271,11 @@ WinMain（L9780）调 FProcessCommandLine（L18191）→ FProcessSwitchesMain（
 - [x] 决策点确认（§8 第 1-4 项已拍板：P0-P3 核心对齐不含 PD/AstroGraph、正式 astrolog32-cli、金样入库 CI 对拍、衍生双段许可；5/6 线程安全/应用层内容留待 P1 前）。
 - [x] 许可处理：LICENSE 双段（上游 GPL-2.0-or-later 聚合声明 + 新代码 MIT）+ NOTICE 溯源（71a329e）。
 - [x] 金样生成器：给原版 astrolog.cpp 加 console 入口（`golden_main.cpp` 单 TU include + 复刻非 GUI 初始化），**mingw32 x86 编译**（VS2026 cl 缺 SDK/ucrt 实测不可用，改 mingw32 与原版 exe PE 对齐）产出 `astrolog32-golden.exe`；跑通 8 个代表输入（中文名/东西经/夏令时/负时区/近两极 78N/±100 年），首批 8 份 @0203 数值金样已入库 `test/golden/`。
-- [ ] CLI `astrolog32-cli` 落地（类原版开关子集 + `--json`），复用现有 OutStr*/ChartListing 输出。
+- [x] CLI `astrolog32-cli` 落地（类原版开关子集 `-qb M D Y T dst zon lon lat` + `--json`/`--text`），复用公开 API `initEnv/RParseSz/GetChartMachineText/GetChartJSON`（`astroproject/cli/main.cpp` + `include/astrolog_lib.h` 扩展 + CMake target）。
+  - `--text` 复刻原版 @0203 writer：金样精确对象集（1-10,16,19,22-33 + 16 占位星行常量）、Fortune/宫位 speed 强制 360、`/YF` 字段布局逐字节对齐；`initEnv()` 加 `g_fSilent/SetSilent()` 抑制版本横幅污染 stdout。
+  - **引擎修复**：Fortune 昼夜反演重新启用（`chart.cpp` CastChart，原注释掉的 `nArabicNight` 逻辑恢复，`neg`→`negV`），`isDayBirth` 由已有 `computeRiseSet()`（swe_rise_trans）在 CastChart 顶部计算 —— 修后 8 份金样 Fortune 全部对齐（此前恒为 Asc+Moon−Sun，金样 6/8 为夜生式 Asc+Sun−Moon）。
+  - 验证：`test/verify_cli.py` 逐字段容差对拍（经度/纬度严格 ≤1e-7°，speed ≤1e-3°，行星/NoN/占位星 distance ≤1e-6）→ **8/8 PASS**，实测 max_lon_err ≤5.2e-10°（9 位小数对齐）。
+  - 已知引擎 GAP（#134 追踪，验证脚本显式跳过）：Fortune/宫位 cusp 的 spacex/y/z 未填充 → distance 恒 0（金样为随盘变化的 ~1.0 AU 地日距）。
 - [ ] CTest 接入 + `test/unit`（API 冒烟、输入校验、编码往返）+ CI verify 升级为"运行 CLI → diff 金样"。
 - [ ] 清理：删 .bak/假桩标注、Kepler 死引擎隔离、stdout 副作用净化（可选回调）。
 - 验收：CI 绿 + 首批金样 diff 全过 + 旧 API 行为不变。

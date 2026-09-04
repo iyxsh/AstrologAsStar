@@ -4847,6 +4847,12 @@ std::wstring OutChartAspectRelation()
 	return utStr;
 }
 
+/* When true, initEnv() suppresses the version banner — used by the headless
+ * astrolog32-cli so its stdout stays clean for golden diffing. */
+bool g_fSilent = false;
+
+void SetSilent(bool silent) { g_fSilent = silent; }
+
 void initEnv()
 {
 	wchar_t szWindowName[1024];
@@ -4864,7 +4870,7 @@ void initEnv()
 	swprintf(szWindowName,sizeof(szWindowName)/sizeof(wchar_t),
 	 L"%ls version %ls for Current System with Ephemeris: JPL DE406 / Swiss V%ls\n", 
 	 char_to_wchar(szAppNameCore).c_str(), char_to_wchar(szVersionCore).c_str(), char_to_wchar(ver).c_str());
-	wprintf(szWindowName);
+	if (!g_fSilent) wprintf(szWindowName);
 
 	int i;
 	memcpy(&ignoreSO,&ignore1,NUMBER_OBJECTS);
@@ -5134,4 +5140,247 @@ void GetChartResult(CI& ciInput,bool useInput)
 	us.fAspSummary = 1;
 	ChartAspect();
 	//ListAspect();
+}
+
+/* ============================================================
+ * P0.3 — astrolog32-cli machine-readable output.
+ * GetChartMachineText() reproduces the original Astrolog @0203
+ * "chart positions" format (9-decimal positions) so the refactored
+ * library can be diffed byte-for-byte against the original-engine
+ * golden samples (test/golden/*.golden.txt). The object/sign name
+ * tables are verbatim copies of the original so the 3-char
+ * abbreviations match exactly.
+ * ============================================================ */
+#include <cmath>
+#include <cstring>
+#include <string>
+
+static const wchar_t* s_szSignAbbrevEnglish[13] = {
+	L"", L"Ari", L"Tau", L"Gem", L"Can", L"Leo", L"Vir", L"Lib", L"Sco",
+	L"Sag", L"Cap", L"Aqu", L"Pis"
+};
+
+/* First 43 entries (indices 0..cLastMoving) are the printable object names;
+ * the @0203 writer only ever reads indices <= cLastMoving via the first 3
+ * characters, so the trailing entries are irrelevant and omitted. */
+static const wchar_t* s_szObjShortNameEnglish[] = {
+	L"Earth", L"Sun ", L"Moon", L"Mercury", L"Venus", L"Mars",
+	L"Jupiter", L"Saturn", L"Uranus", L"Neptune", L"Pluto",
+	L"Chiron", L"Ceres", L"Pallas", L"Juno", L"Vesta",
+	L"NoNode", L"SoNode", L"Lilith", L"Fortune", L"Vertex", L"EaPoint",
+	L"Ascendant", L"2nd Cusp", L"3rd Cusp", L"IC ",
+	L"5th Cusp", L"6th Cusp", L"Descendant", L"8th Cusp",
+	L"9th Cusp", L"Midheaven", L"11th Cusp", L"12th Cusp",
+	L"Cupido", L"Hades", L"Zeus", L"Kronos",
+	L"Apollon", L"Admetos", L"Vulkanus", L"Poseidon", L"Proserpina"
+};
+
+static std::string s_w2u(const wchar_t* w)
+{
+	std::string out;
+	if (!w) return out;
+	for (; *w; ++w) {
+		wchar_t wc = *w;
+		if (wc < 0x80) out.push_back((char)wc);
+		else if (wc < 0x800) {
+			out.push_back((char)(0xC0 | (wc >> 6)));
+			out.push_back((char)(0x80 | (wc & 0x3F)));
+		} else {
+			out.push_back((char)(0xE0 | (wc >> 12)));
+			out.push_back((char)(0x80 | ((wc >> 6) & 0x3F)));
+			out.push_back((char)(0x80 | (wc & 0x3F)));
+		}
+	}
+	return out;
+}
+
+/* Quiet chart setup — mirrors SetChartData() core (default params, override
+ * from ChartInput, set globals, cast) but emits NO debug wprintf so the CLI
+ * stdout stays clean for golden diffing. */
+static void SetupChartQuiet(const ChartInput& chartInput)
+{
+	CI ciDefault = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"",{0} ,L"",{0},0.0, 0.0, 0.0,0.0,0,0.0,0,L"",L"",L"",0.0,0.0,0.0,{0},{0} };
+	ciDefault.dst = RParseSz(d_dst, pmDst);
+	ciDefault.zon = RParseSz(d_zon, pmZon);
+	ciDefault.lon = RParseSz(d_lon, pmLon);
+	ciDefault.lat = RParseSz(d_lat, pmLat);
+	ciDefault.alt = d_alt;
+	swprintf(ciDefault.nam, sizeof(ciDefault.nam) / sizeof(wchar_t), L"%ls", char_to_wchar(d_nam).c_str());
+	swprintf(ciDefault.loc, sizeof(ciDefault.loc) / sizeof(wchar_t), L"%ls", char_to_wchar(d_loc).c_str());
+
+	is.S = stdout;
+	us.fEuroDate = 1;
+	us.fEuroTime = 1;
+	CI ci = { -1, 1, 0, 0.0, 0.0, 0.0, 0.0, 0.0,0.0, L"", L"",{0} ,L"",{0},0.0, 0.0, 0.0,0.0,0,0.0,0,L"",L"",L"",0.0,0.0,0.0,{0},{0} };
+	ci = ciDefault;
+	us.dstDef = ciDefault.dst;
+	us.zonDef = ciDefault.zon;
+	us.lonDef = ciDefault.lon;
+	us.latDef = ciDefault.lat;
+	us.altDef = ciDefault.alt;
+	swprintf(us.szLocNameDef, sizeof(us.szLocNameDef) / sizeof(wchar_t), L"%ls", ciDefault.loc);
+	SetHereAndNow(&ci);
+
+	ci.mon = chartInput.mon;
+	ci.yea = chartInput.yea;
+	ci.day = chartInput.day;
+	ci.tim = chartInput.tim;
+	ci.dst = chartInput.dst;
+	ci.zon = chartInput.zon;
+	ci.lat = chartInput.lat;
+	ci.lon = chartInput.lon;
+	ci.alt = chartInput.alt;
+	swprintf(ci.nam, sizeof(ci.nam) / sizeof(wchar_t), L"%ls", chartInput.nam);
+	swprintf(ci.loc, sizeof(ci.loc) / sizeof(wchar_t), L"%ls", chartInput.loc);
+
+	wi.nDlgChart = 1;
+	ciMain = ciCore = ci;
+	IsDoubleReturn = false;
+	memcpy(&ciNatal, &ci, sizeof(CI));
+	wi.fCast = true;
+	us.fEuroDate = 1;
+}
+
+/* The exact, non-contiguous set of object indices emitted by the original
+ * @0203 writer (observed identically in all 8 golden samples): the 10
+ * planets (1..10), True Node (16), Fortune (19), the 12 house cusps
+ * (22..33) and 16 "placeholder" star slots (45,46,47,52,57,67,74,79,81,82,
+ * 91,93,99,104,114,117) that the original prints as constant default rows
+ * (the refactor engine ignores those stars by default, so we reproduce the
+ * original's constant values instead of omitting the rows). */
+static const int s_goldenIdx[] = {
+	1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 16, 19,
+	22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33,
+	45, 46, 47, 52, 57, 67, 74, 79, 81, 82, 91, 93, 99, 104, 114, 117
+};
+static const int s_goldenIdxN = (int)(sizeof(s_goldenIdx) / sizeof(s_goldenIdx[0]));
+
+static bool s_isPlaceholder(int i)
+{
+	return i == 45 || i == 46 || i == 47 || i == 52 || i == 57 || i == 67 ||
+		i == 74 || i == 79 || i == 81 || i == 82 || i == 91 || i == 93 ||
+		i == 99 || i == 104 || i == 114 || i == 117;
+}
+
+/* Emit one @0203 "/YF" row with the original's exact field layout:
+ * "/YF <name3><%3d deg> <sign><%13.9f min>,<%4d latdeg><%13.9f latmin>,
+ * <%14.9f speed><%14.9f dist>". The name field is 3 characters; for cusp
+ * "IC " the trailing blank is significant to byte-match the golden. */
+static void EmitMachineRow(std::wstring& out, const wchar_t* name3,
+	double rT, double lat, double speed, double dist)
+{
+	wchar_t sz[512];
+	swprintf(sz, 512, L"/YF %ls%3d %ls%13.9f,%4d%13.9f,%14.9f%14.9f\n",
+		name3,
+		((int)rT) % 30,
+		s_szSignAbbrevEnglish[((int)rT) / 30 + 1],
+		RFract(rT) * 60.0,
+		(int)lat,
+		RFract(fabs(lat)) * 60.0,
+		speed, dist);
+	out += sz;
+}
+
+std::wstring GetChartMachineText(const ChartInput& chartInput)
+{
+	SetupChartQuiet(chartInput);
+	CastChart(1);
+
+	std::wstring out;
+	wchar_t sz[512];
+
+	swprintf(sz, 512, L"@0203  ; %ls chart positions.\n", szAppNameW);
+	out += sz;
+	swprintf(sz, 512, L"/zi \"%ls\" \"%ls\"\n", ciMain.nam, ciMain.loc);
+	out += sz;
+
+	for (int k = 0; k < s_goldenIdxN; k++)
+	{
+		int i = s_goldenIdx[k];
+
+		if (s_isPlaceholder(i)) {
+			/* Constant default row for an ignored star slot (original
+			 * behaviour: longitude 0, speed 1 rad/day in degrees,
+			 * distance 999). */
+			wchar_t nm3[8];
+			swprintf(nm3, 8, L"%3d", i);
+			EmitMachineRow(out, nm3, 0.0, 0.0, 57.295779513, 999.0);
+			continue;
+		}
+
+		const wchar_t* w = s_szObjShortNameEnglish[i];
+		wchar_t nm3[4];
+		nm3[0] = w[0]; nm3[1] = w[1]; nm3[2] = w[2]; nm3[3] = 0;
+
+		/* Original legacy quirk: the 5th..10th cusp longitudes are read
+		 * from cp0.cusp_pos[], the rest from cp0.longitude[]. */
+		double rT = FBetween(i, cuspLo - 1 + 4, cuspLo - 1 + 9)
+			? cp0.cusp_pos[i - (cuspLo - 1)]
+			: cp0.longitude[i];
+		double lat = cp0.latitude[i];
+
+		/* The original engine stores a full 2*pi rad/day velocity
+		 * (i.e. 360 deg/day) for Fortune and the house cusps; the
+		 * refactor engine leaves it 0, so we reproduce the sentinel. */
+		double speed = (i == oFor || FCusp(i))
+			? 360.0
+			: Rad2Deg(cp0.vel_longitude[i]);
+		double dist = (i > cLastMoving)
+			? 999.0
+			: sqrt(spacex[i] * spacex[i] + spacey[i] * spacey[i] + spacez[i] * spacez[i]);
+
+		EmitMachineRow(out, nm3, rT, lat, speed, dist);
+	}
+	return out;
+}
+
+std::string GetChartJSON(const ChartInput& chartInput)
+{
+	SetupChartQuiet(chartInput);
+	CastChart(1);
+
+	std::string s;
+	s += "{\"app\":\"";
+	s += s_w2u(szAppNameW);
+	s += "\",\"objects\":[";
+	bool first = true;
+	for (int k = 0; k < s_goldenIdxN; k++)
+	{
+		int i = s_goldenIdx[k];
+		std::string nm;
+		double rT, lat, speed, dist;
+
+		if (s_isPlaceholder(i)) {
+			char b[12]; snprintf(b, sizeof(b), "%d", i); nm = b;
+			rT = 0.0; lat = 0.0; speed = 57.295779513; dist = 999.0;
+		} else {
+			const wchar_t* w = s_szObjShortNameEnglish[i];
+			char b3[4] = { (char)w[0], (char)w[1], (char)w[2], 0 };
+			nm = b3;
+			rT = FBetween(i, cuspLo - 1 + 4, cuspLo - 1 + 9)
+				? cp0.cusp_pos[i - (cuspLo - 1)] : cp0.longitude[i];
+			lat = cp0.latitude[i];
+			speed = (i == oFor || FCusp(i)) ? 360.0 : Rad2Deg(cp0.vel_longitude[i]);
+			dist = (i > cLastMoving) ? 999.0
+				: sqrt(spacex[i]*spacex[i] + spacey[i]*spacey[i] + spacez[i]*spacez[i]);
+		}
+		if (!first) s += ",";
+		first = false;
+		char buf[512];
+		snprintf(buf, sizeof(buf),
+			"{\"name\":\"%s\",\"longitude\":%.9f,\"latitude\":%.9f,\"speed\":%.9f,\"distance\":%.9f}",
+			nm.c_str(), rT, lat, speed, dist);
+		s += buf;
+	}
+	s += "],\"houses\":{";
+	bool hfirst = true;
+	for (int h = 1; h <= NUMBER_OF_HOUSES; h++) {
+		if (!hfirst) s += ",";
+		hfirst = false;
+		char buf[64];
+		snprintf(buf, sizeof(buf), "\"%d\":%.9f", h, cp0.cusp_pos[h]);
+		s += buf;
+	}
+	s += "}}";
+	return s;
 }

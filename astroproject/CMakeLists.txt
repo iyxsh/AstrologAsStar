@@ -182,6 +182,16 @@ if(WIN32 AND MSVC)
     target_compile_definitions(astrolog32_apichart2 PRIVATE _CRT_SECURE_NO_WARNINGS)
 endif()
 
+# ============================================================
+# P0.3 — astrolog32-cli (real command-line interface)
+# ============================================================
+add_executable(astrolog32-cli cli/main.cpp)
+target_link_libraries(astrolog32-cli astrolog32)
+
+if(WIN32 AND MSVC)
+    target_compile_definitions(astrolog32-cli PRIVATE _CRT_SECURE_NO_WARNINGS)
+endif()
+
 # 安装规则
 install(TARGETS astrolog32
     ARCHIVE DESTINATION lib/${PLATFORM_DIR}

@@ -257,11 +257,20 @@ double CastChart(bool fDate)
 
 		j = cp0.longitude[oMoo] - cp0.longitude[oSun];
 
-		//if (us.nArabicNight == 0) //Invert Night
-		//{
-		//	if (isDayBirth == 0)
-		//		neg(j);
-		//}
+		/* Day/night Part-of-Fortune inversion (matches the original engine:
+		 * in the default mode us.nArabicNight==0 "invert night", night
+		 * births use j = Sun-Moon (i.e. Fortune = Asc+Sun-Moon). isDayBirth
+		 * is set by computeRiseSet() at the top of CastChart(). */
+		if (us.nArabicNight < 0) /* Invert always */
+		{
+			if (isDayBirth)
+				negV(j);
+		}
+		if (us.nArabicNight == 0) /* Invert night */
+		{
+			if (!isDayBirth)
+				negV(j);
+		}
 		// 福点
 		j = fabs(j) < 90.0 ? j : j - RSgn(j) * 360.0;
 		cp0.longitude[oFor] = Mod(j + is.Asc);
