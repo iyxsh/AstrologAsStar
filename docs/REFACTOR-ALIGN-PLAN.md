@@ -1,0 +1,285 @@
+# AstrologAsStar 完全重构对齐方案（基线：Astrolog32 v3.51）
+
+> 状态：**待确认草案**（2026-09-04）。本文档为重构的设计依据与实施路线图；
+> 经确认后按 Git 技能规范分阶段落地，每阶段提交 + 双端/三端同步。
+> 对齐目标 = **原版引擎计算能力**；GUI / 图形 / 档案库 / 解释文案等原版
+> Windows 专属层**不在**对齐范围（新项目定位即"无 GUI 跨平台引擎"）。
+
+---
+
+## 0. 结论摘要
+
+- 原版 `A32_V3_51_Proj_2022` 是 **~11.7 万行**的 Windows MFC 单文件巨型应用
+  （astrolog.cpp 84,792 行 + newChart.h 22,986 行 + dbmanage.h 7,943 行 + 资源/地名库/星历文件），
+  **纯计算能力远超**现重构版。
+- 现重构版 `AstrologAsStar` 仅 ~1.07 万行，是"沿主链精简"的产物：
+  **本命盘主链可用，其余能力要么是桩、要么是死代码、要么无入口**，且
+  缺配置解析、无数值测试、编码与许可均有隐患。
+- 最佳方案 = **以原版为"行为金标准"，在新架构内分阶段补全 + 金样对拍验收**，
+  不搬运 Windows/GUI/DB 代码。保留 8 平台 CI 流水线与跨平台静态库 API 形态。
+- 关键使能点：原版 exe 支持经典 `-o` 文件输出开关 → 可在本机宿主生成
+  **文本金样（golden）**，作为各阶段数值对齐的客观判据。
+
+---
+
+## 1. 背景、目标与硬约束
+
+### 1.1 背景
+AstrologAsStar = 从 Astrolog32（5.40G 血统 + 6.00+ 片段 + 中文定制，内部版号
+3.51，见 `version.h` `szVersionCore="3.51"`）重构出的**无 GUI 跨平台 C++11 引擎**，
+当前形态：静态库 `astrolog32` + 4 个公开 API + 3 个演示 exe；SWE 以 git submodule
+源码构建；CI 在单一 docker runner 上做 8 平台 × 3 档（dev/test/prod）矩阵构建。
+
+### 1.2 目标
+1. 与原版**引擎计算能力对齐**（不是文件对齐，是能力/数值对齐）。
+2. 修复现存缺陷（宫位映射、节点/莉莉丝占位、桩函数、编码、许可等）。
+3. **保留**：8 平台 CI 流水线、跨平台静态库/API、SWE 源码构建铁律、产物命名规范。
+4. 建立**可长期演进**的测试网（数值金样 + 单测），杜绝"无测试重构"再发生。
+
+### 1.3 硬约束（不可变）
+- 无 GUI、无 Windows-only 依赖；保持 C++11；Linux/Windows/Android 交叉编译不破坏；
+- CI 仍跑在 n8n VM 单一 docker runner 上（内存受限），单测必须轻量；
+- SWE 一律源码构建（预编译二进制铁律，E30/E31）；
+- `.gitlab-ci.yml` 由 `scripts/gen-gitlab-ci.py` 生成，平台矩阵改动走生成器。
+
+---
+
+## 2. 两侧工程解剖（事实基线）
+
+### 2.1 原版 A32_V3_51_Proj_2022（E:\IT\astrolog\A32_V3_51_Proj_2022）
+
+| 资产 | 规模/说明 |
+|---|---|
+| astrolog.cpp | 84,792 行：引擎+GUI 交织单文件（WinMain 10250 / WndProc 12285 / NWmCommand 24438；纯计算 CastChart 21107、DoReturn 18306、Action 18426、DisplayPrimDirs 33697、ChartFirdaria 40838、ChartAstroGraph 41318…） |
+| newChart.h | 22,986 行：**面向对象进阶计算层**（内联类：Houses/Planet/Planets/两 Speculum/Fortune/MidPoints/ZodPars/Firdaria/Syzygy/Essentials/Accidentals/SecMotion/Transit/Profections/Decennial/ZodRelL1/**PrimDirs ~1.3 万行**/PDsInChart…），非绘图模块 |
+| new.h | 784 行：印度盘/中文拼音等 |
+| dbmanage.h | 7,943 行：SQLite 人物档案库（PERSON 表 + ListView + 增删改查 + .dat/.json 导入导出） |
+| resources_en.h | 2,468 行：839 个 sXXXX 字符串 + 526 个 cmd 菜单命令 + 75 菜单/对话框资源 |
+| atlas.h | 2.18MB：Walter Pullen 国际地名内嵌表（26,733 城）+ 外置 atlas 目录 |
+| 编译 | astrolog32_en.vcxproj：astrolog.cpp + cJSON.c + sqlite3.c + xmlParser.cpp + CharStrings.cpp + **内嵌 SWE 全套 swe*.c** |
+| 数据资产 | int/ephemeris/（sepl_18.se1 484KB、semo_18.se1 1.30MB、seas_18.se1 223KB，DE431 系）；fixstars.cat（中文 1216 行恒星表）；sefstars.txt（1265 行）；STARS.DAT（75 星释义）；interpretations/HOUSE?.DAT+PL??.DAT（分语言文案） |
+| 多语言 | language.dll + Lang()/LoadStringW；CHINESE/CZECH/FRENCH/ITALIAN + ch/en/cz/fr/it/int 数据目录 |
+| 运行版 | ch/main/astrolog32.exe、int/main/astrolog32.exe（含完整数据布局）；Output/Astrolog32_v3_51_setup.exe |
+| 命令行 | 经典 astrolog 字母开关体系（FProcessSwitchesMain 22324；-M 宏、-Y 图类、#扩展开关）；**支持 -o 文本文件输出（fWriteFile L1171 / 18645，内部 UNICODE 文件重定向）** ← 金样通道 |
+
+### 2.2 原版能力总览（对齐目标面）
+
+- **天体**：118 对象槽 = 日/月/五星 + 天海冥 + Chiron + 谷神/智神/婚神/灶神 +
+  南北交 + 莉莉丝 + 福点/Vertex/EP + 12 宫头 + **9 颗天王星族(Cupido…Proserpina)** +
+  **75 颗恒星**（可选）；阿拉伯点**按需计算 177 个**（`cPart=177`）。
+- **宫位**：16 系（Placidus/Koch/Equal(Asc)/Campanus/Meridian/Regiomontanus/
+  Porphyry/Morinus/Topocentric/Alcabitius/Equal(MC)/Neo-Porphyry/Whole/Vedic/
+  Null(整星座制)/Shripati）+ 3D 宫（RHousePlaceIn3D）。
+- **相位**：18 型主次族 + 平行/反平行（declination）；主/次容许度表可自定义；
+  格局识别码 acS..acK（stellium/大三角/T三角/Yod/大十字…）。
+- **盘型/功能**：本命、行运、次限、太阳弧/月亮弧、PD（主限方向，黄道/宫位/入世
+  多轴全矩阵）、法达 Firdaria、Profection、Decennial、黄道释放 ZodRelL1、
+  日月返、合盘/组合盘/中点关系盘、泛音、移置（改地重算）、映点/反映点、
+  十二分盘、九分盘(Navamsa)、行星时段、日/月食、生物节律、AstroGraph、
+  恒星列表、日历/月历/星历表(ephemeris listing)。
+- **输出**：文本长表 ChartListing、文本轮 ChartWheel、盘格 ChartGrid、
+  相位表 ChartAspect(+Summary)、speculum 宫位表、格局文本；PS/WMF 图形。
+- **应用层**：解释引擎（外库 .DAT 文本）、atlases 地名/时区、配置文本
+  astrolog32.dat、语言 DLL。
+
+### 2.3 重构版 AstrologAsStar 现状（实现度矩阵）
+
+| 模块 | 判定 | 说明 |
+|---|---|---|
+| core/chart.cpp（397） | ✅ 真实现 | CastChart/ProcessInput/computeRiseSet；福点/南交补算；Dignify 真数据 |
+| core/ephemeris.cpp（158） | ✅ 真实现 | SWE 循环计算；遗留 `..\main` Windows 反斜杠路径残留 |
+| core/planet.cpp（1007） | ⚠️ 双引擎，Kepler 死 | SE 映射全（含 9 天王星族）；但 Kepler 引擎仅被桩函数调用 |
+| core/houses.cpp（210） | ⚠️ 接线缺陷 | **hsEqualMC/hsWhole/hsNull 三系落到整宫 'A'**（Null 应为空宫） |
+| core/aspects.cpp（605） | ⚠️ 有实现 | 18 型齐但默认只放行 5 主相位；关系盘 `\|\|` 判断语义可疑 |
+| core/fixed_stars.cpp（374） | 🪦 死代码 | ComputeStars 完整但**零调用**，恒星全被 initEnv 屏蔽 |
+| core/lunar_nodes.cpp（52） | 🪦 半桩 | 南交=北交+180 近似；真节点/真莉莉丝为占位；**无调用方** |
+| core/progressions/synastry/transits.cpp（28~39） | 🪦 **假桩** | 三者同体，= 普通本命重算（不调 ProcessInput、不算宫头、无 JD 推进）；**无调用方** |
+| utils/formatter.cpp / parser.cpp（5+5） | 🪦 纯桩 | 空文件；头文件也仅注释 |
+| utils/TransU.cpp（132） | ⚠️ 真但脆 | setlocale 每调用一次（非线程安全）；注释乱码 U+FFFD |
+| src/astrolog.cpp（5137） | ✅/🪦 混合 | ChartListing/ChartAspect/ChartAspectRelation/CastRelation/DisplayGrands/食/映点/十二分/九分 多数组件"移植但无开关/无入口"；PD/Firdaria 仅剩标题与注释；GetMainChartAspect 有 stdout 副作用 |
+| include/core/options.h（613） | 🪦 **从未实例化** | Options 类无任何引用（仅被 .bak 引用） |
+| config | ❌ 无 | 无配置解析器；`astrolog32.dat` 从未打开 → 宫位/黄道/天体集/容许度只能改常量 |
+| test/（260） | ❌ 演示壳 | 3 exe 无断言、无数值校验、永远 exit 0 |
+| CI verify | ❌ 存在性门禁 | 只查 .a 非空 + 头文件存在；**从不解包运行任何 exe**；无任何数值金样 |
+| 许可 | ❌ 矛盾 | 文件头保留 Walter Pullen 5.40G/6.00 GPL 声明，根 LICENSE 却标 2025 iyxsh MIT |
+| 中文/编码 | ⚠️ 双端风险 | Win 端 CP_ACP 转宽、Linux 端 C locale mbstowcs 失效；CI 不运行 exe 故未暴露 |
+
+### 2.4 API 现状（astrolog_lib.h）
+
+`initEnv / RParseSz / SetChartData(mode, ChartInput) / GetMainChartAspect /
+GetChartAspectRelation / GetChartResult`。
+- `GetMainChartAspect` = 本命位置 + 相位文本（含向 stdout 打印横幅副作用）。
+- `GetChartAspectRelation` = CastRelation 但 `us.nRel` 默认 rcNone → 仅"盘2星体落
+  盘1宫 + 相位表"，composite/midpoint 分支无入口。
+- **没有任何盘型/配置参数**：无法切换行运/次限/返照/合盘、宫位系、黄道、天体集、
+  容许度、日心/恒星黄道等 —— 这是与"引擎库"定位最不相称的架构缺口。
+
+---
+
+## 3. 差距矩阵（对齐动作总表）
+
+| # | 能力域 | 原版 v3.51 | AstrologAsStar 现状 | 缺口 | 对齐动作 |
+|---|---|---|---|---|---|
+| A1 | 本命盘主链 | ✅ | ✅（基本一致） | 低 | 金样校准微差 |
+| A2 | 宫位系统接线 | 16 系全 | 枚举 16，**实际 3 系错映射**（EqualMC/Whole/Null→整宫） | 高 | 修正 SwissHouse 映射 + 3D 宫复测 |
+| A3 | 南北交点/莉莉丝 | 真交点 + 真莉莉丝远地点 | 南交近似 +180；莉莉丝占位 | 高 | 接 SE 真节点/真莉莉丝（含均值/真值选项） |
+| A4 | 小行星/天王星族/恒星 | 全量可开关 | SE 映射全但默认全屏蔽；恒星零调用 | 高 | 默认天体集开关配置化 + 恒星启用 + 数据文件策略 |
+| A5 | 阿拉伯点 | 177 点按需 | 仅福点 1 个（CastChart 内嵌公式） | 高 | 移植 tArabicPart 177 点表 + 配置化 |
+| A6 | 相位集/容许度 | 18 型+平行/反平行+自定义表 | 18 型枚举在、默认 5 主、无自定义入口 | 中 | 配置化：相位集/容许度/格局 |
+| A7 | 格局识别 | ac 码 + 搜索 | DisplayGrands 在、无入口/无测 | 中 | 接 API + 金样 |
+| A8 | 行运/次限/太阳弧 | Action/CastChart 标志真算法 | **假桩**（=本命重算） | 极高 | P2 重写（ProcessInput 已有 fProgressUS 骨架） |
+| A9 | 日月返 | DoReturn | ❌ | 极高 | P2 移植 |
+| A10 | 合盘/组合盘/中点 | 多关系盘 | 仅"落宫+相位表"；composite/midpoint 分支无入口 | 高 | P2 接 CastRelation 全分支 + API 参数 |
+| A11 | 映点/反映点/十二分/九分 | 有 | 真算法残存但无开关 | 中 | P2/P3 接线 |
+| A12 | 法达/Profection/Decennial/ZodRel/行星时段/日历月历星历表/生物节律 | 有 | ❌（Firdaria 仅标题） | 高 | P3 移植 |
+| A13 | PD 主限方向（黄道/宫位/入世全矩阵） | ~1.3 万行 | ❌ | 极高 | **P4 可选大项**（成本最高，见决策点） |
+| A14 | AstroGraph 世界地图 | 有 | ❌ | 高（量小但依赖地图坐标） | P4 可选 |
+| A15 | 日食/月食表 | 有（NCheckEclipse…） | 几何函数在、无入口无测 | 中 | P2/P3 接线 |
+| A16 | 配置/选项 | astrolog32.dat + 开关体系 | **无解析器、Options 类死** | 极高 | **P1 建立 Config**（先于一切功能补齐） |
+| A17 | 星历数据策略 | .se1 + Moshier 回退 | 仅 SWIEPH 无文件（远日期/星历缺失区不稳） | 中 | 复用宿主 .se1 或 Moshier 回退 + 环境变量 |
+| A18 | 输出形态 | 文本长表/轮/格/相位/speculum/格局 | ChartListing/ChartAspect/OutStr* 在但契约未稳定 | 中 | 稳定输出层 + CLI（见 5） |
+| A19 | 数值测试 | 无（GUI 时代） | 无 | 极高 | **P0 金样对拍 + 单测网** |
+| A20 | CLI | 经典开关 | 3 个固定参数演示壳 | 高 | P0 落地真 CLI（对拍/交付兼用） |
+| A21 | 编码/中文 | 语言 DLL + 宽字符 | 双端 locale 隐患、乱码注释 | 中 | P0 统一 UTF-8/UTF-16 边界 |
+| A22 | 许可 | GPL/5.40G 条款 | MIT 冲突 | 高 | P0 定 License+NOTICE（见决策点） |
+| A23 | API 副作用 | — | 打印横幅等 stdout 副作用 | 中 | P0 净化（回调/去打印） |
+| A24 | 死代码清理 | — | .bak 22,993 行头、假桩、Kepler 死引擎 | 低 | P0 清理/标注 |
+
+---
+
+## 4. 根因结论
+
+为什么重构版"缺这么多"：
+1. **精简式重构只保主链**：把 GUI 单文件里"本命盘文本输出"这条路抽出来跨平台化，
+   其余功能（即便已在同文件里）多数以"注释掉 / 删掉 / 留桩"处理，且**没有保留
+   行为基线**——无从知道砍掉后算得对不对。
+2. **Options/配置层没接线**：原版的自由度都靠 `us`/配置文件/开关，重构时开关体系
+   没迁 → 大量真实现（CastRelation 各分支、映点、格局、食）变成"无入口死代码"。
+3. **测试与 CI 只做存在性门禁**：3 个演示 exe 永远 exit 0，CI 从不执行 → 桩函数、
+   错映射、编码问题全部隐身。
+4. **模块化只拆了壳**：目录结构现代化了，但全局单例（us/is/ciCore/cp0..cp4）
+   与函数间隐式耦合照搬，模块间仍是"原文件分段"，PD 等复杂状态机难以直接嵌入。
+
+---
+
+## 5. 目标架构与设计原则
+
+```
+astroproject/
+├─ include/astrolog.h / astrolog_lib.h   # 公共 API（新增盘型/配置入口，旧 API 保留兼容）
+├─ include/core/…
+│   options.h        # Options 类复活：唯一配置对象（取代散落全局 us 的读入口）
+│   config.h         # 解析默认值/JSON/env（P1）
+├─ src/
+│   core/
+│     chart.cpp      # 本命核心（保留）
+│     relation.cpp   # P2: CastRelation 全分支正式化（行运/次限/太阳弧/返照/合盘/组合/中点/映点…）
+│     returns.cpp    # P2: 日月返 DoReturn
+│     events.cpp     # P3: 法达/Profection/Decennial/ZodRel/行星时段/日历/星历表/食
+│     arabic_parts.cpp # P1: 177 点表
+│     stars.cpp      # P1: 恒星启用（数据文件可选加载）
+│     aspects.cpp    # 增强：相位集/容许度配置化 + 格局（P1-P2）
+│     primary_directions.cpp  # P4（可选）: PD 全矩阵
+│   util/…           # parser/formatter 真实现；TransU 去 setlocale
+│   cli/main.cpp     # P0: astrolog32-cli（类原版开关 + JSON/text 输出）
+├─ test/
+│   golden/          # P0: 原版 -o 生成的金样 .txt + 对拍驱动
+│   unit/            # P0: 轻量断言式单测（CTest 接入）
+├─ swe/              # submodule 保持源码构建
+├─ data/             # P1: 可选运行时数据（.se1 复用策略、恒星表、阿拉伯点表内嵌）
+└─ CMakeLists.txt    # 新增 target：astrolog32-cli + 单测；install 规则扩展
+```
+
+设计原则：
+1. **原版即规格**：任何"该算什么"以原版行为为准；任何"怎么算"以可测试的数值一致为准。
+2. **先配置后功能**：P1 先打通 Options/Config 再到全功能（否则每加一个功能都要开洞）。
+3. **先金样后实现**：每个能力先固化金样（红），再实现到绿。
+4. **不搬运**：MFC/GDI/资源 DLL/SQLite 档案/解释文案库/语言 DLL 一律不迁；
+   解释文案若未来需要 → 独立数据层 + 许可单列（决策点）。
+5. **兼容旧 API**：`SetChartData/Get*` 签名不动，新增
+   `SetChartOptions(const ChartOptions&)` / `GetChartText(ChartType,…)` 等扩展入口；
+   `CastChart` 等内部全局单例保留但收敛读写点，文档明示非线程安全
+   （并发抽取为可选项，见决策点）。
+
+### 5.1 金样对拍机制（验收的锚）
+- 生成：本机宿主（Windows）用原版 `int/main/astrolog32.exe`（带 int/ephemeris）
+  以经典开关 + `-o <file>` 输出文本（内部 UNICODE 文件），按"能力×代表盘"矩阵
+  批量产出；归一化（去头部版本行/日期行/空白）后提交为 `test/golden/*.golden.txt`。
+- 校验：CI verify 阶段（Linux 容器）跑 `astrolog32-cli` 同输入 → 归一化 → diff 金样。
+  跨平台（mingw/android）保持编译 + 冒烟，数值对拍以原生 6 平台为准。
+- 局限与对策：原版 exe 仅 Windows 且输出含 GUI 时代排版 → 金样只取
+  数值行（位置/宫头/相位/容许度等），排版不比对；历元选 .se1 覆盖范围
+  （1900–2100 稳妥，DE431 更宽）；sweph 双引擎差异以 Moshier 或同一 SWE 文件保证
+  同源可比。
+
+---
+
+## 6. 分阶段实施计划
+
+### P0 · 地基与测试网（先决，不可跳）
+- [ ] 决策点确认（见 §8）→ 本方案定稿、入库 docs/。
+- [ ] 许可处理：LICENSE 改双段（衍生声明 + 上游条款 + NOTICE），版本号规范化。
+- [ ] 金样通道验证：用原版 exe 跑通 5~10 个代表性输入（含中文名/东西经/夏令时/负时区/近两极），产出首批金样。
+- [ ] CLI `astrolog32-cli` 落地（类原版开关子集 + `--json`），复用现有 OutStr*/ChartListing 输出。
+- [ ] CTest 接入 + `test/unit`（API 冒烟、输入校验、编码往返）+ CI verify 升级为"运行 CLI → diff 金样"。
+- [ ] 清理：删 .bak/假桩标注、Kepler 死引擎隔离、stdout 副作用净化（可选回调）。
+- 验收：CI 绿 + 首批金样 diff 全过 + 旧 API 行为不变。
+
+### P1 · 配置层 + 本命盘修正
+- [ ] Options/Config 接线（取代代码内常量），提供默认值 = 原版默认。
+- [ ] A2 宫位三系修正（hsNull 空宫语义）、A3 真节点/真莉莉丝、A5 阿拉伯点 177 表、
+  A4 天体集开关（含恒星加载：数据文件策略）。
+- [ ] A6 相位集/容许度配置化 + A7 格局识别入口。
+- [ ] 金样：本命盘 × 宫位系(16) × 天体集 × 容许度矩阵。
+- 验收：本命盘数值与金样逐项一致。
+
+### P2 · 动态盘第一梯队（核心业务盘型）
+- [ ] relation.cpp：CastRelation 全分支正式化；`ChartType` API 参数（行运/次限/
+  太阳弧/月亮弧/合盘/组合盘/中点/映点/移置）。
+- [ ] returns.cpp：日月返（含双月返 IsDoubleReturn 逻辑）。
+- [ ] A15 日月食表入口。
+- 验收：与金样一致（覆盖代表日期 ±100 年）。
+
+### P3 · 第二梯队（时间主星族）
+- [ ] 法达 Firdaria、Profection、Decennial、黄道释放 ZodRel、行星时段、
+  日历/月历/星历表 listing、生物节律（纯计算段）。
+- 验收：金样一致。
+
+### P4 · 高精/可选大项
+- [ ] PD 主限方向全矩阵（若决策要做；移植量 ~1.3 万行内联逻辑，需状态机重构）。
+- [ ] AstroGraph（若决策要做）。
+- 验收：金样一致（PD 以原版对拍为准）。
+
+> 每个 P 阶段结束：更新 README/能力矩阵 + 提交（Git 技能规范）+ 双端推送 +
+> 记忆归档。P1~P4 均**不得**破坏旧 API 与平台矩阵。
+
+---
+
+## 7. 风险与对策
+
+| 风险 | 对策 |
+|---|---|
+| 原版 exe 输出带 GUI 排版/语言 DLL 差异 → 金样难比 | 金样只取数值行；固定 int 英文版 + 同数据目录；归一化器 |
+| PD/法达等依赖原版全局单例状态机，移植易引入漂移 | 以原版 exe 对拍为准 + 单元化（输入状态显式化）；PD 放 P4 |
+| 远日期（<1800/>2400）sweph 文件缺失 | Moshier 回退 + 金样限 .se1 可靠区间 |
+| 中文/编码在 Linux CI 从未被跑 | P0 加"中文输入→CLI→UTF-8 输出"CI 用例（容器内 zh_CN.UTF-8 或显式 UTF-8 管道） |
+| 许可风险（再分发含上游代码/文案） | P0 处理；解释文案/恒星释义若入包需逐项核上游许可 |
+| runner 内存受限、8 平台×3 档矩阵时间 | 单测/对拍只进原生平台 verify 的轻量 job；不做全矩阵测试 |
+
+---
+
+## 8. 决策点（需用户拍板）
+
+1. **对齐范围与深度**：
+   A) 分阶段核心对齐（P0–P3：本命/行运/次限/太阳弧/返照/合盘/组合/中点/法达等 + 修缺陷）——**推荐**；
+   B) 全量含 P4（PD 主限全矩阵 + AstroGraph，成本与周期显著更高）；
+   C) 仅修缺陷 + 配置化（P0+P1，最小改动）。
+2. **正式 CLI**：是否新增 `astrolog32-cli`（对拍/交付/调试三用，含 JSON 输出）？
+   要（推荐）／ 不要（仅 API + 单测内部驱动）。
+3. **金样对拍**：是否接受"本机宿主跑原版 exe -o 生成金样、提交仓库、CI 对拍"作为验收机制？
+   接受（推荐）／ 只要手工对照／ 不做数值对拍（仅单测自洽）。
+4. **许可**：LICENSE 改为衍生双段（保留上游声明 + NOTICE + 明确 MIT 仅覆盖新代码）？
+   改为衍生合规（推荐）／ 维持现状 MIT（接受再分发风险）。
+5. **线程安全**：本阶段 API 维持"单线程全局单例"（文档明示）还是投入抽取 ChartContext 支持并发？
+   维持单线程（推荐）／ 并发化。
+6. **解释文案/档案库等原版应用层内容**：一律不迁移（推荐）／ 需要解释文案（另行评估许可与数据层）。
