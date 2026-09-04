@@ -205,6 +205,14 @@ if(WIN32 AND MSVC)
 endif()
 add_test(NAME unit_smoke COMMAND astrolog32_unit)
 
+# P1.1 — 配置层（原版 dat 格式开关解释器）单测
+add_executable(astrolog32_unit_config test/unit/unit_config.cpp)
+target_link_libraries(astrolog32_unit_config astrolog32)
+if(WIN32 AND MSVC)
+    target_compile_definitions(astrolog32_unit_config PRIVATE _CRT_SECURE_NO_WARNINGS)
+endif()
+add_test(NAME unit_config COMMAND astrolog32_unit_config)
+
 # 金样对拍：运行 astrolog32-cli → 与 test/golden/*.golden.txt 逐字段 diff
 # （需要 Python3 解释器；未找到时跳过注册，可手动跑 test/verify_cli.py）
 find_package(Python3 COMPONENTS Interpreter)

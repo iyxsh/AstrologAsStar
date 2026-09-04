@@ -288,7 +288,19 @@ WinMain（L9780）调 FProcessCommandLine（L18191）→ FProcessSwitchesMain（
 - 验收：CI 绿 + 首批金样 diff 全过 + 旧 API 行为不变。
 
 ### P1 · 配置层 + 本命盘修正
-- [ ] Options/Config 接线（取代代码内常量），提供默认值 = 原版默认。
+- [x] **P1.1 Config 层（A16 闸门，batch-1）**：新建 `include/core/config.h` +
+  `src/core/config.cpp` —— 原版 astrolog32.dat 格式开关解释器（`ConfigProcessTokens`/
+  `ConfigLoadFile`，默认值=原版即 us 静态聚合，未覆盖不变），词汇 = 原版
+  FProcessSwitchesMain 子集（用户拍板：dat 原版格式 + P1 特性域 ~25 开关，非 JSON）：
+  `-c <n>` 宫位系 / `-s` 恒星黄道族（offset、-sr/-sh/-sd/-sz/-sm）/ `-h <n>` 中心天体 /
+  `-P` 阿拉伯点族（<n>/z/n/f/0）/ `-Y` 族（n 真节点、L 真莉莉丝 oscLilith、c/d/t/C/H）；
+  未知/未实现开关安全 no-op（与原版容错分层一致）。CLI 接线：`--cfg <file>`（dat 先加载、
+  命令行开关后覆盖）+ 引擎开关透传（`-c 6 -Yn -P 20 …`）。单测 `astrolog32_unit_config`
+  （CTest unit_config）8 组断言。**交叉对拍实证**：`-c 6`(Porphyry) 宫头与原版 golden runner
+  `astrolog32-golden.exe --o0` **9 位小数逐位一致**（Asc..12th），行星/福点仅末位噪声；
+  dat 文件路径与直传 `-c 6` 输出全等；非法参数报 `(file … line N)`。回归：ctest 3/3、
+  金样 8/8 不破。注：Options 类（MFC 默认表/显示参数）保持休眠 —— 引擎配置由 `us` 单例 +
+  本解释器承担，P1.5 阿拉伯点表头化时再行归并。
 - [ ] A2 宫位三系修正（hsNull 空宫语义）、A3 真节点/真莉莉丝、A5 阿拉伯点 177 表、
   A4 天体集开关（含恒星加载：数据文件策略）。
 - [ ] A6 相位集/容许度配置化 + A7 格局识别入口。

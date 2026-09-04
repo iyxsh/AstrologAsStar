@@ -8,6 +8,9 @@
 //   -n <name> -l <location>       chart name / location
 //   -o <file> | --o0 <file>       write output to file instead of stdout
 //   -h | --help
+//   --cfg <file>                  load an astrolog32.dat-format config file
+//   ...engine switches...         P1.1 config passthrough, e.g. -c 6 -Yn -P 20
+//                                 (-s -sr -sm <n> -h <n> -Pz -YL ...)
 //
 // The --text (@0203) output reproduces the original-engine machine format
 // (9-decimal positions) and is intended to be diffed against the golden
@@ -16,9 +19,11 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+#include <vector>
 #include "../include/astrolog_lib.h"
 #include "../include/utils/utils.h"
 #include "../include/utils/TransU.h"
+#include "../include/core/config.h"
 
 static std::string w2u(const std::wstring& w)
 {
@@ -42,6 +47,8 @@ int main(int argc, char* argv[])
 {
 	bool json = false;
 	std::string outFile;
+	std::string cfgFile;
+	std::vector<std::string> cfgToks;   /* engine-switch passthrough tokens */
 	std::wstring name = L"";
 	std::wstring loc = L"";
 	bool haveQb = false;
@@ -79,12 +86,38 @@ int main(int argc, char* argv[])
 			if (k + 1 < argc) loc = char_to_wchar(argv[++k]);
 		} else if (a == "-o" || a == "--o0" || a == "--output") {
 			if (k + 1 < argc) outFile = argv[++k];
+		} else if (a == "--cfg" || a == "-cfg") {
+			if (k + 1 < argc) cfgFile = argv[++k];
+			else { fprintf(stderr, "error: --cfg requires a file path\n"); return 2; }
 		} else if (a == "-h" || a == "--help") {
-			printf("astrolog32-cli - Astrolog32 refactor CLI\n");
-			printf("Usage:\n");
-			printf("  astrolog32-cli -qb M D Y T dst zon lon lat [--json|--text] [-n name] [-l location] [-o file]\n");
-			printf("  lon: west positive / east negative ; zon: east positive / west negative\n");
-			return 0;
+			/* -h 后跟数字 = 原版中心天体开关 -h <n>；否则为帮助 */
+			bool numericNext = (k + 1 < argc) && argv[k + 1][0] != '\0' &&
+				(strchr("-0123456789", argv[k + 1][0]) != NULL);
+			if (numericNext) {
+				cfgToks.push_back("-h");
+				cfgToks.push_back(argv[++k]);
+			} else {
+				printf("astrolog32-cli - Astrolog32 refactor CLI\n");
+				printf("Usage:\n");
+				printf("  astrolog32-cli -qb M D Y T dst zon lon lat [--json|--text]\n");
+				printf("                 [-n name] [-l location] [-o file] [--cfg file]\n");
+				printf("  engine switches (P1.1): -c <house> -s [-sr|-sh|-sd|-sz] -sm <mode>\n");
+				printf("    -h <center> -P <n>|-Pz|-Pn|-Pf|-P0 -Yn -YL -Yc -Yd -Yt -YC -YH\n");
+				printf("  lon: west positive / east negative ; zon: east positive / west negative\n");
+				return 0;
+			}
+		} else if ((a[0] == '-' || a[0] == '=' || a[0] == '_' || a[0] == ':') && a.size() >= 2) {
+			/* 未保留的开关 → 引擎配置透传（原版开关子集，--cfg 之后应用）。
+			 * 引擎开关的数字参数是独立 token（如 "-c 6"）：紧随其后的数字形
+			 * token 一并收集（-s/-P 的可选数字同理；解释器会忽略多余数字）。 */
+			cfgToks.push_back(a);
+			if (k + 1 < argc) {
+				const char* nx = argv[k + 1];
+				char c0 = nx[0];
+				bool numericNext = (c0 >= '0' && c0 <= '9') ||
+					((c0 == '-' || c0 == '.') && nx[1] >= '0' && nx[1] <= '9');
+				if (numericNext) { cfgToks.push_back(argv[++k]); }
+			}
 		} else {
 			fprintf(stderr, "warning: ignoring unknown argument '%s'\n", a.c_str());
 		}
@@ -97,6 +130,25 @@ int main(int argc, char* argv[])
 
 	SetSilent(true);   // suppress the initEnv version banner on stdout
 	initEnv();
+
+	/* P1.1 config 层：--cfg 文件先加载，CLI 引擎开关后覆盖（原版分层语义） */
+	if (!cfgFile.empty()) {
+		char err[256] = "";
+		if (!ConfigLoadFile(cfgFile.c_str(), err, sizeof(err))) {
+			fprintf(stderr, "error: --cfg: %s\n", err);
+			return 2;
+		}
+	}
+	if (!cfgToks.empty()) {
+		std::vector<const char*> cv;
+		cv.reserve(cfgToks.size());
+		for (size_t i = 0; i < cfgToks.size(); i++) cv.push_back(cfgToks[i].c_str());
+		char err[256] = "";
+		if (!ConfigProcessTokens(&cv[0], (int)cv.size(), err, sizeof(err))) {
+			fprintf(stderr, "error: engine switch: %s\n", err);
+			return 2;
+		}
+	}
 
 	ChartInput ci = {0};
 	ci.mon = qbMon; ci.day = qbDay; ci.yea = qbYea;
