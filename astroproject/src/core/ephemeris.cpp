@@ -15,16 +15,20 @@ extern double spacez[];
 extern byte oscLilith;
 extern int cSign;
 
+/* 目录表（原版遗留，Windows 反斜杠路径已清理为跨平台正斜杠相对路径）。
+ * 语义：相对“当前工作目录”的回退查找目录 —— 运行时 exe 目录发现尚未实现，
+ * 故在宿主/CI 中这些目录通常不存在，Swiss Ephemeris 自动回退内置 Moshier。
+ * 仅 fixed_stars.cpp 的 FileFind() 仍按 dirs.main 查找 sefstars.txt。 */
 global_directories_t dirs =
 {
 	{ "",						"" },
-	{ "Main",					"..\\main" },
-	{ "Ephemeris",				"..\\ephemeris" },
-	{ "Charts",					"..\\charts" },
-	{ "Interpretations",		"..\\interpretations" },
-	{ "Miscellaneous",			"..\\miscellaneous" },
-	{ "American Atlas",			"..\\atlas\\american" },
-	{ "International Atlas",	"..\\atlas\\international" },
+	{ "Main",					"../main" },
+	{ "Ephemeris",				"../ephemeris" },
+	{ "Charts",					"../charts" },
+	{ "Interpretations",		"../interpretations" },
+	{ "Miscellaneous",			"../miscellaneous" },
+	{ "American Atlas",			"../atlas/american" },
+	{ "International Atlas",	"../atlas/international" },
 };
 
 void SetEphemerisPath(void)

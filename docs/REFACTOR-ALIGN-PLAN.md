@@ -275,7 +275,7 @@ WinMain（L9780）调 FProcessCommandLine（L18191）→ FProcessSwitchesMain（
   - `--text` 复刻原版 @0203 writer：金样精确对象集（1-10,16,19,22-33 + 16 占位星行常量）、Fortune/宫位 speed 强制 360、`/YF` 字段布局逐字节对齐；`initEnv()` 加 `g_fSilent/SetSilent()` 抑制版本横幅污染 stdout。
   - **引擎修复**：Fortune 昼夜反演重新启用（`chart.cpp` CastChart，原注释掉的 `nArabicNight` 逻辑恢复，`neg`→`negV`），`isDayBirth` 由已有 `computeRiseSet()`（swe_rise_trans）在 CastChart 顶部计算 —— 修后 8 份金样 Fortune 全部对齐（此前恒为 Asc+Moon−Sun，金样 6/8 为夜生式 Asc+Sun−Moon）。
   - 验证：`test/verify_cli.py` 逐字段容差对拍（经度/纬度严格 ≤1e-7°，speed ≤1e-3°，行星/NoN/占位星 distance ≤1e-6）→ **8/8 PASS**，实测 max_lon_err ≤5.2e-10°（9 位小数对齐）。
-  - 已知引擎 GAP（#134 追踪，验证脚本显式跳过）：Fortune/宫位 cusp 的 spacex/y/z 未填充 → distance 恒 0（金样为随盘变化的 ~1.0 AU 地日距）。
+  - 已知引擎 GAP（P1 引擎对齐追踪，验证脚本显式跳过）：Fortune/宫位 cusp 的 spacex/y/z 未填充 → distance 恒 0（金样为随盘变化的 ~1.0 AU 地日距）。
 - [x] CTest 接入 + `test/unit`（API 冒烟、输入校验、编码往返）+ CI verify 升级为"运行 CLI → diff 金样"。
   - CMakeLists：`enable_testing()` + `astrolog32_unit`（`test/unit/unit_smoke.cpp`，无 gtest 依赖纯断言）
     + `golden_diff` CTest（`Python3 + test/verify_cli.py + $<TARGET_FILE:astrolog32-cli>`）。
@@ -284,7 +284,7 @@ WinMain（L9780）调 FProcessCommandLine（L18191）→ FProcessSwitchesMain（
   - CI：`gen-gitlab-ci.py` 新增 `golden_diff_{dev,test,prod}` job（stage verify，needs:[] 与制品解耦，
     builder-ubuntu-22.04 镜像内 cmake 构建 CLI → `python3 test/verify_cli.py`；CLI 自带 Swiss Moshier
     回退无需 .se1，已实测 8/8 一致）。重生成 `.gitlab-ci.yml`（+75 行，仅新增 3 job）。
-- [ ] 清理：删 .bak/假桩标注、Kepler 死引擎隔离、stdout 副作用净化（可选回调）。
+- [x] P0.5 清理（#134）：`git rm` 孤儿 22993 行 MFC 头 `include/core/newChart.h.bak`（重构后无真身/无引用）；progressions/synastry/transits/lunar_nodes 四模块零调用（实测全仓无引用方）→ 顶部加 **STUB 横幅**（保留作 P2 重写骨架）；`planet.cpp ComputePlanets()` 旧 Kepler 引擎仅被上述 STUB 引用 → 加 **LEGACY 死代码横幅**（删除条件 = P2 完成 STUB 重写）；`SetChartData/GetChartResult/GetMainChartAspect/GetChartAspectRelation` 的调试 `wprintf`/`ChartListing` stdout 副作用全部纳入 `g_fSilent` 门控（静音默认 false，旧 demo 行为不变）；`src/utils/TransU.cpp` 头部 7 处 GBK 误读损坏注释重写为规范 UTF-8；`ephemeris.cpp` Windows 反斜杠目录表清理为跨平台正斜杠 + 惰性语义注释。回归：全量构建零 error、ctest 2/2、金样 8/8（max_lon_err ≤3.5e-10°）。
 - 验收：CI 绿 + 首批金样 diff 全过 + 旧 API 行为不变。
 
 ### P1 · 配置层 + 本命盘修正

@@ -1,18 +1,18 @@
-// ��ƽ̨ת������ �¼�ת������
+// 跨平台宽窄字符转换工具（TransU = Transcode Utilities）
 #include "TransU.h"
-// ��ƽ̨ת������
+// 宽字符转窄字符（wchar_t* -> std::string）
 std::string wchar_to_char(const wchar_t* wstr)
 {
 	if (wstr == nullptr) return "";
 
-	// ����ϵͳ���ػ����루�����ƽ̨������
-	setlocale(LC_ALL, ""); // �Զ�����ϵͳĬ�ϱ���
+// 设置系统区域为本地编码（兼容跨平台需要）
+	setlocale(LC_ALL, ""); // 自动选用系统默认编码
 
-	// �������軺������С
+	// 先取转换所需缓冲区长度
 	size_t len = wcstombs(nullptr, wstr, 0);
-	if (len == (size_t)-1) return ""; // ת��ʧ�ܴ���
+	if (len == (size_t)-1) return ""; // 转换失败返回空串
 
-	// �����ڴ沢ִ��ת��
+	// 分配内存并执行转换
 	char* buffer = new char[len + 1];
 	wcstombs(buffer, wstr, len);
 	buffer[len] = '\0';

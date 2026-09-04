@@ -20,8 +20,8 @@ strict):
                                               Fortune and the 12 house cusps
                                               (the refactor engine does not
                                               populate spacex/y/z for those
-                                              derived points yet — tracked as
-                                              engine gap in #134)
+                                              derived points yet — engine
+                                              gap tracked in P1 alignment)
 
 Usage:
     python test/verify_cli.py [path/to/astrolog32-cli.exe]
@@ -165,7 +165,7 @@ def check_golden(exe, golden_path, verbose):
     if verbose:
         print("  objects=%d  max_lon_err=%.3e deg  skip_dist=%d%s" %
               (len(gobjs), max_lon_err, n_skip_dist,
-               "  <-- Fortune/cusp distance skipped (engine gap #134)" if n_skip_dist else ""))
+               "  <-- Fortune/cusp distance skipped (engine gap, P1)" if n_skip_dist else ""))
     return not problems, problems, max_lon_err, n_skip_dist
 
 

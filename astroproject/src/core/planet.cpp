@@ -435,6 +435,20 @@ void ErrorCorrect(int ind, double* x, double* y, double* z)
 
 /* Calculate the position of each body that orbits the Sun. A heliocentric chart is  */
 /* most natural; extra calculation is needed to have other central bodies. */
+/* ============================================================================
+ * LEGACY — 旧 Kepler 轨道根数引擎（死代码，勿接入主链）
+ * ----------------------------------------------------------------------------
+ * ComputePlanets() 是原版 Astrolog 基于轨道根数(rgoe 表) + Kepler 方程求解的
+ * 经典行星算法。2026-08 重构后主链行星/节点位置一律走瑞士星历：
+ *   CastChart → CastBodies → ComputeWithSwissEphemeris(ephemeris.cpp)
+ *             → CalculatePlanetSE() → swe_calc()，精度为金样 9 位小数锚定。
+ * 本函数当前唯一引用方是三个零调用的 STUB 模块
+ * （progressions.cpp / synastry.cpp / transits.cpp，见各文件顶部横幅），
+ * 编译期可达但运行时不可达；金样对拍(8/8)不经过本函数。
+ * 注意其产物 (cp0.longitude/vel_longitude/spacex…) 与瑞士路径共用全局数组，
+ * 若未来接入会产生数值漂移（Kepler 精度远低于 swe_calc）。
+ * 删除条件：P2 完成 STUB 模块重写后，随 STUB 骨架一并删除本函数。
+ * ==========================================================================*/
 void ComputePlanets()
 {
 	double helioret[cLastMoving + 1], heliox[cLastMoving + 1];

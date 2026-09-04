@@ -4924,20 +4924,23 @@ void SetChartData(const int ChartMode,const ChartInput& chartInput, bool useInpu
 		swprintf(ci.nam, sizeof(ci.nam) / sizeof(wchar_t), L"%ls", chartInput.nam);
 		swprintf(ci.loc, sizeof(ci.loc) / sizeof(wchar_t), L"%ls", chartInput.loc);
 	}
-	if(ChartMode == 1)
+	if (!g_fSilent)
 	{
-		wprintf(L"Main Chart:\n");
+		if (ChartMode == 1)
+		{
+			wprintf(L"Main Chart:\n");
+		}
+		else if (ChartMode == 2)
+		{
+			wprintf(L"ChartData2:\n");
+		}
+		else
+		{
+			wprintf(L"Error Data:\n");
+		}
+		wprintf(L"year:%d, month:%d, day:%d, time:%f, dst:%f, zon:%f, lat:%f, lon:%f, alt:%f, name:%ls, loc:%ls\n",
+			ci.yea, ci.mon, ci.day, ci.tim, ci.dst, ci.zon, ci.lat, ci.lon, ci.alt, ci.nam, ci.loc);
 	}
-	else if(ChartMode == 2)
-	{
-		wprintf(L"ChartData2:\n");
-	}
-	else
-	{
-		wprintf(L"Error Data:\n");
-	}
-	wprintf(L"year:%d, month:%d, day:%d, time:%f, dst:%f, zon:%f, lat:%f, lon:%f, alt:%f, name:%ls, loc:%ls\n",
-		ci.yea, ci.mon, ci.day, ci.tim, ci.dst, ci.zon, ci.lat, ci.lon, ci.alt, ci.nam, ci.loc);
 	
 	wi.nDlgChart = ChartMode;
 	switch (wi.nDlgChart)
@@ -4988,16 +4991,22 @@ std::wstring GetMainChartAspect()
 	std::wstring outStrchartaspect = L"";
 	double cast_res = CastChart(1);
 	//ChartListing();
-	wprintf(L"CastChart: %lf\n", cast_res);
+	if (!g_fSilent) wprintf(L"CastChart: %lf\n", cast_res);
 	outstrchart = OutStrChart();
-	wprintf(L">>>=== ChartsData Show ===>>> :\n");
-	wprintf(L"%ls\n", outstrchart.c_str());
+	if (!g_fSilent)
+	{
+		wprintf(L">>>=== ChartsData Show ===>>> :\n");
+		wprintf(L"%ls\n", outstrchart.c_str());
+	}
 	us.fAspList = true;
 	FCreateGrid(false);
 	us.fAspSummary = 1;
 	outStrchartaspect = OutStrChartAspect();
-	wprintf(L">>>=== AspectData Show ===>>> :\n");
-	wprintf(L"%ls\n", outStrchartaspect.c_str());
+	if (!g_fSilent)
+	{
+		wprintf(L">>>=== AspectData Show ===>>> :\n");
+		wprintf(L"%ls\n", outStrchartaspect.c_str());
+	}
 	return L"本命[" + outstrchart + outStrchartaspect + L"#]";
 }
 
@@ -5010,7 +5019,7 @@ std::wstring GetChartAspectRelation()
 	//wprintf(L"%lf\n", cast_res);
 	//ChartListing();
 	outstrchart = OutStrChart();
-	wprintf(L"%ls\n", outstrchart.c_str());
+	if (!g_fSilent) wprintf(L"%ls\n", outstrchart.c_str());
 	us.fAspList = true;
 	FCreateGrid(false);
 
@@ -5019,8 +5028,11 @@ std::wstring GetChartAspectRelation()
 		return L"";
 	//ChartAspectRelation();
 	outStrchartaspect = OutChartAspectRelation();
-	wprintf(L">>>=== ChartAspectRelationData Show ===>>> :\n");
-	wprintf(L"%ls\n", outStrchartaspect.c_str());
+	if (!g_fSilent)
+	{
+		wprintf(L">>>=== ChartAspectRelationData Show ===>>> :\n");
+		wprintf(L"%ls\n", outStrchartaspect.c_str());
+	}
 	return L"本命[" + outstrchart + outStrchartaspect + L"#]";
 }
 
@@ -5089,8 +5101,9 @@ void GetChartResult(CI& ciInput,bool useInput)
 	//swprintf(ci.nam, sizeof(ci.nam) / sizeof(wchar_t),L"%ls", L"此时此刻");
 	//swprintf(ci.loc, sizeof(ci.loc) / sizeof(wchar_t),L"%ls", L"北京, 中国");
 	//wi.chs = 1;
-	wprintf(L"year:%d, month:%d, day:%d, time:%f, dst:%f, zon:%f, lat:%f, lon:%f, alt:%f, name:%ls, loc:%ls",
-		ci.yea, ci.mon, ci.day, ci.tim, ci.dst, ci.zon, ci.lat, ci.lon, ci.alt, ci.nam, ci.loc);
+	if (!g_fSilent)
+		wprintf(L"year:%d, month:%d, day:%d, time:%f, dst:%f, zon:%f, lat:%f, lon:%f, alt:%f, name:%ls, loc:%ls",
+			ci.yea, ci.mon, ci.day, ci.tim, ci.dst, ci.zon, ci.lat, ci.lon, ci.alt, ci.nam, ci.loc);
 	wi.nDlgChart = 1;
 	switch (wi.nDlgChart)
 	{
@@ -5131,8 +5144,11 @@ void GetChartResult(CI& ciInput,bool useInput)
 	wi.fCast = true;
 	us.fEuroDate = 1; 
 	double res = CastChart(1);
-	wprintf(L"%lf\n", res);
-	ChartListing();
+	if (!g_fSilent)
+	{
+		wprintf(L"%lf\n", res);
+		ChartListing();
+	}
 
 	us.fAspList = true;
 	FCreateGrid(false);

@@ -19,7 +19,6 @@
 #include "core/progressions.h"
 #include "core/synastry.h"
 #include "core/transits.h"
-//#include "core/newChart.h"
 
 // 包含模型
 #include "models/settings.h"
