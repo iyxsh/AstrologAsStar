@@ -238,6 +238,23 @@ WinMain（L9780）调 FProcessCommandLine（L18191）→ FProcessSwitchesMain（
   覆盖范围（1900–2100 稳妥，DE431 更宽）；sweph 同源（原版内嵌 2.10.03，AstrologAsStar
   submodule 版本需对齐或金样用 Moshier 区段保证可比）。
 
+**✅ 2026-09-04 实施状态（console 变体已跑通）**：
+- 工具链改为 **mingw32（32-bit x86，与原版 exe 对齐）**——VS cl 缺 SDK/ucrt 不可用；
+  源码工作副本在 `E:\data\astrolog_golden\src`（UTF-16/GB18030→UTF-8 转码 + 最小 mingw
+  适配：`-fno-operator-names`/`-D_stdcall`/`-fpermissive`/`-std=c++14`/`-fexec-charset=GBK`
+  `-include mingw_patch.h`；`x_memset` __asm→memset；dbmanage.h throw 改
+  std::runtime_error；about_dialog_text 改 extern；min/max 混型补转型；htmlhelp stub）。
+- 产物 `run\astrolog32-golden.exe`（console 全静态）+ `run\ephemeris\*.se1`。
+- **命令行语法（实证）**：`-qb M D Y T dst zon lon lat` 全参（lon 西正东负、zon 东正
+  西负）；`-os <file>` 落文本（UTF-16LE）；**`-o/-o0` 走不通**（case 'o' 不消费文件名
+  token，原版仅菜单 SaveAs 内部路径）；文本输出仅在 is.S!=stdout 走 putwc，故必须 -os
+  且 golden_main 强制 fGraphics=FALSE（原版静态初始化=TRUE）+ `ciNatal=ciCore`（缺则
+  PrintHeader 哨兵 -1 崩溃）。
+- 首批 8 份金样已产：`E:\data\astrolog_golden\goldens\*.golden.txt`（北京/纽约夏令时/
+  格林尼治 1900&2100/悉尼夏令时/北极圈 78N/上海/洛杉矶负时区），同输入双跑字节一致。
+  详见 `E:\data\astrolog_golden\README.md`。待办：归一化规则落地 + 审校入库
+  `AstrologAsStar/test/golden/`（P0.4 接线时一并提交）。
+
 ---
 
 ## 6. 分阶段实施计划
