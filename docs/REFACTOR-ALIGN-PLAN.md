@@ -10,7 +10,7 @@
 ## 0. 结论摘要
 
 - 原版 `A32_V3_51_Proj`（E:\IT\astrolog\A32_V3_51_Proj，★正确基线）是 **~11.7 万行**的
-  Windows MFC 单文件巨型应用
+  纯 Win32 SDK 单文件巨型应用（非 MFC）
   （astrolog.cpp 84,291 行 + newChart.h 22,986 行 + dbmanage.h 7,943 行 + 资源/地名库/星历文件），
   **纯计算能力远超**现重构版。
 - 现重构版 `AstrologAsStar` 仅 ~1.07 万行，是"沿主链精简"的产物：
@@ -55,6 +55,8 @@ AstrologAsStar = 从 Astrolog32（5.40G 血统 + 6.00+ 片段 + 中文定制，�
 > 经函数面比对（下详），**两版核心代码 100% 一致**（574 函数全同，_2022 仅多
 > InitConsole/MyTextOutputA/MyTextOutputW 3 个调试函数 + 全局变量 `ignore1` 改名 +
 > 注释差异），本方案差距矩阵/功能结论不受影响；仅路径、行号、exe 版本需按本表更新。
+> **另修正**：原版为**纯 Win32 SDK 程序（UseOfMfc=false，零 MFC 头引用）**，
+> 非"Windows MFC 应用"——GUI 层是手写 WNDCLASS/WndProc 经典 Win32。
 
 | 资产 | 规模/说明 |
 |---|---|
