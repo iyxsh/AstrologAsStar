@@ -1,0 +1,6 @@
+# 预构建工具链镜像：builder-ubuntu-24.04（加速 CI，2026-09-04 定稿）
+# 24.04 是 deb822 格式（/etc/apt/sources.list.d/ubuntu.sources），sed 规则与 CI before_script 同源
+FROM ubuntu:24.04
+RUN sed -i 's|http://archive.ubuntu.com/ubuntu|http://mirrors.ustc.edu.cn/ubuntu|g; s|https://archive.ubuntu.com/ubuntu|http://mirrors.ustc.edu.cn/ubuntu|g; s|http://security.ubuntu.com/ubuntu|http://mirrors.ustc.edu.cn/ubuntu|g; s|https://security.ubuntu.com/ubuntu|http://mirrors.ustc.edu.cn/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources && \
+    apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq cmake make g++ && \
+    rm -rf /var/lib/apt/lists/*

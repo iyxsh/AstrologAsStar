@@ -53,15 +53,18 @@ import io, os, sys
 # ============================================================
 PLATFORMS = [
     # 原生 Linux 系（docker 镜像直接构建）
-    dict(id="ubuntu-22.04", image="ubuntu:22.04", pkg="apt", os="Ubuntu",      ver="22.04", lib_dir="linux",   libc="",         arch="x86_64", cross=""),
-    dict(id="ubuntu-24.04", image="ubuntu:24.04", pkg="apt", os="Ubuntu",      ver="24.04", lib_dir="linux",   libc="",         arch="x86_64", cross=""),
-    dict(id="debian-12",    image="debian:12",    pkg="apt", os="Debian",      ver="12",    lib_dir="linux",   libc="",         arch="x86_64", cross=""),
-    dict(id="alpine-3.20",  image="alpine:3.20",  pkg="apk", os="Alpine",      ver="3.20",  lib_dir="linux",   libc="",         arch="x86_64", cross=""),
-    dict(id="rockylinux-9", image="rockylinux:9", pkg="dnf", os="Rocky Linux", ver="9",     lib_dir="linux",   libc="",         arch="x86_64", cross=""),
-    dict(id="fedora-40",    image="fedora:40",    pkg="dnf", os="Fedora",      ver="40",    lib_dir="linux",   libc="",         arch="x86_64", cross=""),
+    # image = 预构建工具链镜像 builder-<id>（docker/ + scripts/build-builder-images.sh 构建，
+    #          runner pull_policy=if-not-present 直命中本地，省去每 job ~400s 现场装工具链）。
+    #         本机无该镜像时回退官方 distro 名可保证 CI 可跑（见 docker/ 注释）。
+    dict(id="ubuntu-22.04", image="builder-ubuntu-22.04", pkg="apt", os="Ubuntu",      ver="22.04", lib_dir="linux",   libc="",         arch="x86_64", cross=""),
+    dict(id="ubuntu-24.04", image="builder-ubuntu-24.04", pkg="apt", os="Ubuntu",      ver="24.04", lib_dir="linux",   libc="",         arch="x86_64", cross=""),
+    dict(id="debian-12",    image="builder-debian-12",    pkg="apt", os="Debian",      ver="12",    lib_dir="linux",   libc="",         arch="x86_64", cross=""),
+    dict(id="alpine-3.20",  image="builder-alpine-3.20",  pkg="apk", os="Alpine",      ver="3.20",  lib_dir="linux",   libc="",         arch="x86_64", cross=""),
+    dict(id="rockylinux-9", image="builder-rockylinux-9", pkg="dnf", os="Rocky Linux", ver="9",     lib_dir="linux",   libc="",         arch="x86_64", cross=""),
+    dict(id="fedora-40",    image="builder-fedora-40",    pkg="dnf", os="Fedora",      ver="40",    lib_dir="linux",   libc="",         arch="x86_64", cross=""),
     # 交叉编译目标（在现有 docker runner 内构建，无需额外 OS runner）
-    dict(id="windows",      image="ubuntu:22.04", pkg="apt", os="Windows",     ver="10",    lib_dir="windows", libc="mingw-w64", arch="x86_64", cross="mingw"),
-    dict(id="android",      image="ubuntu:22.04", pkg="apt", os="Android",     ver="API24", lib_dir="android", libc="bionic",    arch="aarch64", cross="android"),
+    dict(id="windows",      image="builder-windows",      pkg="apt", os="Windows",     ver="10",    lib_dir="windows", libc="mingw-w64", arch="x86_64", cross="mingw"),
+    dict(id="android",      image="builder-android",      pkg="apt", os="Android",     ver="API24", lib_dir="android", libc="bionic",    arch="aarch64", cross="android"),
 ]
 
 # 环境矩阵（分支 → 环境名 → 触发规则 + 构建档位）
@@ -404,16 +407,17 @@ default:
         echo "cmake 缺失，尝试安装构建工具链..."
         if command -v apt-get >/dev/null 2>&1; then
           # 加速：默认源(deb.debian.org / archive.ubuntu.com)在本网络下极慢，
-          # 且每个 job 都是全新容器、都要重装一遍。改用清华 TUNA。
+          # 且每个 job 都是全新容器、都要重装一遍。改用中科大 USTC。
           # 要点：
           #  - 基础镜像无 ca-certificates，https 源会 update 失败，故统一用 http
+          #  - TUNA 于 2026-09-04 起 403（http/https 均不可达），勿再回切
           #  - 源 URL 自带路径后缀(如 /ubuntu、/debian)，替换时必须一并吃掉，
           #    否则会变成 /ubuntu/ubuntu 双路径
           #  - Debian 12 / Ubuntu 24.04 是 deb822(.sources)，Ubuntu 22.04 是 .list，都要处理
           if [ "$(id -u)" = "0" ]; then
             for _f in /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
               [ -f "$_f" ] && sed -i \
-                's|http://deb.debian.org/debian|http://mirrors.tuna.tsinghua.edu.cn/debian|g; s|https://deb.debian.org/debian|http://mirrors.tuna.tsinghua.edu.cn/debian|g; s|http://security.debian.org/debian-security|http://mirrors.tuna.tsinghua.edu.cn/debian-security|g; s|https://security.debian.org/debian-security|http://mirrors.tuna.tsinghua.edu.cn/debian-security|g; s|http://archive.ubuntu.com/ubuntu|http://mirrors.tuna.tsinghua.edu.cn/ubuntu|g; s|https://archive.ubuntu.com/ubuntu|http://mirrors.tuna.tsinghua.edu.cn/ubuntu|g; s|http://security.ubuntu.com/ubuntu|http://mirrors.tuna.tsinghua.edu.cn/ubuntu|g; s|https://security.ubuntu.com/ubuntu|http://mirrors.tuna.tsinghua.edu.cn/ubuntu|g' "$_f"
+                's|http://deb.debian.org/debian|http://mirrors.ustc.edu.cn/debian|g; s|https://deb.debian.org/debian|http://mirrors.ustc.edu.cn/debian|g; s|http://security.debian.org/debian-security|http://mirrors.ustc.edu.cn/debian-security|g; s|https://security.debian.org/debian-security|http://mirrors.ustc.edu.cn/debian-security|g; s|http://archive.ubuntu.com/ubuntu|http://mirrors.ustc.edu.cn/ubuntu|g; s|https://archive.ubuntu.com/ubuntu|http://mirrors.ustc.edu.cn/ubuntu|g; s|http://security.ubuntu.com/ubuntu|http://mirrors.ustc.edu.cn/ubuntu|g; s|https://security.ubuntu.com/ubuntu|http://mirrors.ustc.edu.cn/ubuntu|g' "$_f"
             done || true
           fi
           # DEBIAN_FRONTEND=noninteractive 消除 debconf 交互前端警告
@@ -421,9 +425,10 @@ default:
           $SUDO apt-get update -qq && DEBIAN_FRONTEND=noninteractive $SUDO apt-get install -y -qq cmake make g++ \
             || echo "WARN: 构建工具链安装失败(权限或网络)，继续尝试"
         elif command -v apk >/dev/null 2>&1; then
-          # Alpine 也用 TUNA 加速（默认 dl-cdn.alpinelinux.org 慢；alpine 基础镜像自带 ca-certificates）
+          # Alpine 用 aliyun 加速（实测 2026-09-04：USTC alpine ~7KB/s 卡死、aliyun ~104KB/s；
+          # 默认 dl-cdn.alpinelinux.org 慢；alpine 基础镜像自带 ca-certificates）
           if [ "$(id -u)" = "0" ]; then
-            sed -i 's|dl-cdn.alpinelinux.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apk/repositories 2>/dev/null || true
+            sed -i 's|dl-cdn.alpinelinux.org|mirrors.aliyun.com|g' /etc/apk/repositories 2>/dev/null || true
           fi
           $SUDO apk add --no-cache cmake make g++ \
             || echo "WARN: 构建工具链安装失败(权限或网络)，继续尝试"

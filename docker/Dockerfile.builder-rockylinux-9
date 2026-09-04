@@ -1,0 +1,6 @@
+# 预构建工具链镜像：builder-rockylinux-9（加速 CI，2026-09-04 定稿）
+# Rocky 用 USTC（TUNA 不镜像 Rocky）；baseurl 含 $contentdir 变量须吃整段，与 CI before_script 同源
+FROM rockylinux:9
+RUN sed -i 's|^mirrorlist=|#mirrorlist=|g; s|^#baseurl=http://dl.rockylinux.org/$contentdir|baseurl=https://mirrors.ustc.edu.cn/rocky|g' /etc/yum.repos.d/*.repo && \
+    dnf install -y -q cmake make gcc-c++ && \
+    dnf clean all

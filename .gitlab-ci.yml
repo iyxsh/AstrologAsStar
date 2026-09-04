@@ -61,16 +61,17 @@ default:
         echo "cmake 缺失，尝试安装构建工具链..."
         if command -v apt-get >/dev/null 2>&1; then
           # 加速：默认源(deb.debian.org / archive.ubuntu.com)在本网络下极慢，
-          # 且每个 job 都是全新容器、都要重装一遍。改用清华 TUNA。
+          # 且每个 job 都是全新容器、都要重装一遍。改用中科大 USTC。
           # 要点：
           #  - 基础镜像无 ca-certificates，https 源会 update 失败，故统一用 http
+          #  - TUNA 于 2026-09-04 起 403（http/https 均不可达），勿再回切
           #  - 源 URL 自带路径后缀(如 /ubuntu、/debian)，替换时必须一并吃掉，
           #    否则会变成 /ubuntu/ubuntu 双路径
           #  - Debian 12 / Ubuntu 24.04 是 deb822(.sources)，Ubuntu 22.04 是 .list，都要处理
           if [ "$(id -u)" = "0" ]; then
             for _f in /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
               [ -f "$_f" ] && sed -i \
-                's|http://deb.debian.org/debian|http://mirrors.tuna.tsinghua.edu.cn/debian|g; s|https://deb.debian.org/debian|http://mirrors.tuna.tsinghua.edu.cn/debian|g; s|http://security.debian.org/debian-security|http://mirrors.tuna.tsinghua.edu.cn/debian-security|g; s|https://security.debian.org/debian-security|http://mirrors.tuna.tsinghua.edu.cn/debian-security|g; s|http://archive.ubuntu.com/ubuntu|http://mirrors.tuna.tsinghua.edu.cn/ubuntu|g; s|https://archive.ubuntu.com/ubuntu|http://mirrors.tuna.tsinghua.edu.cn/ubuntu|g; s|http://security.ubuntu.com/ubuntu|http://mirrors.tuna.tsinghua.edu.cn/ubuntu|g; s|https://security.ubuntu.com/ubuntu|http://mirrors.tuna.tsinghua.edu.cn/ubuntu|g' "$_f"
+                's|http://deb.debian.org/debian|http://mirrors.ustc.edu.cn/debian|g; s|https://deb.debian.org/debian|http://mirrors.ustc.edu.cn/debian|g; s|http://security.debian.org/debian-security|http://mirrors.ustc.edu.cn/debian-security|g; s|https://security.debian.org/debian-security|http://mirrors.ustc.edu.cn/debian-security|g; s|http://archive.ubuntu.com/ubuntu|http://mirrors.ustc.edu.cn/ubuntu|g; s|https://archive.ubuntu.com/ubuntu|http://mirrors.ustc.edu.cn/ubuntu|g; s|http://security.ubuntu.com/ubuntu|http://mirrors.ustc.edu.cn/ubuntu|g; s|https://security.ubuntu.com/ubuntu|http://mirrors.ustc.edu.cn/ubuntu|g' "$_f"
             done || true
           fi
           # DEBIAN_FRONTEND=noninteractive 消除 debconf 交互前端警告
@@ -78,9 +79,10 @@ default:
           $SUDO apt-get update -qq && DEBIAN_FRONTEND=noninteractive $SUDO apt-get install -y -qq cmake make g++ \
             || echo "WARN: 构建工具链安装失败(权限或网络)，继续尝试"
         elif command -v apk >/dev/null 2>&1; then
-          # Alpine 也用 TUNA 加速（默认 dl-cdn.alpinelinux.org 慢；alpine 基础镜像自带 ca-certificates）
+          # Alpine 用 aliyun 加速（实测 2026-09-04：USTC alpine ~7KB/s 卡死、aliyun ~104KB/s；
+          # 默认 dl-cdn.alpinelinux.org 慢；alpine 基础镜像自带 ca-certificates）
           if [ "$(id -u)" = "0" ]; then
-            sed -i 's|dl-cdn.alpinelinux.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apk/repositories 2>/dev/null || true
+            sed -i 's|dl-cdn.alpinelinux.org|mirrors.aliyun.com|g' /etc/apk/repositories 2>/dev/null || true
           fi
           $SUDO apk add --no-cache cmake make g++ \
             || echo "WARN: 构建工具链安装失败(权限或网络)，继续尝试"
@@ -410,7 +412,7 @@ build_dev_ubuntu_22_04:
     PLATFORM: "ubuntu-22.04"
     OS_NAME: "Ubuntu"
     OS_VERSION: "22.04"
-    BUILD_IMAGE: "ubuntu:22.04"
+    BUILD_IMAGE: "builder-ubuntu-22.04"
     ENVIRONMENT: "development"
     TIER: "dev"
     ARCH: "x86_64"
@@ -434,7 +436,7 @@ build_dev_ubuntu_24_04:
     PLATFORM: "ubuntu-24.04"
     OS_NAME: "Ubuntu"
     OS_VERSION: "24.04"
-    BUILD_IMAGE: "ubuntu:24.04"
+    BUILD_IMAGE: "builder-ubuntu-24.04"
     ENVIRONMENT: "development"
     TIER: "dev"
     ARCH: "x86_64"
@@ -458,7 +460,7 @@ build_dev_debian_12:
     PLATFORM: "debian-12"
     OS_NAME: "Debian"
     OS_VERSION: "12"
-    BUILD_IMAGE: "debian:12"
+    BUILD_IMAGE: "builder-debian-12"
     ENVIRONMENT: "development"
     TIER: "dev"
     ARCH: "x86_64"
@@ -482,7 +484,7 @@ build_dev_alpine_3_20:
     PLATFORM: "alpine-3.20"
     OS_NAME: "Alpine"
     OS_VERSION: "3.20"
-    BUILD_IMAGE: "alpine:3.20"
+    BUILD_IMAGE: "builder-alpine-3.20"
     ENVIRONMENT: "development"
     TIER: "dev"
     ARCH: "x86_64"
@@ -506,7 +508,7 @@ build_dev_rockylinux_9:
     PLATFORM: "rockylinux-9"
     OS_NAME: "Rocky Linux"
     OS_VERSION: "9"
-    BUILD_IMAGE: "rockylinux:9"
+    BUILD_IMAGE: "builder-rockylinux-9"
     ENVIRONMENT: "development"
     TIER: "dev"
     ARCH: "x86_64"
@@ -530,7 +532,7 @@ build_dev_fedora_40:
     PLATFORM: "fedora-40"
     OS_NAME: "Fedora"
     OS_VERSION: "40"
-    BUILD_IMAGE: "fedora:40"
+    BUILD_IMAGE: "builder-fedora-40"
     ENVIRONMENT: "development"
     TIER: "dev"
     ARCH: "x86_64"
@@ -554,7 +556,7 @@ build_dev_windows:
     PLATFORM: "windows"
     OS_NAME: "Windows"
     OS_VERSION: "10"
-    BUILD_IMAGE: "ubuntu:22.04"
+    BUILD_IMAGE: "builder-windows"
     ENVIRONMENT: "development"
     TIER: "dev"
     ARCH: "x86_64"
@@ -578,7 +580,7 @@ build_dev_android:
     PLATFORM: "android"
     OS_NAME: "Android"
     OS_VERSION: "API24"
-    BUILD_IMAGE: "ubuntu:22.04"
+    BUILD_IMAGE: "builder-android"
     ENVIRONMENT: "development"
     TIER: "dev"
     ARCH: "aarch64"
@@ -602,7 +604,7 @@ build_test_ubuntu_22_04:
     PLATFORM: "ubuntu-22.04"
     OS_NAME: "Ubuntu"
     OS_VERSION: "22.04"
-    BUILD_IMAGE: "ubuntu:22.04"
+    BUILD_IMAGE: "builder-ubuntu-22.04"
     ENVIRONMENT: "testing"
     TIER: "test"
     ARCH: "x86_64"
@@ -626,7 +628,7 @@ build_test_ubuntu_24_04:
     PLATFORM: "ubuntu-24.04"
     OS_NAME: "Ubuntu"
     OS_VERSION: "24.04"
-    BUILD_IMAGE: "ubuntu:24.04"
+    BUILD_IMAGE: "builder-ubuntu-24.04"
     ENVIRONMENT: "testing"
     TIER: "test"
     ARCH: "x86_64"
@@ -650,7 +652,7 @@ build_test_debian_12:
     PLATFORM: "debian-12"
     OS_NAME: "Debian"
     OS_VERSION: "12"
-    BUILD_IMAGE: "debian:12"
+    BUILD_IMAGE: "builder-debian-12"
     ENVIRONMENT: "testing"
     TIER: "test"
     ARCH: "x86_64"
@@ -674,7 +676,7 @@ build_test_alpine_3_20:
     PLATFORM: "alpine-3.20"
     OS_NAME: "Alpine"
     OS_VERSION: "3.20"
-    BUILD_IMAGE: "alpine:3.20"
+    BUILD_IMAGE: "builder-alpine-3.20"
     ENVIRONMENT: "testing"
     TIER: "test"
     ARCH: "x86_64"
@@ -698,7 +700,7 @@ build_test_rockylinux_9:
     PLATFORM: "rockylinux-9"
     OS_NAME: "Rocky Linux"
     OS_VERSION: "9"
-    BUILD_IMAGE: "rockylinux:9"
+    BUILD_IMAGE: "builder-rockylinux-9"
     ENVIRONMENT: "testing"
     TIER: "test"
     ARCH: "x86_64"
@@ -722,7 +724,7 @@ build_test_fedora_40:
     PLATFORM: "fedora-40"
     OS_NAME: "Fedora"
     OS_VERSION: "40"
-    BUILD_IMAGE: "fedora:40"
+    BUILD_IMAGE: "builder-fedora-40"
     ENVIRONMENT: "testing"
     TIER: "test"
     ARCH: "x86_64"
@@ -746,7 +748,7 @@ build_test_windows:
     PLATFORM: "windows"
     OS_NAME: "Windows"
     OS_VERSION: "10"
-    BUILD_IMAGE: "ubuntu:22.04"
+    BUILD_IMAGE: "builder-windows"
     ENVIRONMENT: "testing"
     TIER: "test"
     ARCH: "x86_64"
@@ -770,7 +772,7 @@ build_test_android:
     PLATFORM: "android"
     OS_NAME: "Android"
     OS_VERSION: "API24"
-    BUILD_IMAGE: "ubuntu:22.04"
+    BUILD_IMAGE: "builder-android"
     ENVIRONMENT: "testing"
     TIER: "test"
     ARCH: "aarch64"
@@ -794,7 +796,7 @@ build_prod_ubuntu_22_04:
     PLATFORM: "ubuntu-22.04"
     OS_NAME: "Ubuntu"
     OS_VERSION: "22.04"
-    BUILD_IMAGE: "ubuntu:22.04"
+    BUILD_IMAGE: "builder-ubuntu-22.04"
     ENVIRONMENT: "production"
     TIER: "prod"
     ARCH: "x86_64"
@@ -819,7 +821,7 @@ build_prod_ubuntu_24_04:
     PLATFORM: "ubuntu-24.04"
     OS_NAME: "Ubuntu"
     OS_VERSION: "24.04"
-    BUILD_IMAGE: "ubuntu:24.04"
+    BUILD_IMAGE: "builder-ubuntu-24.04"
     ENVIRONMENT: "production"
     TIER: "prod"
     ARCH: "x86_64"
@@ -844,7 +846,7 @@ build_prod_debian_12:
     PLATFORM: "debian-12"
     OS_NAME: "Debian"
     OS_VERSION: "12"
-    BUILD_IMAGE: "debian:12"
+    BUILD_IMAGE: "builder-debian-12"
     ENVIRONMENT: "production"
     TIER: "prod"
     ARCH: "x86_64"
@@ -869,7 +871,7 @@ build_prod_alpine_3_20:
     PLATFORM: "alpine-3.20"
     OS_NAME: "Alpine"
     OS_VERSION: "3.20"
-    BUILD_IMAGE: "alpine:3.20"
+    BUILD_IMAGE: "builder-alpine-3.20"
     ENVIRONMENT: "production"
     TIER: "prod"
     ARCH: "x86_64"
@@ -894,7 +896,7 @@ build_prod_rockylinux_9:
     PLATFORM: "rockylinux-9"
     OS_NAME: "Rocky Linux"
     OS_VERSION: "9"
-    BUILD_IMAGE: "rockylinux:9"
+    BUILD_IMAGE: "builder-rockylinux-9"
     ENVIRONMENT: "production"
     TIER: "prod"
     ARCH: "x86_64"
@@ -919,7 +921,7 @@ build_prod_fedora_40:
     PLATFORM: "fedora-40"
     OS_NAME: "Fedora"
     OS_VERSION: "40"
-    BUILD_IMAGE: "fedora:40"
+    BUILD_IMAGE: "builder-fedora-40"
     ENVIRONMENT: "production"
     TIER: "prod"
     ARCH: "x86_64"
@@ -944,7 +946,7 @@ build_prod_windows:
     PLATFORM: "windows"
     OS_NAME: "Windows"
     OS_VERSION: "10"
-    BUILD_IMAGE: "ubuntu:22.04"
+    BUILD_IMAGE: "builder-windows"
     ENVIRONMENT: "production"
     TIER: "prod"
     ARCH: "x86_64"
@@ -969,7 +971,7 @@ build_prod_android:
     PLATFORM: "android"
     OS_NAME: "Android"
     OS_VERSION: "API24"
-    BUILD_IMAGE: "ubuntu:22.04"
+    BUILD_IMAGE: "builder-android"
     ENVIRONMENT: "production"
     TIER: "prod"
     ARCH: "aarch64"

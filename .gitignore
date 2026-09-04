@@ -4,3 +4,6 @@
 .idea/
 astroproject/build/
 A32_V3_51_Proj_2022
+# 预编译产物（铁律：预编译二进制绝不入库；.lib 历史跟踪除外）
+astroproject/lib/**/*.a
+astroproject/lib/**/CMakeFiles/

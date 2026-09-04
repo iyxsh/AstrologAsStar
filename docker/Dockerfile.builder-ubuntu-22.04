@@ -1,0 +1,17 @@
+# 预构建工具链镜像：builder-ubuntu-22.04（加速 CI，2026-09-04 定稿）
+# ============================================================
+# 问题：每个 job 都是全新容器，6 平台每次 apt/apk/dnf 重装工具链
+#       （ubuntu-22.04 实测 ~400s；6 平台合计 ~36min，串行更久）。
+# 方案：预构建带 cmake/make/g++ 的定制镜像，CI image: 引用 builder-<平台>，
+#       runner(pull_policy=if-not-present) 直接复用本地镜像零拉取，
+#       before_script 检测 cmake 存在 -> 整段跳过。build job 从 ~8min 降到 ~1-2min。
+#
+# 批量构建：scripts/build-builder-images.sh（在 n8n VM 上执行）
+# 镜像源 sed 与 .gitlab-ci.yml default.before_script 保持同源逻辑（勿单独改一套）：
+#   - apt 用 http TUNA（基础镜像无 ca-certificates，https 会 update 失败）
+#   - dnf 用 USTC(rocky) / aliyun(fedora)；apk 用 TUNA
+# ============================================================
+FROM ubuntu:22.04
+RUN sed -i 's|http://archive.ubuntu.com/ubuntu|http://mirrors.ustc.edu.cn/ubuntu|g; s|http://security.ubuntu.com/ubuntu|http://mirrors.ustc.edu.cn/ubuntu|g' /etc/apt/sources.list && \
+    apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq cmake make g++ && \
+    rm -rf /var/lib/apt/lists/*

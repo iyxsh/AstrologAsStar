@@ -1,0 +1,7 @@
+# 预构建工具链镜像：builder-fedora-40（加速 CI，2026-09-04 定稿）
+# Fedora 用 aliyun（USTC/TUNA 的 fedora 缺 Everything 仓库 404；aliyun 无 /linux/ 层）
+# baseurl 占位是 download.example[.com]/pub/fedora/linux，两种变体都替换，与 CI before_script 同源
+FROM fedora:40
+RUN sed -i 's|^metalink=|#metalink=|g; s|^mirrorlist=|#mirrorlist=|g; s|^#baseurl=http://download.example/pub/fedora/linux|baseurl=http://mirrors.aliyun.com/fedora|g; s|^#baseurl=https://download.example.com/pub/fedora/linux|baseurl=http://mirrors.aliyun.com/fedora|g; s|^baseurl=http://download.example/pub/fedora/linux|baseurl=http://mirrors.aliyun.com/fedora|g; s|^baseurl=https://download.example.com/pub/fedora/linux|baseurl=http://mirrors.aliyun.com/fedora|g' /etc/yum.repos.d/*.repo && \
+    dnf install -y -q cmake make gcc-c++ && \
+    dnf clean all

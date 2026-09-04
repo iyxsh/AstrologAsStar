@@ -1,0 +1,8 @@
+# 预构建工具链镜像：builder-android（NDK 交叉，加速 CI，2026-09-04 定稿）
+# base = ubuntu:22.04（平台矩阵中 android 的构建宿主）
+# NDK r25b 本体在 runner 宿主卷 /opt/ci-cache/ndk（config.toml volumes 挂载），镜像无需含；
+# 预装 wget/unzip 让 job 的"宿主无 NDK 缓存"回退下载分支也无需现场装包
+FROM ubuntu:22.04
+RUN sed -i 's|http://archive.ubuntu.com/ubuntu|http://mirrors.ustc.edu.cn/ubuntu|g; s|http://security.ubuntu.com/ubuntu|http://mirrors.ustc.edu.cn/ubuntu|g' /etc/apt/sources.list && \
+    apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq cmake make g++ wget unzip && \
+    rm -rf /var/lib/apt/lists/*

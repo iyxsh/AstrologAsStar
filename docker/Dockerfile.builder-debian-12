@@ -1,0 +1,6 @@
+# 预构建工具链镜像：builder-debian-12（加速 CI，2026-09-04 定稿）
+# debian:12 是 deb822 格式（/etc/apt/sources.list.d/debian.sources），sed 规则与 CI before_script 同源
+FROM debian:12
+RUN sed -i 's|http://deb.debian.org/debian|http://mirrors.ustc.edu.cn/debian|g; s|https://deb.debian.org/debian|http://mirrors.ustc.edu.cn/debian|g; s|http://security.debian.org/debian-security|http://mirrors.ustc.edu.cn/debian-security|g; s|https://security.debian.org/debian-security|http://mirrors.ustc.edu.cn/debian-security|g' /etc/apt/sources.list.d/debian.sources && \
+    apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq cmake make g++ && \
+    rm -rf /var/lib/apt/lists/*
