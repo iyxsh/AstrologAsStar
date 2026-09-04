@@ -9,16 +9,18 @@
 
 ## 0. 结论摘要
 
-- 原版 `A32_V3_51_Proj_2022` 是 **~11.7 万行**的 Windows MFC 单文件巨型应用
-  （astrolog.cpp 84,792 行 + newChart.h 22,986 行 + dbmanage.h 7,943 行 + 资源/地名库/星历文件），
+- 原版 `A32_V3_51_Proj`（E:\IT\astrolog\A32_V3_51_Proj，★正确基线）是 **~11.7 万行**的
+  Windows MFC 单文件巨型应用
+  （astrolog.cpp 84,291 行 + newChart.h 22,986 行 + dbmanage.h 7,943 行 + 资源/地名库/星历文件），
   **纯计算能力远超**现重构版。
 - 现重构版 `AstrologAsStar` 仅 ~1.07 万行，是"沿主链精简"的产物：
   **本命盘主链可用，其余能力要么是桩、要么是死代码、要么无入口**，且
   缺配置解析、无数值测试、编码与许可均有隐患。
 - 最佳方案 = **以原版为"行为金标准"，在新架构内分阶段补全 + 金样对拍验收**，
   不搬运 Windows/GUI/DB 代码。保留 8 平台 CI 流水线与跨平台静态库 API 形态。
-- 关键使能点：原版 exe 支持经典 `-o` 文件输出开关 → 可在本机宿主生成
-  **文本金样（golden）**，作为各阶段数值对齐的客观判据。
+- 关键使能点：原版代码保留了完整**文本输出链**（ChartListing/PrintChart/FOutputData，
+  `is.S=stdout` 输出、`-o` 写 UTF-8 文件），但 GUI exe 命令行模式不触发该链 →
+  金样生成器 = **给原版源码加 console 入口，用宿主 VS2026 编译一次**（详见 §5.1 修正）。
 
 ---
 
@@ -46,21 +48,26 @@ AstrologAsStar = 从 Astrolog32（5.40G 血统 + 6.00+ 片段 + 中文定制，�
 
 ## 2. 两侧工程解剖（事实基线）
 
-### 2.1 原版 A32_V3_51_Proj_2022（E:\IT\astrolog\A32_V3_51_Proj_2022）
+### 2.1 原版 A32_V3_51_Proj（E:\IT\astrolog\A32_V3_51_Proj）★正确基线（2026-09-04 纠正）
+
+> **位置纠错**：此前分析误用 `A32_V3_51_Proj_2022`（同族旧副本，含调试弹窗/多语言
+> 发布资产）。用户指正**权威原工程 = `A32_V3_51_Proj`**（无后缀）。
+> 经函数面比对（下详），**两版核心代码 100% 一致**（574 函数全同，_2022 仅多
+> InitConsole/MyTextOutputA/MyTextOutputW 3 个调试函数 + 全局变量 `ignore1` 改名 +
+> 注释差异），本方案差距矩阵/功能结论不受影响；仅路径、行号、exe 版本需按本表更新。
 
 | 资产 | 规模/说明 |
 |---|---|
-| astrolog.cpp | 84,792 行：引擎+GUI 交织单文件（WinMain 10250 / WndProc 12285 / NWmCommand 24438；纯计算 CastChart 21107、DoReturn 18306、Action 18426、DisplayPrimDirs 33697、ChartFirdaria 40838、ChartAstroGraph 41318…） |
-| newChart.h | 22,986 行：**面向对象进阶计算层**（内联类：Houses/Planet/Planets/两 Speculum/Fortune/MidPoints/ZodPars/Firdaria/Syzygy/Essentials/Accidentals/SecMotion/Transit/Profections/Decennial/ZodRelL1/**PrimDirs ~1.3 万行**/PDsInChart…），非绘图模块 |
+| astrolog.cpp | **84,291 行**（UTF-16）：引擎+GUI 交织单文件（WinMain 9780 / WndProc 11807；纯计算 CastChart 20629、DoReturn 17828、Action 17948、CastRelation 42411、DisplayGrands 36883、NCheckEclipse 38267、ChartListing 36076、ChartFirdaria 40357、ChartAstroGraph 40837、DisplayPrimDirs 33219、PrintChart 41477、FOutputData 49223） |
+| newChart.h | 22,986 行（gb18030）：**面向对象进阶计算层**（内联类：Houses/Planet/Planets/两 Speculum/Fortune/MidPoints/ZodPars/Firdaria/Syzygy/Essentials/Accidentals/SecMotion/Transit/Profections/Decennial/ZodRelL1/**PrimDirs ~1.3 万行**/PDsInChart…），非绘图模块 |
 | new.h | 784 行：印度盘/中文拼音等 |
 | dbmanage.h | 7,943 行：SQLite 人物档案库（PERSON 表 + ListView + 增删改查 + .dat/.json 导入导出） |
 | resources_en.h | 2,468 行：839 个 sXXXX 字符串 + 526 个 cmd 菜单命令 + 75 菜单/对话框资源 |
-| atlas.h | 2.18MB：Walter Pullen 国际地名内嵌表（26,733 城）+ 外置 atlas 目录 |
-| 编译 | astrolog32_en.vcxproj：astrolog.cpp + cJSON.c + sqlite3.c + xmlParser.cpp + CharStrings.cpp + **内嵌 SWE 全套 swe*.c** |
-| 数据资产 | int/ephemeris/（sepl_18.se1 484KB、semo_18.se1 1.30MB、seas_18.se1 223KB，DE431 系）；fixstars.cat（中文 1216 行恒星表）；sefstars.txt（1265 行）；STARS.DAT（75 星释义）；interpretations/HOUSE?.DAT+PL??.DAT（分语言文案） |
-| 多语言 | language.dll + Lang()/LoadStringW；CHINESE/CZECH/FRENCH/ITALIAN + ch/en/cz/fr/it/int 数据目录 |
-| 运行版 | ch/main/astrolog32.exe、int/main/astrolog32.exe（含完整数据布局）；Output/Astrolog32_v3_51_setup.exe |
-| 命令行 | 经典 astrolog 字母开关体系（FProcessSwitchesMain 22324；-M 宏、-Y 图类、#扩展开关）；**支持 -o 文本文件输出（fWriteFile L1171 / 18645，内部 UNICODE 文件重定向）** ← 金样通道 |
+| atlas.h | 2.18MB：Walter Pullen 国际地名内嵌表（26,733 城）+ int/atlas/american、int/atlas/international 外置 |
+| 编译 | astrolog32_en.vcxproj（v143/VS2022，Unicode，/SUBSYSTEM:Windows）：astrolog.cpp + cJSON.c + sqlite3\sqlite3.c + xmlParser.cpp + General\CharStrings.cpp + **内嵌 SWE 全套 swe*.c（2.10.03）** + resources_en.rc；Release_en/ 留有 2025-03-12 完整 .obj（可增量链接） |
+| 数据资产 | int/ephemeris/（sepl_18.se1 484KB、semo_18.se1 1.30MB、seas_18.se1 223KB，DE431 系）；int/main/sefstars.txt（恒星表）；int/main/FIXSTARS.CAT；int/charts/（John_Lennon/Yoko_Ono.dat 样例盘） |
+| 运行版 | int/main/astrolog32.exe（9.2MB，2025-03-12，**干净版**，无调试弹窗；Astrolog32.db 档案库、Help.chm 等随行） |
+| 命令行 | 经典 astrolog 字母开关体系（FProcessSwitchesMain 21846；-M 宏、-Y 图类、#扩展开关）；**但为 GUI 程序：WinMain 解析开关后进消息循环，从不触发 Action() 文本输出** → 金样通道不能直接跑 exe -o（见 §5.1 修正） |
 
 ### 2.2 原版能力总览（对齐目标面）
 
@@ -201,16 +208,33 @@ astroproject/
    `CastChart` 等内部全局单例保留但收敛读写点，文档明示非线程安全
    （并发抽取为可选项，见决策点）。
 
-### 5.1 金样对拍机制（验收的锚）
-- 生成：本机宿主（Windows）用原版 `int/main/astrolog32.exe`（带 int/ephemeris）
-  以经典开关 + `-o <file>` 输出文本（内部 UNICODE 文件），按"能力×代表盘"矩阵
-  批量产出；归一化（去头部版本行/日期行/空白）后提交为 `test/golden/*.golden.txt`。
+### 5.1 金样对拍机制（验收的锚）★2026-09-04 修正
+
+**重要实证修正**：原版 `astrolog32.exe` 是 GUI 程序——命令行传 `-o`/日期开关后，
+WinMain（L9780）调 FProcessCommandLine（L18191）→ FProcessSwitchesMain（L21846）解析
+开关即进入**消息循环**，从不调用 Action()（L17948）→ 实测 `-o out.txt` 运行 8s 后
+进程仍存活、文件不生成（int/main 与 ch/main 两个 exe 均如此，_2022 调试版还弹窗）。
+因此"直接跑原版 exe -o 产金样"**不可行**。
+
+**可行方案（金样生成器 = 原版 console 变体）**：
+- 原版文本输出链完整且**不依赖 GUI**：ChartListing（L36076）/PrintChart（L41477）以
+  `is.S=stdout` 输出文本；`-o` 经 FOutputData（L49223）用 CreateFileW 写 UTF-8（BOM+@0102
+  头）；`-os` 将文本重定向文件（is.szFileScreen）。GUI 只是把 stdout 接到窗口缓冲。
+- 做法：以原版 astrolog.cpp 为底，**新增一个 console 入口**（仿经典 Astrolog 文本模式
+  main：解析开关 → 若非图形模式调 Action()/PrintChart → `-o` 落盘 → exit），
+  用宿主 **VS2026 Community**（v143 工具链，Release_en 已有全部 .obj 佐证可编译）编译
+  出 `astrolog32-golden.exe`。产物不入 AstrologAsStar 仓库，仅宿主生成金样用。
+- 命令形如：`astrolog32-golden -qy 1958 -qm 7 -qd 4 -qt 12:01 -z0 -Y0 -o <out>`；
+  若 console 改造有 GUI 初始化阻碍（LoadLanguagePack/字体等），退路 = 用
+  `SendMessage` 驱动 GUI 的 cmdSaveText（40200）菜单命令（GUI 自动化，不推荐首选）。
+- 生成：按"能力×代表盘"矩阵批量产出（本命/宫位系/推进/合盘等，覆盖中文名/东西经/
+  夏令时/负时区/近两极/±100 年）；归一化（去 @0102 头/版本行/日期行/空白）后提交
+  `test/golden/*.golden.txt`。
 - 校验：CI verify 阶段（Linux 容器）跑 `astrolog32-cli` 同输入 → 归一化 → diff 金样。
   跨平台（mingw/android）保持编译 + 冒烟，数值对拍以原生 6 平台为准。
-- 局限与对策：原版 exe 仅 Windows 且输出含 GUI 时代排版 → 金样只取
-  数值行（位置/宫头/相位/容许度等），排版不比对；历元选 .se1 覆盖范围
-  （1900–2100 稳妥，DE431 更宽）；sweph 双引擎差异以 Moshier 或同一 SWE 文件保证
-  同源可比。
+- 局限与对策：金样只取数值行（位置/宫头/相位/容许度等），排版不比对；历元选 .se1
+  覆盖范围（1900–2100 稳妥，DE431 更宽）；sweph 同源（原版内嵌 2.10.03，AstrologAsStar
+  submodule 版本需对齐或金样用 Moshier 区段保证可比）。
 
 ---
 
@@ -219,7 +243,7 @@ astroproject/
 ### P0 · 地基与测试网（先决，不可跳）
 - [ ] 决策点确认（见 §8）→ 本方案定稿、入库 docs/。
 - [ ] 许可处理：LICENSE 改双段（衍生声明 + 上游条款 + NOTICE），版本号规范化。
-- [ ] 金样通道验证：用原版 exe 跑通 5~10 个代表性输入（含中文名/东西经/夏令时/负时区/近两极），产出首批金样。
+- [ ] 金样生成器：给原版 astrolog.cpp 加 console 入口，宿主 VS2026 编译 `astrolog32-golden.exe`，跑通 5~10 个代表性输入（含中文名/东西经/夏令时/负时区/近两极），产出首批金样。
 - [ ] CLI `astrolog32-cli` 落地（类原版开关子集 + `--json`），复用现有 OutStr*/ChartListing 输出。
 - [ ] CTest 接入 + `test/unit`（API 冒烟、输入校验、编码往返）+ CI verify 升级为"运行 CLI → diff 金样"。
 - [ ] 清理：删 .bak/假桩标注、Kepler 死引擎隔离、stdout 副作用净化（可选回调）。
@@ -259,8 +283,8 @@ astroproject/
 
 | 风险 | 对策 |
 |---|---|
-| 原版 exe 输出带 GUI 排版/语言 DLL 差异 → 金样难比 | 金样只取数值行；固定 int 英文版 + 同数据目录；归一化器 |
-| PD/法达等依赖原版全局单例状态机，移植易引入漂移 | 以原版 exe 对拍为准 + 单元化（输入状态显式化）；PD 放 P4 |
+| 原版 GUI exe 无法命令行批处理输出（WinMain 进消息循环不触发 Action） | 金样生成器 = 原版源码加 console 入口 + 宿主 VS2026 编译；文本输出链本就不依赖 GUI（is.S=stdout） |
+| PD/法达等依赖原版全局单例状态机，移植易引入漂移 | 以原版 console 变体对拍为准 + 单元化（输入状态显式化）；PD 放 P4 |
 | 远日期（<1800/>2400）sweph 文件缺失 | Moshier 回退 + 金样限 .se1 可靠区间 |
 | 中文/编码在 Linux CI 从未被跑 | P0 加"中文输入→CLI→UTF-8 输出"CI 用例（容器内 zh_CN.UTF-8 或显式 UTF-8 管道） |
 | 许可风险（再分发含上游代码/文案） | P0 处理；解释文案/恒星释义若入包需逐项核上游许可 |
@@ -276,7 +300,7 @@ astroproject/
    C) 仅修缺陷 + 配置化（P0+P1，最小改动）。
 2. **正式 CLI**：是否新增 `astrolog32-cli`（对拍/交付/调试三用，含 JSON 输出）？
    要（推荐）／ 不要（仅 API + 单测内部驱动）。
-3. **金样对拍**：是否接受"本机宿主跑原版 exe -o 生成金样、提交仓库、CI 对拍"作为验收机制？
+3. **金样对拍**：是否接受"金样 = 原版源码 console 变体（宿主 VS2026 编译 astrolog32-golden.exe）生成、提交仓库、CI 对拍"作为验收机制？（已确认替代"跑 GUI exe -o"）
    接受（推荐）／ 只要手工对照／ 不做数值对拍（仅单测自洽）。
 4. **许可**：LICENSE 改为衍生双段（保留上游声明 + NOTICE + 明确 MIT 仅覆盖新代码）？
    改为衍生合规（推荐）／ 维持现状 MIT（接受再分发风险）。
