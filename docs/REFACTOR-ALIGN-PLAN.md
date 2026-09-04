@@ -260,9 +260,9 @@ WinMain（L9780）调 FProcessCommandLine（L18191）→ FProcessSwitchesMain（
 ## 6. 分阶段实施计划
 
 ### P0 · 地基与测试网（先决，不可跳）
-- [ ] 决策点确认（见 §8）→ 本方案定稿、入库 docs/。
-- [ ] 许可处理：LICENSE 改双段（衍生声明 + 上游条款 + NOTICE），版本号规范化。
-- [ ] 金样生成器：给原版 astrolog.cpp 加 console 入口，宿主 VS2026 编译 `astrolog32-golden.exe`，跑通 5~10 个代表性输入（含中文名/东西经/夏令时/负时区/近两极），产出首批金样。
+- [x] 决策点确认（§8 第 1-4 项已拍板：P0-P3 核心对齐不含 PD/AstroGraph、正式 astrolog32-cli、金样入库 CI 对拍、衍生双段许可；5/6 线程安全/应用层内容留待 P1 前）。
+- [x] 许可处理：LICENSE 双段（上游 GPL-2.0-or-later 聚合声明 + 新代码 MIT）+ NOTICE 溯源（71a329e）。
+- [x] 金样生成器：给原版 astrolog.cpp 加 console 入口（`golden_main.cpp` 单 TU include + 复刻非 GUI 初始化），**mingw32 x86 编译**（VS2026 cl 缺 SDK/ucrt 实测不可用，改 mingw32 与原版 exe PE 对齐）产出 `astrolog32-golden.exe`；跑通 8 个代表输入（中文名/东西经/夏令时/负时区/近两极 78N/±100 年），首批 8 份 @0203 数值金样已入库 `test/golden/`。
 - [ ] CLI `astrolog32-cli` 落地（类原版开关子集 + `--json`），复用现有 OutStr*/ChartListing 输出。
 - [ ] CTest 接入 + `test/unit`（API 冒烟、输入校验、编码往返）+ CI verify 升级为"运行 CLI → diff 金样"。
 - [ ] 清理：删 .bak/假桩标注、Kepler 死引擎隔离、stdout 副作用净化（可选回调）。
