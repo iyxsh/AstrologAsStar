@@ -229,6 +229,14 @@ if(WIN32 AND MSVC)
 endif()
 add_test(NAME unit_grands COMMAND astrolog32_unit_grands)
 
+# P2/A8 — 次限推进链单测（delta=0 golden 恒等 + 前向 sanity）
+add_executable(astrolog32_unit_progress test/unit/unit_progress.cpp)
+target_link_libraries(astrolog32_unit_progress astrolog32)
+if(WIN32 AND MSVC)
+    target_compile_definitions(astrolog32_unit_progress PRIVATE _CRT_SECURE_NO_WARNINGS)
+endif()
+add_test(NAME unit_progress COMMAND astrolog32_unit_progress)
+
 # 金样对拍：运行 astrolog32-cli → 与 test/golden/*.golden.txt 逐字段 diff
 # （需要 Python3 解释器；未找到时跳过注册，可手动跑 test/verify_cli.py）
 find_package(Python3 COMPONENTS Interpreter)

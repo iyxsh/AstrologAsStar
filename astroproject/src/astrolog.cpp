@@ -5280,11 +5280,10 @@ static void EmitMachineRow(std::wstring& out, const wchar_t* name3,
 	out += sz;
 }
 
-std::wstring GetChartMachineText(const ChartInput& chartInput)
+/* Machine-writer core（A8 提取单源）：读当前 cp0/is/us 输出 @0203 行。
+ * GetChartMachineText / GetProgressedMachineText 共用，防双份漂移。 */
+static std::wstring BuildMachineText()
 {
-	SetupChartQuiet(chartInput);
-	CastChart(1);
-
 	std::wstring out;
 	wchar_t sz[512];
 
@@ -5340,6 +5339,33 @@ std::wstring GetChartMachineText(const ChartInput& chartInput)
 		EmitMachineRow(out, nm3, rT, lat, speed, dist);
 	}
 	return out;
+}
+
+std::wstring GetChartMachineText(const ChartInput& chartInput)
+{
+	SetupChartQuiet(chartInput);
+	CastChart(1);
+	return BuildMachineText();
+}
+
+/* P2/A8（2026-09-05 采用方案）：次限推进盘机器文本。
+ * SetupChartQuiet(natal) 后镜像 astrolog.cpp rcProgress 注入（~3623 行）：
+ * us.fProgressUS + is.JDp(=MdytszToJulian(目标, ciNatal.dst, 目标zon)) +
+ * us.rProgDay=365.24219（次限默认，golden cmdSecProgressions），再 CastChart。
+ * 推进公式在 chart.cpp ProcessInput（与 golden astrolog.cpp:50576 同源）：
+ * is.T = natal_UT + (JDp - natal_UT)/rProgDay。目标地点沿用本命（同 zon/dst），
+ * 宫位按推进时刻 + 本命地点（与原版 rcProgress 一致）。 */
+std::wstring GetProgressedMachineText(const ChartInput& natal,
+	int tgtMon, int tgtDay, int tgtYea, const char* tgtTim, double tgtDst, double tgtZon)
+{
+	SetupChartQuiet(natal);
+	us.fProgressUS = TRUE;
+	us.rProgDay = 365.24219;   /* 次限默认（golden cmdSecProgressions） */
+	is.JDp = MdytszToJulian(tgtMon, tgtDay, tgtYea, RParseSz(tgtTim, pmTim),
+		tgtDst, tgtZon);
+	CastChart(1);
+	us.fProgressUS = FALSE;    /* 恢复默认，勿泄漏到后续盘 */
+	return BuildMachineText();
 }
 
 std::string GetChartJSON(const ChartInput& chartInput)

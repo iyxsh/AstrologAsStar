@@ -48,6 +48,8 @@ int main(int argc, char* argv[])
 {
 	bool json = false;
 	bool grands = false;        /* --grands：盘后追加格局检测行（A7① 真实盘对拍） */
+	bool haveProg = false;      /* --progto M D Y T：次限推进到目标日期（A8） */
+	const char* pM = nullptr, * pD = nullptr, * pY = nullptr, * pT = nullptr;
 	std::string outFile;
 	std::string cfgFile;
 	std::vector<std::string> cfgToks;   /* engine-switch passthrough tokens */
@@ -82,6 +84,14 @@ int main(int argc, char* argv[])
 			json = true;
 		} else if (a == "--grands") {
 			grands = true;   /* opt-in：输出格局检测行 GR <name> o1 o2 o3 o4 */
+		} else if (a == "--progto") {
+			if (k + 4 >= argc) {
+				fprintf(stderr, "error: --progto requires 4 args: M D Y T\n");
+				return 2;
+			}
+			pM = argv[k + 1]; pD = argv[k + 2]; pY = argv[k + 3]; pT = argv[k + 4];
+			k += 4;
+			haveProg = true;
 		} else if (a == "--text") {
 			json = false;
 		} else if (a == "-n") {
@@ -174,7 +184,11 @@ int main(int argc, char* argv[])
 			fputs(j.c_str(), stdout); fputc('\n', stdout);
 		}
 	} else {
-		std::wstring w = GetChartMachineText(ci);
+		/* A8：--progto 时输出次限推进盘（目标地点沿用本命 dst/zon） */
+		std::wstring w = haveProg
+			? GetProgressedMachineText(ci, atoi(pM), atoi(pD), atoi(pY), pT,
+				ci.dst, ci.zon)
+			: GetChartMachineText(ci);
 		std::string u = w2u(w);
 		if (!outFile.empty()) {
 			FILE* f = fopen(outFile.c_str(), "wb");

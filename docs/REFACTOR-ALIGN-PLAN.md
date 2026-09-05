@@ -434,6 +434,20 @@ A10（关系盘：合盘/组合盘/中点）。
   **结论：golden runner 无法产出可复现次限 @0203 → golden 金样路线对 A8 关闭。**
   两条替代：① 独立 oracle（pymeeus 等，0.1~0.5° 容差；需先建本地双日期 API 通道，推荐）；
   ② 改造 golden_main 补关系初始化后重编 mingw32（涉 oracle 纯度，不推荐，除非要 9 位级）。
+
+**A8 采用方案 + 落地（2026-09-05，推荐路线①）**：
+- **本地双日期 API 通道**：astrolog.cpp 新增 `GetProgressedMachineText(natal, M,D,Y,T,dst,zon)`
+  （镜像 rcProgress ~3623 注入：`us.fProgressUS` + `is.JDp=MdytszToJulian(目标,…)` +
+  `us.rProgDay=365.24219`，再 `CastChart(1)`）；@0203 写行器抽为单源 `BuildMachineText()`
+  （GetChartMachineText 与推进 API 共用，64 金样零回归）。CLI opt-in `--progto M D Y T`
+  （地点沿用本命 dst/zon，默认不触发不影响金样）。
+- **delta=0 golden 恒等（9 位级，ctest `unit_progress`）**：推进到本命日期时刻 == 本命
+  @0203 逐字节（任何 JD/时区/推进公式漂移都会打破）→ 整条触发链达 golden 级验证。
+- **pymeeus 独立 oracle（`test/verify_progress.py`，venv 运行）**：Sun 校准绝对法
+  （±1.2d 内反解引擎本命绝对 JD 后 + ddays/365.24219 预测推进历元）——8 基础盘 × 2 目标
+  **16/16 通过，worst Sun=1e-5° / Moon=0.0048°**（独立星历 arcsec 级确认推进数值正确）。
+- 结论：A8 次限（rcProgress 语义）数值正确性已由「delta=0 golden 恒等 + 独立星历 arcsec 级
+  交叉」双重锁定；后续 P2 动态盘（行运/月亮弧/合盘）可复用该 API 通道与验证模式。
 **A6 余项前置核查（2026-09-05）**：本地**无** `rAspOrb/rObjOrb/rAspInf` 数组（引擎容差为内联
 `rOrb` 逻辑）→ `-Ao/-Am` 自定义容差表需先移植 golden 容差基础设施，非小改；与 -Aa（改
 rAspAngle，常量表可直接改但会破坏既有镜像，慎重）一起归"需专项"。

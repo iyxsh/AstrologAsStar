@@ -88,4 +88,10 @@ ASTROLOG32_API void SetSilent(bool silent);
 ASTROLOG32_API std::wstring GetChartMachineText(const ChartInput& chartInput);
 ASTROLOG32_API std::string GetChartJSON(const ChartInput& chartInput);
 
+/* P2/A8 — 次限推进盘机器文本（@0203 同格式）。natal=本命；tgtMon/Day/Yea/Tim
+ * =推进目标日期时刻（地点沿用本命：dst/zon 与本命一致传入）。推进公式与原版
+ * rcProgress 一致（is.T = natal_UT + (JDp-natal_UT)/rProgDay，rProgDay=365.24219）。 */
+ASTROLOG32_API std::wstring GetProgressedMachineText(const ChartInput& natal,
+	int tgtMon, int tgtDay, int tgtYea, const char* tgtTim, double tgtDst, double tgtZon);
+
 #endif // ASTROLOG_LIB_H
