@@ -412,7 +412,22 @@ workflow:
     - if: $CI_COMMIT_TAG
     - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
       when: never
+    # 仅文档变更时跳过整条流水线（docs/、README*、LICENSE*、NOTICE* 等纯文档），
+    # 避免白跑 2h 构建矩阵（#44 教训）。源码/构建相关变更照常触发。
+    # 注：changes 在分支 push 时与上一提交比对；新分支首提交 GitLab 视为全部命中→照常跑（fail-open）。
     - if: $CI_COMMIT_BRANCH
+      changes:
+        - "astroproject/**/*"
+        - "scripts/**/*"
+        - "test/**/*"
+        - "swisseph"
+        - "swisseph/**/*"
+        - "docker/**/*"
+        - "**/CMakeLists.txt"
+        - ".gitlab-ci.yml"
+        - ".gitattributes"
+        - ".gitignore"
+    - when: never
 
 .variables_template: &variables_definition
   BUILD_DIR: "build"
