@@ -237,6 +237,14 @@ if(WIN32 AND MSVC)
 endif()
 add_test(NAME unit_progress COMMAND astrolog32_unit_progress)
 
+# P2/A8-1 — 行运盘单测（rcTransit == 目标盘 → 金样继承）
+add_executable(astrolog32_unit_transit test/unit/unit_transit.cpp)
+target_link_libraries(astrolog32_unit_transit astrolog32)
+if(WIN32 AND MSVC)
+    target_compile_definitions(astrolog32_unit_transit PRIVATE _CRT_SECURE_NO_WARNINGS)
+endif()
+add_test(NAME unit_transit COMMAND astrolog32_unit_transit)
+
 # 金样对拍：运行 astrolog32-cli → 与 test/golden/*.golden.txt 逐字段 diff
 # （需要 Python3 解释器；未找到时跳过注册，可手动跑 test/verify_cli.py）
 find_package(Python3 COMPONENTS Interpreter)

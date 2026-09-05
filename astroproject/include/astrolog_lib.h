@@ -93,5 +93,7 @@ ASTROLOG32_API std::string GetChartJSON(const ChartInput& chartInput);
  * rcProgress 一致（is.T = natal_UT + (JDp-natal_UT)/rProgDay，rProgDay=365.24219）。 */
 ASTROLOG32_API std::wstring GetProgressedMachineText(const ChartInput& natal,
 	int tgtMon, int tgtDay, int tgtYea, const char* tgtTim, double tgtDst, double tgtZon);
+/* P2/A8-1 — 行运盘机器文本（rcTransit 镜像，单盘数值 ≡ 目标时刻普通盘）。 */
+ASTROLOG32_API std::wstring GetTransitMachineText(const ChartInput& target);
 
 #endif // ASTROLOG_LIB_H

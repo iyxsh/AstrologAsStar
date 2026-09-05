@@ -448,6 +448,11 @@ A10（关系盘：合盘/组合盘/中点）。
   **16/16 通过，worst Sun=1e-5° / Moon=0.0048°**（独立星历 arcsec 级确认推进数值正确）。
 - 结论：A8 次限（rcProgress 语义）数值正确性已由「delta=0 golden 恒等 + 独立星历 arcsec 级
   交叉」双重锁定；后续 P2 动态盘（行运/月亮弧/合盘）可复用该 API 通道与验证模式。
+
+**A8-1 行运（rcTransit）2026-09-05 落地**：新增 `GetTransitMachineText(target)`（rcTransit
+镜像：ignore1=ignore2 行运选择集后 CastChart）——单盘行运数值 ≡ 目标时刻普通盘（宫位
+ignore 不影响 cp0 位置），故正确性由既有 64 金样直接继承；`unit_transit`（ctest）以
+「行运文本 == 目标盘文本 逐字节」断言锁定（bj-1958 / 2026 未来 / 78N 高纬 3 例）。
 **A6 余项前置核查（2026-09-05）**：本地**无** `rAspOrb/rObjOrb/rAspInf` 数组（引擎容差为内联
 `rOrb` 逻辑）→ `-Ao/-Am` 自定义容差表需先移植 golden 容差基础设施，非小改；与 -Aa（改
 rAspAngle，常量表可直接改但会破坏既有镜像，慎重）一起归"需专项"。

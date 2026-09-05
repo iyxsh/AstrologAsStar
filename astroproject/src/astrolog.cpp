@@ -5368,6 +5368,22 @@ std::wstring GetProgressedMachineText(const ChartInput& natal,
 	return BuildMachineText();
 }
 
+/* P2/A8-1（2026-09-05）：行运盘机器文本——镜像 rcTransit 分支：目标时刻盘
+ * cast（ignore1=ignore2 行运选择集，行星位照常计算）。单盘行运数值 ≡ 目标
+ * 时刻普通盘（宫位 ignore 不影响 cp0 位置），故其正确性由既有金样继承；
+ * unit_transit 以逐字节相等断言锁定。 */
+std::wstring GetTransitMachineText(const ChartInput& target)
+{
+	byte igT[NUMBER_OBJECTS];
+	SetupChartQuiet(target);
+	memcpy(igT, ignore1, sizeof(igT));
+	for (int i = 0; i <= cObj; i++)
+		ignore1[i] = ignore2[i];        /* rcTransit 行运选择集 */
+	CastChart(1);
+	memcpy(ignore1, igT, sizeof(igT));
+	return BuildMachineText();
+}
+
 std::string GetChartJSON(const ChartInput& chartInput)
 {
 	SetupChartQuiet(chartInput);
