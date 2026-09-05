@@ -7,3 +7,5 @@ A32_V3_51_Proj_2022
 # 预编译产物（铁律：预编译二进制绝不入库；.lib 历史跟踪除外）
 astroproject/lib/**/*.a
 astroproject/lib/**/CMakeFiles/
+# 构建输出目录（bin/ 下为 cmake 生成的 exe/pdb/dll；历史跟踪的 windows 二进制已 git rm --cached）
+astroproject/bin/
