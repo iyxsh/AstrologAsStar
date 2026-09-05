@@ -60,9 +60,17 @@ zon 东正西负）；`-os <file>` 落文本（UTF-16LE）；数值走 golden_ma
 本身支持 `-o0 <file>` 开关（写 @0203 位置表），在**有显示会话**中运行即可逐位比对：
 
 ```bash
-astrolog32.exe -qb 7 4 1958 12:01 0 8 -116:23 39:54 -o0 out.txt
+astrolog32.exe -qb 7 4 1958 12:01 0 -8 -116:23 39:54 -o0 out.txt
 # 对比 out.txt 与 bj-1958-1204.golden.txt 的 @0203 主体
 ```
 
 （headless 下原版 GUI 进消息循环挂起，无法自动化；本目录 `../oracle_check.py` 为
  pymeeus 独立 sanity 验证脚本，依赖 `pip install pymeeus`。）
+
+**★ cmd 时区约定（2026-09-05 重生成定论）**：`# cmd:` 的 zon/lon 遵循引擎「西正」约定
+（UT = local + zon − dst；golden astrolog.cpp:50540 MdytszToJulian 与本地端口径逐字一致，
+经原版 console 变体实测：北京 zon=-8 → Sun 101.68°=地方正午真值 101.71°）。**东时区传负
+（北京/上海 -8）、西时区传正（纽约 +5、洛杉矶 +8）、悉尼 AEST -10、15E 高纬 -1**；dst 表
+"输入已含夏令时、引擎先扣 dst"。2026-09-05 已把全部 64 份金样 + 8 份 grands.json 的 cmd
+从旧「东正」写法重生成修正——此前北京样例实际落在 UT≈20:01（非北京正午），现为天文正确的
+时刻。oracle_check.py 的 ut_epoch 已同步此语义。详见 REFACTOR-ALIGN-PLAN A15 段。

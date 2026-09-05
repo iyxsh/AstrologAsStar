@@ -39,9 +39,11 @@ def ut_epoch(cmd):
     assert p[0] == '-qb', cmd
     M, D, Y, T, dst, zon = p[1], p[2], p[3], p[4], p[5], p[6]
     hh, mm = T.split(':')
-    # 本地时间 -> 减去 (zon+dst) 小时得到 UT；用 datetime 处理跨日/跨月/跨年借位
+    # ★ 引擎时区语义（2026-09-05 实测定论，见 REFACTOR-ALIGN-PLAN A15 段）：
+    # zon/lon 同为「西正」→ UT = local + zon − dst（MdytszToJulian 口径）。
+    # 东八区 zon=-8、西五区 zon=+5。用 datetime 处理跨日/跨月/跨年借位。
     ldt = datetime.datetime(int(Y), int(M), int(D), int(hh), int(mm))
-    ut = ldt - datetime.timedelta(hours=float(zon) + float(dst))
+    ut = ldt + datetime.timedelta(hours=float(zon)) - datetime.timedelta(hours=float(dst))
     # pymeeus 要求 day>=1，故用整数日 + 小数时刻构造
     day_frac = ut.day + (ut.hour + ut.minute / 60.0) / 24.0
     return Epoch(ut.year, ut.month, day_frac)
