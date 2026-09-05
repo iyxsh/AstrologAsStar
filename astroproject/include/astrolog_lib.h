@@ -144,5 +144,10 @@ ASTROLOG32_API std::wstring GetSolarEclipseTableText(const ChartInput& chart);
 ASTROLOG32_API std::wstring GetLunarEclipseTableText(const ChartInput& chart);
 ASTROLOG32_API std::string GetSolarEclipseTableJSON(const ChartInput& chart);
 ASTROLOG32_API std::string GetLunarEclipseTableJSON(const ChartInput& chart);
+/* P2/轴3 — 原版 -a 相位表机器行（ChartAspect 同装配，字符串版）。
+ * 前置：调用方需已 cast 盘并 FCreateGrid(false) 填充全局 grid（同 --grands 路径）。
+ * 每行 `<rank>: <obj1>(sign1) <ASP> (sign2)<obj2> | <orb>°<mm>' <app> | <power> |`
+ * （rank 自 1、power 降序、orb 弧分取整、app = +/- 或 a/s），供轴3 容许度金样对拍。 */
+ASTROLOG32_API std::wstring GetChartAspectMachineText();
 
 #endif // ASTROLOG_LIB_H

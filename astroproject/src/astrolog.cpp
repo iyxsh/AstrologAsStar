@@ -4725,6 +4725,78 @@ std::wstring OutStrChartAspect()
 	return utStr;
 }
 
+/* P2/轴3 — 原版 -a 相位表机器行（与 ChartAspect 同装配，字符串版）。
+ * 每行：`<rank>: <obj1>(sign1) <ASP> (sign2)<obj2> | <orb>°<mm>' <app> | <power> |`，
+ * 与原版 console `-os ... -a` 输出同 token 语义（rank 自 1、power 降序、orb 弧分取整、
+ * app = +/- 或 a/s）。前置：调用方需已出盘且 FCreateGrid(false) 填充全局 grid
+ * （同 ChartAspect/grands 路径）。轴3 容许度金样矩阵锚点。 */
+std::wstring GetChartAspectMachineText()
+{
+	int ca[cAspect + 1], co[NUMBER_OBJECTS];
+	wchar_t sz[256];
+	int ihi, jhi, ahi, i, j, k, count = 0;
+	double ip, jp, savepower, p;
+	int orb, saveorb;
+	GridInfo tempgrid;
+	std::wstring out;
+
+	memset(ca, 0, sizeof(ca));
+	memset(co, 0, sizeof(co));
+	memcpy(&tempgrid, grid, sizeof(GridInfo));
+
+	PlanetPPower(wi.chs);
+	ComputeInfluence();
+
+	for (;;)
+	{
+		savepower = -1e10;
+		saveorb = 0x7FFF;
+		for (i = 0; i <= cObj; i++)
+		{
+			if (!FIgnore(i))
+			{
+				for (j = 0; j < i; j++)
+				{
+					if (!FIgnore(j))
+					{
+						if ((k = tempgrid.n[j][i]) != 0)
+						{
+							ip = i <= cLastMoving ? ppower1[i] : 2.5;
+							jp = j <= cLastMoving ? ppower1[j] : 2.5;
+							orb = tempgrid.v[j][i];
+							p = rAspInf[k] * sqrt(ip * jp) *
+								(1.0 - fabs((double)orb) / 60.0 / GetOrb(i, j, k));
+							if (us.fParallel)
+								p *= PowerPar;
+							if ((fSortAspectsByOrbs && abs(orb) < abs(saveorb)) ||
+								(!fSortAspectsByOrbs && p > savepower))
+							{
+								saveorb = orb; ihi = i; jhi = j; savepower = p; ahi = k;
+							}
+						}
+					}
+				}
+			}
+		}
+		if (saveorb == 0x7FFF)
+			break;
+		tempgrid.n[jhi][ihi] = 0;
+		count++;
+		swprintf(sz, 255, L"%3d: %ls | %2d%lc%02d' %lc | %9.2f |",
+			count,
+			OutstrPrintAspect(jhi, Z2Sign(cp0.longitude[jhi]),
+				(int)RSgn(cp0.vel_longitude[jhi]), ahi, ihi,
+				Z2Sign(cp0.longitude[ihi]), (int)RSgn(cp0.vel_longitude[ihi]),
+				'a', 12, 12).c_str(),
+			abs(saveorb) / 60, (wchar_t)176, abs(saveorb) % 60,
+			us.fAppSep ? (saveorb < 0 ? L'a' : L's') : (saveorb < 0 ? L'-' : L'+'),
+			savepower);
+		out += sz;
+		out += L"\n";
+	}
+	return out;
+}
+
 std::wstring OutChartAspectRelation()
 {
 	int ca[cAspect + 1], co[NUMBER_OBJECTS];

@@ -412,6 +412,18 @@ WinMain（L9780）调 FProcessCommandLine（L18191）→ FProcessSwitchesMain（
   轴3 金样 = 2 盘 × 3 orb 档（默认/`-Ao 4`/`-Ao 1`）≈ 6 份 + verify 纳入 ctest；③ `-Ao`
   倍率语义先对原版定论再固化。预估为独立专项（数小时级），**未开工**。
 
+**✅ 切片① 已落地（2026-09-05 晚间）**：CLI `--aspects` opt-in + lib
+`GetChartAspectMachineText()`（ChartAspect 同装配的字符串版）。前置 FCreateGrid(false)
+（同 --grands）。实测 bj 默认盘 **25 行与原版逐行数值一致**（rank/obj1/asp/obj2/orb/±/
+power 全同；本地行省略 sign 字形，属归一化层差异）；`-c 0` 与默认一致（原版早前「内容
+突变」为 probe 污染，干净复测 = 与默认相同）✓。ctest 15/15 不破。
+**切片① 遗留开放项（需专项定论后再做 ②③）**：① **`-Ao` 参数形态分歧**——原版为
+`-Ao <aspA> <aspB> <orb_i..orb_j>`（范围+逐相位值，见 original src:10885-10920），本地
+A6 实现为 `-Ao <asp> <deg>`（config.cpp:168-176），`-Ao 4` 两引擎行为不同（原版 99 行、
+本地 0 行）——需对齐原版文法或明确本地扩展；② `-U` 恒星相位行：原版 39 行 vs 本地 25
+（本地 aspect 网格未纳入恒星对象）；③ sign 字形（(Can)/[Lib]）语义无需复现但 harness
+归一化需定义。
+
 
 ### P2 · 动态盘第一梯队（核心业务盘型）
 - [ ] relation.cpp：CastRelation 全分支正式化；`ChartType` API 参数（行运/次限/

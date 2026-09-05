@@ -49,6 +49,7 @@ int main(int argc, char* argv[])
 {
 	bool json = false;
 	bool grands = false;        /* --grands：盘后追加格局检测行（A7① 真实盘对拍） */
+	bool aspects = false;       /* --aspects：盘后追加 -a 相位表机器行（轴3 容许度金样） */
 	bool haveProg = false;      /* --progto M D Y T：次限推进到目标日期（A8） */
 	const char* pM = nullptr, * pD = nullptr, * pY = nullptr, * pT = nullptr;
 	std::string outFile;
@@ -85,6 +86,8 @@ int main(int argc, char* argv[])
 			json = true;
 		} else if (a == "--grands") {
 			grands = true;   /* opt-in：输出格局检测行 GR <name> o1 o2 o3 o4 */
+		} else if (a == "--aspects") {
+			aspects = true;  /* opt-in：输出 -a 相位表机器行（轴3，需 FCreateGrid） */
 		} else if (a == "--progto") {
 			if (k + 4 >= argc) {
 				fprintf(stderr, "error: --progto requires 4 args: M D Y T\n");
@@ -119,7 +122,7 @@ int main(int argc, char* argv[])
 				printf("  engine switches (P1.1): -c <house> -s [-sr|-sh|-sd|-sz] -sm <mode>\n");
 				printf("    -h <center> -P <n>|-Pz|-Pn|-Pf|-P0 -Yn -YL -Yc -Yd -Yt -YC -YH\n");
 				printf("    -RA/-RE <asp>.. -Ao/-Am/-Aa/-Ad <idx> <val> -U[znblp]\n");
-				printf("  A7/A8 opt-in: --grands | --progto M D Y T (次限)\n");
+				printf("  A7/A8/AX3 opt-in: --grands | --aspects | --progto M D Y T (次限)\n");
 				printf("  lon/zon: west positive / east negative（zon 同西正，北京 -8）\n");
 				return 0;
 			}
@@ -198,6 +201,21 @@ int main(int argc, char* argv[])
 			if (f) { fputs(u.c_str(), f); fclose(f); }
 		} else {
 			fputs(u.c_str(), stdout);
+		}
+	}
+
+	/* --aspects（轴3）：原版 -a 相位表机器行。前置与 --grands 一致需
+	 * FCreateGrid(false)（golden 同路径），随后 GetChartAspectMachineText 输出
+	 * `<rank>: obj1(sign) ASP (sign)obj2 | orb°mm' app | power |`。 */
+	if (aspects) {
+		FCreateGrid(false);
+		std::wstring aw = GetChartAspectMachineText();
+		std::string au = w2u(aw);
+		if (!outFile.empty()) {
+			FILE* f = fopen(outFile.c_str(), "ab");
+			if (f) { fputs(au.c_str(), f); fclose(f); }
+		} else {
+			fputs(au.c_str(), stdout);
 		}
 	}
 
