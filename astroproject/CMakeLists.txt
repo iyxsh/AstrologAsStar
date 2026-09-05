@@ -285,6 +285,15 @@ if(WIN32 AND MSVC)
 endif()
 add_test(NAME unit_synastry COMMAND astrolog32_unit_synastry)
 
+# P2/A15 — 日月食表单测（@0503/@0504 头标记 + 条数/升序 + 极大时刻距角极值自洽
+#           + 2026 已知食锚定 + JSON 一致 + 全局泄漏回归）
+add_executable(astrolog32_unit_eclipse test/unit/unit_eclipse.cpp)
+target_link_libraries(astrolog32_unit_eclipse astrolog32)
+if(WIN32 AND MSVC)
+    target_compile_definitions(astrolog32_unit_eclipse PRIVATE _CRT_SECURE_NO_WARNINGS)
+endif()
+add_test(NAME unit_eclipse COMMAND astrolog32_unit_eclipse)
+
 # 金样对拍：运行 astrolog32-cli → 与 test/golden/*.golden.txt 逐字段 diff
 # （需要 Python3 解释器；未找到时跳过注册，可手动跑 test/verify_cli.py）
 find_package(Python3 COMPONENTS Interpreter)

@@ -131,5 +131,18 @@ ASTROLOG32_API std::wstring GetSynastryGridMachineText(const ChartInput& chartA,
 	const ChartInput& chartB);
 ASTROLOG32_API std::string GetSynastryGridJSON(const ChartInput& chartA,
 	const ChartInput& chartB);
+/* P2/A15 — 日月食表（对齐 golden PrintSolarEclipse / PrintLunarEclipse）。
+ * 以盘年份为窗口（Jan 1 00:00 UT 起）循环 swe_sol/lun_eclipse_when_glob 求下一次食的
+ * 极大时刻，越年即止（≤10 条）；时刻按盘时区 zon 转本地时（swe_utc_time_zone）。
+ * 机器文本：@0503 日食表 / @0504 月食表，每行
+ *   <year> <mon> <day> <hour> <min> <type> <jd_ut> <mag> <lon> <lat>
+ * type 取英文稳定 token（Total/Annular/AnnularTotal/Partial/Penumbral/NonCentral）；
+ * lon/lat = 极大点地理坐标（月食恒 0），mag = 食分（月食 umbral magnitude）。
+ * 正确性由 unit_eclipse 锁定：2026 已知食（2 月环食 / 8 月全食 / 3 月全影月食）
+ * + 「极大时刻即日月距角极值点」自洽断言。 */
+ASTROLOG32_API std::wstring GetSolarEclipseTableText(const ChartInput& chart);
+ASTROLOG32_API std::wstring GetLunarEclipseTableText(const ChartInput& chart);
+ASTROLOG32_API std::string GetSolarEclipseTableJSON(const ChartInput& chart);
+ASTROLOG32_API std::string GetLunarEclipseTableJSON(const ChartInput& chart);
 
 #endif // ASTROLOG_LIB_H
