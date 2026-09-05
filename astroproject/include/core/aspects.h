@@ -48,6 +48,7 @@ extern IS is;
 // 函数声明
 void *allocate(long length, char *user);
 void UpdateAspectCount(void);   /* 相位数量重算：nAsp = cAspect − 被屏蔽数（A6） */
+int DetectGrands(const GridInfo* grid, int out[][5], int maxOut);  /* 格局检测 API（A7） */
 bool FCreateGridA(bool fFlip);
 bool FCreateGrid(bool fFlip);
 void ComputeAspects(void);

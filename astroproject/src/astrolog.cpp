@@ -2703,6 +2703,93 @@ void PrintGrand(byte ac, int i1, int i2, int i3, int i4)
 	wprintf(L"\n");
 }
 
+/* Scan the aspect grid of a chart and record any major configurations.     */
+/* A7 API 入口：与 DisplayGrands() 取格局条件逐行镜像（单一实现重构留给 P1.7）。 */
+/* out[n][5] = { ac(acS/acGT/acTS/acY/acGC/acC/acMR/acK), objA, objB, objC, objD }；
+ * 4 体格局用全 4 对象，3 体格局 objD=0。返回记录数（<= maxOut）。 */
+int DetectGrands(const GridInfo* g, int out[][5], int maxOut)
+{
+	int cac = 0, i, j, k, l;
+
+	for (i = 0; i <= cObj && cac < maxOut; i++)
+	{
+		if (!FIgnore(i))
+		{
+			for (j = 0; j <= cObj && cac < maxOut; j++)
+			{
+				if (j != i && !FIgnore(j))
+				{
+					for (k = 0; k <= cObj && cac < maxOut; k++)
+					{
+						if (k != i && k != j && !FIgnore(k))
+						{
+							if (i < j && j < k && g->n[i][j] == aCon && g->n[i][k] == aCon && g->n[j][k] == aCon)
+							{	/* Stellium */
+								out[cac][0] = acS; out[cac][1] = i; out[cac][2] = j; out[cac][3] = k; out[cac][4] = 0; cac++;
+							}
+							else if (i < j && j < k && g->n[i][j] == aTri && g->n[i][k] == aTri && g->n[j][k] == aTri)
+							{	/* Grand Trine */
+								out[cac][0] = acGT; out[cac][1] = i; out[cac][2] = j; out[cac][3] = k; out[cac][4] = 0; cac++;
+								for (l = 0; l <= cObj && cac < maxOut; l++)
+								{	/* Kite = GT + 另一对象与 GT 两两六分（原版不排除 l==i/j/k，照搬） */
+									if (!FIgnore(l))
+									{
+										if (g->n[Min(i, l)][Max(i, l)] == aSex && g->n[Min(j, l)][Max(j, l)] == aSex)
+										{ out[cac][0] = acK; out[cac][1] = i; out[cac][2] = j; out[cac][3] = k; out[cac][4] = l; cac++; }
+										if (g->n[Min(j, l)][Max(j, l)] == aSex && g->n[Min(k, l)][Max(k, l)] == aSex)
+										{ out[cac][0] = acK; out[cac][1] = i; out[cac][2] = j; out[cac][3] = k; out[cac][4] = l; cac++; }
+										if (g->n[Min(i, l)][Max(i, l)] == aSex && g->n[Min(k, l)][Max(k, l)] == aSex)
+										{ out[cac][0] = acK; out[cac][1] = i; out[cac][2] = j; out[cac][3] = k; out[cac][4] = l; cac++; }
+									}
+								}
+							}
+							else if (j < k && g->n[j][k] == aOpp && g->n[Min(i, j)][Max(i, j)] == aSqu && g->n[Min(i, k)][Max(i, k)] == aSqu)
+							{	/* T-Square */
+								out[cac][0] = acTS; out[cac][1] = i; out[cac][2] = j; out[cac][3] = k; out[cac][4] = 0; cac++;
+							}
+							else if (j < k && g->n[j][k] == aSex && g->n[Min(i, j)][Max(i, j)] == aInc && g->n[Min(i, k)][Max(i, k)] == aInc)
+							{	/* Yod */
+								out[cac][0] = acY; out[cac][1] = i; out[cac][2] = j; out[cac][3] = k; out[cac][4] = 0; cac++;
+							}
+							for (l = 0; l <= cObj && cac < maxOut; l++)
+							{
+								if (!FIgnore(l))
+								{
+									if (i < j && i < k && i < l && j < l
+										&& g->n[i][j] == aSqu
+										&& g->n[Min(j, k)][Max(j, k)] == aSqu
+										&& g->n[Min(k, l)][Max(k, l)] == aSqu && g->n[i][l] == aSqu
+										&& MinDistance(cp0.longitude[i], cp0.longitude[k]) > 150.0
+										&& MinDistance(cp0.longitude[j], cp0.longitude[l]) > 150.0)
+									{	/* Grand Cross */
+										out[cac][0] = acGC; out[cac][1] = i; out[cac][2] = j; out[cac][3] = k; out[cac][4] = l; cac++;
+									}
+									else if (i < l
+										&& g->n[Min(i, j)][Max(i, j)] == aSex
+										&& g->n[Min(j, k)][Max(j, k)] == aSex
+										&& g->n[Min(k, l)][Max(k, l)] == aSex
+										&& MinDistance(cp0.longitude[i], cp0.longitude[l]) > 150.0)
+									{	/* Cradle */
+										out[cac][0] = acC; out[cac][1] = i; out[cac][2] = j; out[cac][3] = k; out[cac][4] = l; cac++;
+									}
+									else if (i < j && i < k && i < l &&
+										g->n[Min(i, j)][Max(i, j)] == aOpp
+										&& g->n[Min(k, l)][Max(k, l)] == aOpp
+										&& g->n[Min(i, k)][Max(i, k)] == aTri && g->n[Min(j, l)][Max(j, l)] == aTri)
+									{	/* Mystic Rectangle */
+										out[cac][0] = acMR; out[cac][1] = i; out[cac][2] = j; out[cac][3] = k; out[cac][4] = l; cac++;
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	return cac;
+}
+
 /* Scan the aspect grid of a chart and print out any major configurations, */
 /* as specified with the -g0 switch.                                       */
 void DisplayGrands()

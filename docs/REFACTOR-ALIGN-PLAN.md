@@ -135,7 +135,7 @@ GetChartAspectRelation / GetChartResult`。
 | A4 | 小行星/天王星族/恒星 | 全量可开关 | 恒星 `-U` 已对齐（2026-09-05 实证 128/128 行 9 位零差）；小行星/天王星族开关仍缺 | 恒星子项完成；余天体集开关 | 恒星接入 ComputeStars + `-U`；小行星/天王星族对象开关 = 天体集配置化（A4 子项 2） |
 | A5 | 阿拉伯点 | 177 点按需 | 177 点表+引擎已落地（2026-09-05 实证 354/354 oracle 零差）；仅剩输出/展示路径 | 低（余展示接线） | 移植 tArabicPart 177 点表 + 引擎已毕；`-P` listing 展示路径待接 |
 | A6 | 相位集/容许度 | 18 型+平行/反平行+自定义表 | 18 型枚举在、默认 5 主；`-RA/-RE` 屏蔽/启用已接（2026-09-05）；自定义相位名/角度/容差表待接 | 中 | 相位屏蔽配置化已毕；格局识别 API 入口 + 自定义表后续 |
-| A7 | 格局识别 | ac 码 + 搜索 | DisplayGrands 在、无入口/无测 | 中 | 接 API + 金样 |
+| A7 | 格局识别 | ac 码 + 搜索 | `DetectGrands` API 已接 + 合成网格单测 8/8（2026-09-05）；DisplayGrands 文本路径未重构 | 中 | 格局检测 API 入口已加；真盘金样计数对拍 + DisplayGrands 单一实现重构归 P1.7 |
 | A8 | 行运/次限/太阳弧 | Action/CastChart 标志真算法 | **假桩**（=本命重算） | 极高 | P2 重写（ProcessInput 已有 fProgressUS 骨架） |
 | A9 | 日月返 | DoReturn | ❌ | 极高 | P2 移植 |
 | A10 | 合盘/组合盘/中点 | 多关系盘 | 仅"落宫+相位表"；composite/midpoint 分支无入口 | 高 | P2 接 CastRelation 全分支 + API 参数 |
@@ -367,7 +367,15 @@ WinMain（L9780）调 FProcessCommandLine（L18191）→ FProcessSwitchesMain（
   ctest 5/5 回归通过）。unit_config 新增 -RE 6（nAsp=6）/ -RA 3（nAsp=4）/ 越界报错 /
   无参 no-op / -Rq no-op 断言。遗留：自定义相位名/角度/容差表（-Aa/-Ao/-Am）与 A7
   格局识别 API 入口（DisplayGrands 已存在、无入口/无测）。
-- [ ] A7 格局识别 API 入口（DisplayGrands 接线/无测）+ A6 余项（自定义相位名/角度/容差表）。
+- [x] A7 格局识别 API 入口（DetectGrands）—— **2026-09-05 落地**：`DetectGrands(const GridInfo*,
+  int out[][5], int maxOut)` 记录 8 类格局 {ac, 对象…}（acS 合群/ acGT 大三角/ acK 风筝 /
+  acTS T三角 / acY 上帝手指 / acGC 大十字 / acC 摇篮 / acMR 神秘矩形），条件与
+  `DisplayGrands()` 取格局分支**逐行镜像**（原版不排除 l==i/j/k 的怪癖照搬，避免漂移；
+  Kite 依原版对 GT 三成员的两两六分探测会重复记录）。`unit_grands`：合成网格 8/8 检出 +
+  空网格 0（含 GC/Cradle 的 MinDistance 位置约束）。ctest 6/6 全绿、金样 16/16 不破。
+  遗留：① 真盘格局计数与 golden 文本 listing 对拍（需文本通道）；② DisplayGrands 与
+  DetectGrands 单一实现重构（防双份漂移，归 P1.7）；③ A6 余项自定义相位名/角度/容差表
+  （-Aa/-Ao/-Am，原版 GUI/文本资源域）。
 - [ ] 金样：本命盘 × 宫位系(16) × 天体集 × 容许度矩阵。
 - 验收：本命盘数值与金样逐项一致。
 
