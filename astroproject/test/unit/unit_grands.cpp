@@ -119,7 +119,7 @@ int main(void)
 
     /* --- 5. Grand Cross：1(0°) 2(90°) 3(180°) 4(270°) 全四分链 --- */
     ZERO();
-    for (int i = 1; i <= 118; i++) cp0.longitude[i] = 0.0;
+    for (int i = 1; i < NUMBER_OBJECTS; i++) cp0.longitude[i] = 0.0; /* 清行星+恒星槽位(1..117) */
     cp0.longitude[1] = 0.0; cp0.longitude[2] = 90.0;
     cp0.longitude[3] = 180.0; cp0.longitude[4] = 270.0;
     setpair(g, 1, 2, aSqu); setpair(g, 2, 3, aSqu);
@@ -179,7 +179,7 @@ int main(void)
     disp_check(&g, "Yod");
 
     ZERO();
-    for (int i = 1; i <= 118; i++) cp0.longitude[i] = 0.0;
+    for (int i = 1; i < NUMBER_OBJECTS; i++) cp0.longitude[i] = 0.0; /* 清行星+恒星槽位(1..117) */
     cp0.longitude[1] = 0.0; cp0.longitude[2] = 90.0;
     cp0.longitude[3] = 180.0; cp0.longitude[4] = 270.0;
     setpair(g, 1, 2, aSqu); setpair(g, 2, 3, aSqu);

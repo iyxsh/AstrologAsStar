@@ -3073,7 +3073,7 @@ void ChartAspectRelation()
 				{
 					if (!FIgnore(j))//5
 					{
-						if (k = tempgrid.n[i][j])//5
+						if ((k = tempgrid.n[i][j]) != 0)//5
 						{
 							ip = i <= cLastMoving ? power2[i] : 2.5;//5
 							jp = j <= cLastMoving ? ppower1[j] : 2.5;//5
@@ -4783,7 +4783,7 @@ std::wstring OutChartAspectRelation()
 				{
 					if (!FIgnore(j))//5
 					{
-						if (k = tempgrid.n[i][j])//5
+						if ((k = tempgrid.n[i][j]) != 0)//5
 						{
 							ip = i <= cLastMoving ? power2[i] : 2.5;//5
 							jp = j <= cLastMoving ? ppower1[j] : 2.5;//5
@@ -5148,7 +5148,7 @@ void GetChartResult(CI& ciInput,bool useInput)
  * GetChartMachineText() reproduces the original Astrolog @0203
  * "chart positions" format (9-decimal positions) so the refactored
  * library can be diffed byte-for-byte against the original-engine
- * golden samples (test/golden/*.golden.txt). The object/sign name
+ * golden samples (see test/golden dir, *.golden.txt). The object/sign name
  * tables are verbatim copies of the original so the 3-char
  * abbreviations match exactly.
  * ============================================================ */

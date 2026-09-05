@@ -45,7 +45,7 @@ static void SetErr(char* errtxt, size_t errsz, const char* fmt, const char* sw, 
 {
 	if (errtxt && errsz) {
 		if (arg) snprintf(errtxt, errsz, "switch -%s: invalid argument '%s'", sw, arg);
-		else     snprintf(errtxt, errsz, "switch -%s: %s", sw, fmt);
+		else     snprintf(errtxt, errsz, "switch -%s: %s", sw, fmt ? fmt : "error");
 	}
 }
 

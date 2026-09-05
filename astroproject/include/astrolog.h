@@ -3,7 +3,9 @@
 #ifndef ASTROLOG_H
 #define ASTROLOG_H
 
+#ifndef NOMINMAX
 #define NOMINMAX
+#endif
 #include <iostream>
 #include <cstring>
 #include <cstdlib>
