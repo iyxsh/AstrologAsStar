@@ -392,6 +392,18 @@ WinMain（L9780）调 FProcessCommandLine（L18191）→ FProcessSwitchesMain（
 - [ ] relation.cpp：CastRelation 全分支正式化；`ChartType` API 参数（行运/次限/
   太阳弧/月亮弧/合盘/组合盘/中点/映点/移置）。
 - [ ] returns.cpp：日月返（含双月返 IsDoubleReturn 逻辑）。
+
+#### A9 日月返侦察结论（2026-09-05，定界）
+- golden 机制：`DoReturn()`（astrolog.cpp ~17823）非自行解算，而是：cast 本命后把
+  ignore 全屏蔽仅放行 Sun(1)/Moon(2)，调 **`ChartTransitSearch(0)`** 推进 ciTwin 起点
+  直到日/月回归 natal 黄经 → 存入 `ciSolarReturn/ciLunarReturn`，随后按返照时刻 cast
+  （isSolarReturn/isLunarReturn 分支，astrolog.cpp:3599/3607 已见）。
+- **本地无 ChartTransitSearch**（transits.cpp 为 STUB、ciSolarReturn/IsDoubleReturn 仅
+  全局壳）→ A9 前置 = 移植 golden 行运搜索内核（大模块），不能沿用 A8 的单盘 API 通道。
+- 设计分片：A9-0 先移植/实现**太阳返照**时刻解算（回归 Sun 黄经 == natal Sun；用 swe
+  迭代），验证用身份恒等「返照盘 Sun == 本命 Sun（±1e-9）」+ pymeeus 返照时刻交叉
+  （时刻互差 < 1min 级）；A9-1 月亮返照 + 双月返（IsDoubleReturn 语义需先读 golden
+  ChartTransitSearch 返回粒度，勿臆造）。
 - [ ] A15 日月食表入口。
 - 验收：与金样一致（覆盖代表日期 ±100 年）。
 
