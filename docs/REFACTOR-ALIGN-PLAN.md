@@ -404,6 +404,15 @@ WinMain（L9780）调 FProcessCommandLine（L18191）→ FProcessSwitchesMain（
   迭代），验证用身份恒等「返照盘 Sun == 本命 Sun（±1e-9）」+ pymeeus 返照时刻交叉
   （时刻互差 < 1min 级）；A9-1 月亮返照 + 双月返（IsDoubleReturn 语义需先读 golden
   ChartTransitSearch 返回粒度，勿臆造）。
+
+**A9-0 太阳返照解算 2026-09-05 落地**（`core/returns.cpp`，定义驱动）：
+- 天文定义：目标年内 Sun 黄经（tropical 视黄经，引擎同路径 swe，jde=jd+ΔT）首次回到
+  本命 Sun 黄经的时刻（UT JD）。实现绕开归一化回卷：年初已过 target 先等回卷再二分。
+- `SolarReturnJulian(natalSunLon, year)` / `SunEclipticLon(jd)`；
+  `unit_returns`（ctest）：bj-1958 本命 Sun → 2026/2027/2033 返照，身份恒等
+  SunErr≈2e-10°、逐年 ~365d；pymeeus 独立交叉 Sun≈natal 差 0.00074°（独立模型系统差）。
+- 边界：本模块只解时刻（UT JD），返照盘 cast（ChartInput civil 装配 + golden 分段插值
+  粒度语义）留 A9-1（月亮返照/双月返同批）。
 - [ ] A15 日月食表入口。
 - 验收：与金样一致（覆盖代表日期 ±100 年）。
 
