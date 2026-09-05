@@ -131,7 +131,7 @@ GetChartAspectRelation / GetChartResult`。
 |---|---|---|---|---|---|
 | A1 | 本命盘主链 | ✅ | ✅（基本一致） | 低 | 金样校准微差 |
 | A2 | 宫位系统接线 | 16 系全 | 枚举 16，**实际 3 系错映射**（EqualMC/Whole/Null→整宫） | 高 | 修正 SwissHouse 映射 + 3D 宫复测 |
-| A3 | 南北交点/莉莉丝 | 真交点 + 真莉莉丝远地点 | 南交近似 +180；莉莉丝占位 | 高 | 接 SE 真节点/真莉莉丝（含均值/真值选项） |
+| A3 | 南北交点/莉莉丝 | 真交点 + 真莉莉丝远地点 | 已与原版对齐（2026-09-05 实证） | 完成 | SE 路由 + `-Yn`/`-YL` 已接，实证见 P1 清单 |
 | A4 | 小行星/天王星族/恒星 | 全量可开关 | SE 映射全但默认全屏蔽；恒星零调用 | 高 | 默认天体集开关配置化 + 恒星启用 + 数据文件策略 |
 | A5 | 阿拉伯点 | 177 点按需 | 仅福点 1 个（CastChart 内嵌公式） | 高 | 移植 tArabicPart 177 点表 + 配置化 |
 | A6 | 相位集/容许度 | 18 型+平行/反平行+自定义表 | 18 型枚举在、默认 5 主、无自定义入口 | 中 | 配置化：相位集/容许度/格局 |
@@ -308,6 +308,20 @@ WinMain（L9780）调 FProcessCommandLine（L18191）→ FProcessSwitchesMain（
   `HouseWhole()`（cusp=整宫 0°，宫 1=Asc 所在星座）/`HouseNull()`（cusp=Sign2Z(i)）三算法。
   实证：**16/16 宫位系 × 3 盘（bj/bombay/syd）与原版 golden runner 逐位一致**；ctest 3/3 +
   金样 8/8 回归不破。3D 宫复测归 P1.7 矩阵。
+- [x] A3 真节点/真莉莉丝（#136）—— **2026-09-05 实证收尾**：① 引擎核查——planet.cpp
+  `astrolog_object_2_SE_object()` 的 NoNode→`us.fTrueNode?SE_TRUE_NODE:SE_MEAN_NODE`、
+  Lil→`oscLilith?SE_OSCU_APOG:SE_MEAN_APOG` 与 golden 原版 astrolog.cpp:76381/76385 **逐行一致**；
+  SoNode 派生（chart.cpp：NoNode+180 / vel 复制 / lat 不处理）与 golden:20740 逐行一致；金样 8/8 中
+  的 NoN(mean node) 9 位零差已覆盖默认链。② 开关——`-Yn`(fTrueNode)/`-YL`(oscLilith) 已于 P1.1 接入
+  config，全局默认 `oscLilith=0`（mean，同 golden）；unit_config 2 组 toggle 断言在册。③ **交叉对拍**：
+  golden runner 开启对象 17/18（`-YR 17 17 0 -YR 18 18 0`）得 4 变体锚点：mean NoN=27Lib35.817169449、
+  `-Yn`=28Lib5.270379889（mean↔true 差 ~29.5′）、`-YL` Lil 15Ari0.524→23Ari21.985（差 ~8.6°，速度变负），
+  SoN=NoN+180。本地 CLI 四变体同命令对拍：**mean 9 位零差**；`-Yn` 真节点 bj-1958 差 1.5e-4°(0.55")
+  但 syd/ny 仅 ~3e-6°(0.01")——归因**两侧 swe 2.10.03 源码文件漂移**（sweph.c 34 行 / swemmoon.c 12 行 /
+  swephlib.c 100 行 diff，mean/解析路径不受影响）；**同表环境实证**（.se1 可达）golden 与本地 CLI 逐位
+  一致（5.485724545）→ 路由与 swe 版本等价，无逻辑错。④ 顺带还原 `initEnv()` 曾强制 `eepp=1`(SWIEPH)
+  的硬编码为原版 `eepp=-1`（golden 从不强制；实证本地缺表 fallback==显式 MOSEPH，无数值影响，
+  .se1 存在时自动用表）。回归：ctest 3/3、金样 8/8 不破。遗留：`-YR` 对象开关启用属 A4 天体集范围。
 - [ ] A6 相位集/容许度配置化 + A7 格局识别入口。
 - [ ] 金样：本命盘 × 宫位系(16) × 天体集 × 容许度矩阵。
 - 验收：本命盘数值与金样逐项一致。

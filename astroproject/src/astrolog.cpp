@@ -4876,7 +4876,10 @@ void initEnv()
 	memcpy(&ignoreSO,&ignore1,NUMBER_OBJECTS);
 	for (i = starLo; i <= starHi; i++)
 		ignore1[i]=1;
-	eepp = 1;
+	/* A3: 还原 eepp=-1 原版语义（golden 的 initEnv 从不强制 eepp）。
+	 * flag 不带星历掩码时 swe 默认 SWIEPH，缺表自动回退 Moshier；
+	 * 有 .se1 时自动用表。实测本地 fallback 与显式 MOSEPH 数值相同，
+	 * 本行无数值影响，仅消除重构期硬编码（曾强制 eepp=1）。 */
 }
 
 //ChartMode 目前支持两种模式 1 MainChart 2 ChartData2
