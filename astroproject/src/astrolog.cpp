@@ -2587,7 +2587,9 @@ void InterpretAspect(int x, int y)
 
 #define space     cp0.pt
 
-const char* tAspectConfig[] = {"Stellium", "Grand Trine", "T-Square", "Yod", "Grand Cross", "Cradle", "Mystic Rect", "Kite"};
+/* 格局名表：索引 = ac 码（acS=1..acK=8），故 [0] 空占位（镜像 golden lang
+ * 资源 tAspectConfig="|Stellium|Grand Trine|…"；曾缺占位致整体错位 + acK 越界）。 */
+const char* tAspectConfig[] = {"", "Stellium", "Grand Trine", "T-Square", "Yod", "Grand Cross", "Cradle", "Mystic Rect", "Kite"};
 const char* sWith2  = "with";
 const char* sfrom = "from";
 const char* sand3 = "and";

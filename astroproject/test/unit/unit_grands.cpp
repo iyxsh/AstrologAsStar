@@ -157,25 +157,26 @@ int main(void)
         CHECK(n == 0);
     }
 
-    /* --- 9. DisplayGrands 文本回放（A7 遗留② 单一实现重构 2026-09-05）---
-     * 检测统一走 DetectGrands 后按记录序回放打印；断言打印行数与 DetectGrands
-     * 记录数一致（漏打/重打即失败），空盘断言 No-major 行。 */
+    /* --- 9. DisplayGrands 文本回放（A7 遗留② 单一实现重构 + 标签修复）---
+     * 断言：打印行数 == DetectGrands 记录数（漏打/重打即失败），且每条输出
+     * 含正确格局名（2026-09-05 修复 tAspectConfig 缺 [0] 占位的错位 bug）。 */
     ZERO();
     setpair(g, 1, 2, aCon); setpair(g, 1, 3, aCon); setpair(g, 2, 3, aCon);
-    disp_check(&g, NULL);
+    disp_check(&g, "Stellium");
 
     ZERO();
     setpair(g, 1, 2, aTri); setpair(g, 1, 3, aTri); setpair(g, 2, 3, aTri);
     setpair(g, 1, 4, aSex); setpair(g, 2, 4, aSex);
-    disp_check(&g, NULL);
+    disp_check(&g, "Grand Trine");
+    disp_check(&g, "Kite");
 
     ZERO();
     setpair(g, 5, 6, aOpp); setpair(g, 5, 7, aSqu); setpair(g, 6, 7, aSqu);
-    disp_check(&g, NULL);
+    disp_check(&g, "T-Square");
 
     ZERO();
     setpair(g, 8, 9, aSex); setpair(g, 8, 10, aInc); setpair(g, 9, 10, aInc);
-    disp_check(&g, NULL);
+    disp_check(&g, "Yod");
 
     ZERO();
     for (int i = 1; i <= 118; i++) cp0.longitude[i] = 0.0;
@@ -184,19 +185,19 @@ int main(void)
     setpair(g, 1, 2, aSqu); setpair(g, 2, 3, aSqu);
     setpair(g, 3, 4, aSqu); setpair(g, 1, 4, aSqu);
     setpair(g, 1, 3, aOpp); setpair(g, 2, 4, aOpp);
-    disp_check(&g, NULL);
+    disp_check(&g, "Grand Cross");
 
     ZERO();
     cp0.longitude[1] = 0.0; cp0.longitude[2] = 60.0;
     cp0.longitude[3] = 120.0; cp0.longitude[4] = 180.0;
     setpair(g, 1, 2, aSex); setpair(g, 2, 3, aSex); setpair(g, 3, 4, aSex);
     setpair(g, 1, 4, aOpp);
-    disp_check(&g, NULL);
+    disp_check(&g, "Cradle");
 
     ZERO();
     setpair(g, 1, 2, aOpp); setpair(g, 3, 4, aOpp);
     setpair(g, 1, 3, aTri); setpair(g, 2, 4, aTri);
-    disp_check(&g, NULL);
+    disp_check(&g, "Mystic Rect");
 
     ZERO();
     disp_check(&g, "No major configurations in aspect grid.");

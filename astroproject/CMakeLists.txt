@@ -243,6 +243,11 @@ if(Python3_Interpreter_FOUND)
             ${CMAKE_CURRENT_SOURCE_DIR}/../test/verify_arabic.py
             $<TARGET_FILE:astrolog32-cli>
             $<TARGET_FILE:astrolog32_unit_arabic>)
+    # A7① — 真实盘格局计数：本地 --grands 与 golden -g0 计数 fixture 对拍
+    add_test(NAME grands_oracle
+        COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/../test/verify_grands.py
+            $<TARGET_FILE:astrolog32-cli>)
 endif()
 
 # 安装规则

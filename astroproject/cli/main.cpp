@@ -24,6 +24,7 @@
 #include "../include/utils/utils.h"
 #include "../include/utils/TransU.h"
 #include "../include/core/config.h"
+#include "../include/core/aspects.h"   /* FCreateGrid/DetectGrands/grid（--grands） */
 
 static std::string w2u(const std::wstring& w)
 {
@@ -46,6 +47,7 @@ static std::string w2u(const std::wstring& w)
 int main(int argc, char* argv[])
 {
 	bool json = false;
+	bool grands = false;        /* --grands：盘后追加格局检测行（A7① 真实盘对拍） */
 	std::string outFile;
 	std::string cfgFile;
 	std::vector<std::string> cfgToks;   /* engine-switch passthrough tokens */
@@ -78,6 +80,8 @@ int main(int argc, char* argv[])
 			haveQb = true;
 		} else if (a == "--json") {
 			json = true;
+		} else if (a == "--grands") {
+			grands = true;   /* opt-in：输出格局检测行 GR <name> o1 o2 o3 o4 */
 		} else if (a == "--text") {
 			json = false;
 		} else if (a == "-n") {
@@ -177,6 +181,22 @@ int main(int argc, char* argv[])
 			if (f) { fputs(u.c_str(), f); fclose(f); }
 		} else {
 			fputs(u.c_str(), stdout);
+		}
+	}
+
+	/* --grands（A7①）：真实盘格局检测行。FCreateGrid(false) 与 ChartAspect 前置
+	 * 一致（golden 同路径），随后 DetectGrands 输出 GR <名> o1..o4。 */
+	if (grands) {
+		static const char* acname[9] = { "", "Stellium", "Grand Trine", "T-Square",
+			"Yod", "Grand Cross", "Cradle", "Mystic Rect", "Kite" };
+		static int as[30000][5];
+		FCreateGrid(false);
+		int n = DetectGrands(grid, as, 30000);
+		for (int t = 0; t < n; t++) {
+			int ac = as[t][0];
+			printf("GR %s %d %d %d %d\n",
+				ac >= 1 && ac <= 8 ? acname[ac] : "?",
+				as[t][1], as[t][2], as[t][3], as[t][4]);
 		}
 	}
 	return 0;

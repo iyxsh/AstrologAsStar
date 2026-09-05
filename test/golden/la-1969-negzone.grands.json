@@ -1,0 +1,9 @@
+{
+ "chart": "la-1969-negzone",
+ "cmd": "-qb 7 20 1969 20:17 1 -7 118:15 34:03",
+ "counts": {
+  "Grand Trine": 3,
+  "Kite": 9,
+  "Stellium": 1
+ }
+}

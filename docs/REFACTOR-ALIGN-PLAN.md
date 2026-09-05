@@ -135,7 +135,7 @@ GetChartAspectRelation / GetChartResult`。
 | A4 | 小行星/天王星族/恒星 | 全量可开关 | 恒星 `-U` 已对齐（2026-09-05 实证 128/128 行 9 位零差）；小行星/天王星族开关仍缺 | 恒星子项完成；余天体集开关 | 恒星接入 ComputeStars + `-U`；小行星/天王星族对象开关 = 天体集配置化（A4 子项 2） |
 | A5 | 阿拉伯点 | 177 点按需 | 177 点表+引擎已落地（2026-09-05 实证 354/354 oracle 零差）；仅剩输出/展示路径 | 低（余展示接线） | 移植 tArabicPart 177 点表 + 引擎已毕；`-P` listing 展示路径待接 |
 | A6 | 相位集/容许度 | 18 型+平行/反平行+自定义表 | 18 型枚举在、默认 5 主；`-RA/-RE` 屏蔽/启用、`-Ao/-Am` 容差自定义均已接（2026-09-05）；`-Aa` 角度/`-An/-AA` 命名待接 | 中 | 屏蔽 + 容差配置化已毕；格局 API 已接；`-Aa` 需 rAspAngle 去 const、命名属语言资源域 |
-| A7 | 格局识别 | ac 码 + 搜索 | `DetectGrands` API + `DisplayGrands` 单一实现重构均毕（2026-09-05）；展示层格局名标签 off-by-one 待修 | 中 | 格局检测 API 已接 + 合成网格单测 8/8；真盘金样计数对拍归文本通道 |
+| A7 | 格局识别 | ac 码 + 搜索 | `DetectGrands` API + `DisplayGrands` 单一实现 + 标签修复 + 真实盘 golden `-g0` 计数对拍 8/8 均毕（2026-09-05） | 低 | 格局检测 API 已接 + 合成单测 8/8 + CI `grands_oracle` |
 | A8 | 行运/次限/太阳弧 | Action/CastChart 标志真算法 | **假桩**（=本命重算） | 极高 | P2 重写（ProcessInput 已有 fProgressUS 骨架） |
 | A9 | 日月返 | DoReturn | ❌ | 极高 | P2 移植 |
 | A10 | 合盘/组合盘/中点 | 多关系盘 | 仅"落宫+相位表"；composite/midpoint 分支无入口 | 高 | P2 接 CastRelation 全分支 + API 参数 |
@@ -376,10 +376,14 @@ WinMain（L9780）调 FProcessCommandLine（L18191）→ FProcessSwitchesMain（
   空网格 0（含 GC/Cradle 的 MinDistance 位置约束）。ctest 6/6 全绿、金样 16/16 不破。
   **遗留② 单一实现重构 2026-09-05 完成**：DisplayGrands 收为薄壳（DetectGrands + 按记录序
   回放 PrintGrand，-120 行），unit_grands §9 以「打印行数 == DetectGrands 记录数 + 空盘
-  No-major」守护防漏打/重打（检测正确性由 §1-8 覆盖）。期间发现展示层既有 bug：格局名
-  标签 `tAspectConfig[ac]` 对 `acS=1..acK=8` 少一位整体错位（acK 越界读相邻变量）——仅影响
-  文本展示，@0203 机器行与金样不受影响；修正归展示层专项（与轴3 文本通道同批）。
-  遗留：① 真盘格局计数与 golden 文本 listing 对拍（需文本通道）；③ A6 余项 `-Ao/-Am` 容差已落地（492b975）；
+  No-major」守护防漏打/重打（检测正确性由 §1-8 覆盖）。
+  **遗留① 真实盘 golden 对拍 2026-09-05 完成**：发现 golden_main 支持 `-os` 文本 listing
+  且 `-g0` 触发格局段 → CLI 加 opt-in `--grands`（FCreateGrid(false)+DetectGrands，默认不
+  触发不影响金样）；8 盘 golden `-g0` 计数 fixture 入 `test/golden/*.grands.json`，
+  `verify_grands.py`（ctest `grands_oracle`）8/8 与本地逐类型一致（含 Stellium/T-Square/
+  Cradle/GT/Kite）。**展示层标签 bug 已修**：tAspectConfig 缺 [0] 占位致 `acS=1..acK=8`
+  错位（acK 越界）——golden lang 资源带前导 `|`；补 `""` 首元素后 unit_grands §9 升级为
+  标签级断言。③ A6 余项 `-Ao/-Am` 容差已落地（492b975）；
   `-Aa` 需 rAspAngle 去 const、`-An/-AA` 命名属语言资源域。
 - [x] 金样矩阵（轴1 宫位系已固化）—— 48 份 `test/golden/*.hs<NN>.golden.txt`（bj/syd/la × hs00..15，原版 `--o0 -c <hs>`）入 CI；verify_cli 样本 16→64，逐字段 9 位零差（A2 实证固化，golden_diff 9.2s）。轴2 天体集 = 现有 8 份默认 + 8 份 `-U` 金样。轴3 容许度 = 需相位文本通道（待接）。
 - 验收：本命盘数值与金样逐项一致。
