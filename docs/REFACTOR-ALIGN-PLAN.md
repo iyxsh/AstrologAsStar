@@ -533,8 +533,8 @@ A10 验证走 oracle：
    单测 unit_composite（中点恒等全对象 + 跨180反例 + cusp 校正）；回归 64 金样不破。
 2. **A10-2 时空中点 Midpoint** `GetMidpointMachineText(a,b)`：双时刻双地点 ratio + recast
    （语义=两盘时空折中盘，API 双 ChartInput 天然携带）。**2026-09-05 已落地**（见下）。
-3. **A10-3 Synastry 关系网格**（最低优先）：跨盘相位网格文本通道需先定网格文本格式/标题
-   （OutChartAspectRelation 现为 GUI 调试串）——单独定界。
+3. **A10-3 Synastry 关系网格** `GetSynastryGridMachineText(a,b)`：两盘交叉相位网格（盘A×盘B）
+   ——**2026-09-05 已落地**（见下）。
 
 **A10-1 合成盘 Composite 2026-09-05 落地**（A10 分片①，采用方案 = 复用 CastRelation 而非复制分支）：
 - 新 API（astrolog_lib.h + astrolog.cpp）：`GetCompositeMachineText(a,b)`（@0203 文本）与
@@ -565,8 +565,27 @@ A10 验证走 oracle：
   ctest 全绿（10 unit + golden_diff），金样 64 不破。
 - 验证模式：A8/A10 金样路线对关系盘已关（golden_main 关系路径 SEGV）；A10-2 正确性由
   「自反恒等 + 对称 + 时空中点 Oracle（同地邻时中点 == 普通盘）」三重锁定。
-- 剩余 A10-3 Synastry 关系网格（最低优先）：跨盘相位网格文本通道需先定网格文本格式/标题
-  （OutChartAspectRelation 现为 GUI 调试串）——单独定界。
+
+**A10-3 Synastry 关系网格 2026-09-05 落地**（A10 分片③，复用 A10-1/2 双盘通道）：
+- 新 API（astrolog_lib.h + astrolog.cpp）：`GetSynastryGridMachineText(a,b)`（@0403 文本）与
+  `GetSynastryGridJSON(a,b)`（十进制 JSON）；共享装配核心 `CastSynastryGrid`（static）：
+  两次 SetupChartQuiet（盘2 转存 ciMain 后切回盘1 主盘）→ `us.nRel=rcDual`（仅触发 CastRelation
+  把两盘分别 cast 入 cp1=盘A / cp2=盘B，combine 步改 cp0 与网格无关）→ `ciTwin/ciTran/ciNatal2=twin`
+  → `CastRelation()` 原函数 → `FCreateGridRelation(FALSE)` 把全局 `grid` 填为「盘A×盘B 交叉相位」
+  （`grid->n[i][j]=aspect`，i=cp2=B, j=cp1=A）→ 出口备份还原 us.nRel/ciTwin/ciTran/ciNatal2/ignore1..3
+  （cp1/cp2/grid 不还原，供写行器读出）。
+- **格式定论（原"待定"项）**：网格非 @0203 盘而是一组交叉相位，故新开 @0403 文本，每行
+  `<objA_idx> <asp_abbr> <objB_idx> <lonA> <lonB> <orb_deg> <exact_deg>`——对象用**引擎序号**
+  （0=Earth,1=Sun,...见 s_szObjShortNameEnglish，避 cObj=117 超 s_szObjShortNameEnglish[46] 界
+  与本地化），asp 取英文缩写 `tAspectAbbrev`（Con/Opp/Squ/Tri/Sex/...）。忽略集**同步**
+  `ignore2=ignore3=ignore1` 使 FCreateGridRelation 的 UNION 语义退化为单一对象集（默认不纳入恒星）。
+- `unit_synastry`（ctest，no gtest）：①对称——grid(A,B) 与 grid(B,A) 交换 A/B designation 后逐行
+  集合相等（破两盘被当同一盘 / i,j 映射错）②角度自洽——每行 `orb ≈ wrap180(MinDistance(lonA,lonB)
+  − exact)`（grid 内部即如此存 orb，浮点尾差 < 弧分）③asp 合法 token ④头标记 @0403 ⑤JSON 与文本
+  逐条一致 ⑥泄漏回归（grid 后 chart(A) 仍逐字节）。ctest 11/11 + golden_diff 64 不破；A=北京1958 /
+  B=纽约1985 实测 22 条交叉相位。
+- 验证模式：网格正确性由「对称 + 角度自洽 + asp 合法 + JSON 一致」四重锁定（金样路线对关系盘已关）。
+- **A10 全分片完成**（A10-1 Composite / A10-2 Midpoint / A10-3 Synastry grid 均落地，三端已推）。
 
 **A6 余项前置核查（2026-09-05）**：本地**无** `rAspOrb/rObjOrb/rAspInf` 数组（引擎容差为内联
 `rOrb` 逻辑）→ `-Ao/-Am` 自定义容差表需先移植 golden 容差基础设施，非小改；与 -Aa（改
