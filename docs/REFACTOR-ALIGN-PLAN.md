@@ -420,8 +420,14 @@ WinMain（L9780）调 FProcessCommandLine（L18191）→ FProcessSwitchesMain（
 - 双月返 = 月内返回 2 个（golden IsDoubleReturn 场景，无需另存 ciLunarReturn0）。
 - unit_returns：2026 逐月身份恒等全过（Moon==本命 ≤1e-6）；全年 total=13 次、
   7 月双返 1 例；ctest 11/11。
-- 边界仍存：返照盘 civil cast + 与 golden ChartTransitSearch 分段粒度的对照（本地无该
-  内核，采用天文定义高精度解算，文档已声明）。
+- **A9 civil cast 收口 2026-09-05**：`GetSolarReturnMachineText(natal, year)`（astrolog.cpp）
+  ——**引擎空间解算**：以引擎自身 cast 的 Sun 黄经为被解函数，目标年逐日正午找跨越
+  （unwrap 含 360 回卷），日内连续时间二分求 civil 时刻并直接出盘（地点/时区沿用本命），
+  规避 JD→civil 时区语义推导。unit_returns 端到端：返照盘 Sun==本命 Sun **4.7e-4°**
+  （bj 2026-07-03 22:26 本地）。排掉三个签名坑：MdyToJulian(mon,day,yea)、
+  JulianToMdy(mon,day,yea)、swe_revjul(year,mon,day,hour[0-24])。
+- 边界：golden 经 ChartTransitSearch 分段插值取返照（本地无该内核）；本实现按天文定义
+  + 引擎空间高精度解算（civil 分钟级），语义一致、精度更高，文档已声明。
 - [ ] A15 日月食表入口。
 - 验收：与金样一致（覆盖代表日期 ±100 年）。
 

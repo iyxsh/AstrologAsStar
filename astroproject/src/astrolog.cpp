@@ -52,6 +52,7 @@ https://passion-astrologue.com/regle-30-degres-astuce-interpretation/
 
 #include "astrolog.h"
 #include "../../include/core/chart.h"   /* CastChart / gSolarArc（P2/A8-2） */
+#include "../../swe/swisseph/swephexp.h" /* swe_revjul（P2/A9 太阳返照 civil 解算） */
 
 #define _CRT_SECURE_NO_DEPRECATE
 #ifndef _WIN32_WINNT
@@ -5401,6 +5402,100 @@ std::wstring GetSolarArcMachineText(const ChartInput& natal,
 	CastChart(1);
 	gSolarArc = 0;
 	us.fProgressUS = FALSE;
+	return BuildMachineText();
+}
+
+/* P2/A9-0：太阳返照盘机器文本（引擎空间解算，避免 JD→civil 时区语义坑）。
+ * 以引擎自身 cast 的 Sun 黄经（cp0.longitude[oSun]，度）为被解函数，在目标年
+ * 逐日正午找跨越（unwrap 含 360 回卷），再日内连续时间二分，求「引擎 Sun ==
+ * 本命 Sun」的 civil 时刻并 cast 出盘。地点/时区沿用本命。 */
+std::wstring GetSolarReturnMachineText(const ChartInput& natal, int year)
+{
+	SetupChartQuiet(natal);
+	CastChart(1);
+	double target = cp0.longitude[oSun];          /* 本命 Sun（度） */
+	int yy, mm, dd;
+	double fd;
+
+	/* MdyToJulian(mon,day,yea) —— 勿按 (y,m,d) 传参（历次签名坑） */
+	auto dayNumOf = [](int y, int m, int d) { return (long)MdyToJulian(m, d, y); };
+	auto wrap = [](double dlt) -> double {
+		if (dlt > 180.0) dlt -= 360.0;
+		if (dlt < -180.0) dlt += 360.0;
+		return dlt;
+	};
+	/* 在引擎 civil 日期 D（=引擎日数，正午锚）时刻 timPseudo cast 返回 Sun(deg) */
+	auto sunAtCivil = [&](long D, double timPseudo) -> double {
+		ChartInput t = natal;
+		JulianToMdy((double)D, &mm, &dd, &yy);
+		t.yea = yy; t.mon = mm; t.day = dd; t.tim = timPseudo;
+		SetupChartQuiet(t);
+		CastChart(1);
+		return cp0.longitude[oSun];
+	};
+
+	long D0 = dayNumOf(year, 1, 1);
+	long curD = D0;
+	double rawLo = sunAtCivil(curD, 12.0);      /* 正午 raw（括号下界） */
+	if (isnan(rawLo)) return L"";
+	double U0 = rawLo;
+	int M = (int)floor((rawLo - target) / 360.0);
+	double kTarget = 360.0 * (double)(M + 1);
+	int found = 0;
+
+	/* 1) 逐日正午扫描：noon(D) → noon(D+1)，unwrap 后跨越 target+kTarget */
+	for (int i = 0; i <= 368 && !found; i++)
+	{
+		long Dn = curD + 1;
+		JulianToMdy((double)Dn, &mm, &dd, &yy);
+		if (yy > year)
+			break;
+		double rawN = sunAtCivil(Dn, 12.0);
+		if (isnan(rawN)) return L"";
+		double U1 = U0 + wrap(rawN - rawLo);
+		if (U1 >= target + kTarget)
+		{
+			found = 1;
+			break;
+		}
+		curD = Dn; rawLo = rawN; U0 = U1;
+	}
+	if (!found)
+		return L"";
+
+	/* 2) 日内连续时间二分：τ∈[0,1) 从 curD 正午起；U 相对起点 rawLo unwrap */
+	auto evalU = [&](double tau) -> double {
+		double jd = (double)curD + tau;
+		swe_revjul(jd, jd >= 2299171.0, &yy, &mm, &dd, &fd);
+		double hours = fd;   /* swe_revjul 输出已是小时(0-24) */
+		int h = (int)hours;
+		int mn = (int)((hours - h) * 60.0);
+		double s = sunAtCivil(dayNumOf(yy, mm, dd), h + (double)mn / 100.0);
+		return U0 + wrap(s - rawLo);
+	};
+	double lo = 0.0, hi = 1.0;
+	for (int it = 0; it < 55; it++)
+	{
+		double mid = (lo + hi) / 2.0;
+		if (evalU(mid) >= target + kTarget)
+			hi = mid;
+		else
+			lo = mid;
+	}
+
+	/* 3) 收敛时刻出盘 */
+	{
+		double jd = (double)curD + (lo + hi) / 2.0;
+		swe_revjul(jd, jd >= 2299171.0, &yy, &mm, &dd, &fd);
+		double hours = fd;   /* swe_revjul 输出已是小时(0-24) */
+		int h = (int)hours;
+		int mn = (int)((hours - h) * 60.0);
+		ChartInput rc = natal;
+		rc.yea = yy; rc.mon = mm; rc.day = dd;
+		rc.tim = h + (double)mn / 100.0;
+		SetupChartQuiet(rc);
+		CastChart(1);
+	}
 	return BuildMachineText();
 }
 

@@ -99,5 +99,7 @@ ASTROLOG32_API std::wstring GetTransitMachineText(const ChartInput& target);
 ASTROLOG32_API std::wstring GetSolarArcMachineText(const ChartInput& natal,
 	int tgtMon, int tgtDay, int tgtYea, const char* tgtTim, int mode,
 	double tgtDst, double tgtZon);
+/* P2/A9 — 太阳返照盘机器文本（引擎空间解算 civil 时刻后 cast；地点/时区沿用本命）。 */
+ASTROLOG32_API std::wstring GetSolarReturnMachineText(const ChartInput& natal, int year);
 
 #endif // ASTROLOG_LIB_H

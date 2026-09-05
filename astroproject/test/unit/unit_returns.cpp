@@ -103,6 +103,18 @@ int main(void)
     }
     fprintf(stderr, "]\n");
 
+    /* 4) 太阳返照盘端到端（A9 civil cast）：返照盘 Sun == 本命 Sun（≤0.01°） */
+    std::wstring sr = GetSolarReturnMachineText(nat, 2026);
+    CHECK(!sr.empty());
+    double srSun = lon_of(sr, L"/YF Sun ");
+    CHECK(srSun > -1e8);
+    double circ2 = fmod(fabs(srSun - natalSun), 360.0);
+    if (circ2 > 180.0) circ2 = 360.0 - circ2;
+    CHECK(circ2 < 0.01);
+    CHECK(sr != text);                          /* 返照盘 ≠ 本命盘（其余行星已移） */
+    fprintf(stderr, "  solar-return-chart Sun=%.6f natal=%.6f diff=%.6f deg\n",
+        srSun, natalSun, circ2);
+
     if (g_fail) {
         fprintf(stderr, "FAIL unit_returns\n");
         return 1;
