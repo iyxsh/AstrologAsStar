@@ -128,15 +128,12 @@ int main(int argc, char* argv[])
 			}
 		} else if ((a[0] == '-' || a[0] == '=' || a[0] == '_' || a[0] == ':') && a.size() >= 2) {
 			/* 未保留的开关 → 引擎配置透传（原版开关子集，--cfg 之后应用）。
-			 * 引擎开关的数字参数是独立 token（如 "-c 6"）：紧随其后的数字形
-			 * token 一并收集（-s/-P 的可选数字同理；解释器会忽略多余数字）。 */
+			 * 引擎开关可带**多 token 值块**：-A 族（-Ao Con Con 10 范围文法）、
+			 * -RA/-RE 相位屏蔽列表、-c 6、-P 20 等。统一策略：消费该开关之后所有
+			 * 非 '-' 开头 token（遇下一开关即停；-qb 的位置参数在 -qb 分支先行消费）。 */
 			cfgToks.push_back(a);
-			if (k + 1 < argc) {
-				const char* nx = argv[k + 1];
-				char c0 = nx[0];
-				bool numericNext = (c0 >= '0' && c0 <= '9') ||
-					((c0 == '-' || c0 == '.') && nx[1] >= '0' && nx[1] <= '9');
-				if (numericNext) { cfgToks.push_back(argv[++k]); }
+			while (k + 1 < argc && argv[k + 1][0] != '-') {
+				cfgToks.push_back(argv[++k]);
 			}
 		} else {
 			fprintf(stderr, "warning: ignoring unknown argument '%s'\n", a.c_str());

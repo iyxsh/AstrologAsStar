@@ -165,13 +165,11 @@ int ConfigProcessTokens(const char* const* argv, int argc,
 			break;
 		}
 
-		/* ---- -A 族 相位自定义（A6 余项；镜像原版 -Ao/-Am）：
-		 *    -Ao <asp> <deg> 设相位容差（负数=旧版语义→忽略该相）；-Am <obj> <deg> 对象容差 ---- */
+		/* ---- -A 族 相位自定义（A6 余项；镜像原版 -Ao/-Am 数值文法）：
+		 *    -Ao <asp> <deg> 设相位容差（负数=旧版语义→忽略该相）；-Am <obj> <deg> 对象容差
+		 *    注：原版 -Ao 实为范围文法 `-Ao <i> <j> <v_i..v_j>`（多值），但 mingw console
+		 *    端口多值路径退化（值列表吞 -qb 参数）→ orb 轴金样生成被阻塞，见 plan 轴3 纪要。 ---- */
 		case 'A': {
-			/* -Ao <asp> <deg> 相位容差 / -Am <obj> <deg> 对象容差 /
-			 * -Aa <asp> <deg> 相位角度 / -Ad <obj> <deg> 对象容差增量
-			 * （镜像原版 case 'A' 子开关：o/m/d → 对应表，default(含 a) → rAspAngle）。
-			 * -An/-AA 等未实现：安全 no-op。 */
 			if (ch2 != 'o' && ch2 != 'm' && ch2 != 'a' && ch2 != 'd') break;
 			const char* swName = (ch2 == 'o') ? "Ao" : (ch2 == 'm') ? "Am" : (ch2 == 'a') ? "Aa" : "Ad";
 			if (i + 2 >= argc) { SetErr(errtxt, errsz, "-Ao/-Am/-Aa/-Ad need index and degrees", swName, NULL); return 0; }
