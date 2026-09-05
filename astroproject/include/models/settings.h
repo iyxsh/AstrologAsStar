@@ -92,7 +92,7 @@ typedef struct UserSettings
 	bool fAnsiChar;			/* -k0 */
 
 	/* Rare flags */
-	bool fTrueNode;			/* -Yn */
+	bool fTrueNode;		/* -U 恒星显示 (A4)：启用真实恒星计算与输出 */			/* -Yn */
 	bool fEuroDate;			/* -Yd */
 	bool fEuroTime;			/* -Yt */
 	bool fSmartAspects;		/* -YC */
@@ -191,6 +191,7 @@ typedef struct UserSettings
 	// 添加缺失的字段
 	int objNode;        /* -Yn */
 	int objOnLilith;    /* -Yl */
+	bool fAllStar;		/* -U 恒星显示 (A4)：启用真实恒星计算与输出（默认 false = 占位语义） */
 } US;
 
 // Internal settings structure

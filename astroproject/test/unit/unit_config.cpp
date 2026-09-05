@@ -33,6 +33,7 @@ struct Snap {
     int house, arabicParts, center;
     double siderealCorrection;
     int trueNode, lilith, sidereal;
+    int allStar, nStar;
 };
 static Snap snap(void)
 {
@@ -44,6 +45,8 @@ static Snap snap(void)
     s.trueNode = us.fTrueNode;
     s.lilith = oscLilith;
     s.sidereal = us.fSidereal;
+    s.allStar = us.fAllStar;
+    s.nStar = us.nStar;
     return s;
 }
 static void restore(const Snap& s)
@@ -55,6 +58,8 @@ static void restore(const Snap& s)
     us.fTrueNode = s.trueNode;
     oscLilith = s.lilith;
     us.fSidereal = s.sidereal;
+    us.fAllStar = s.allStar;
+    us.nStar = s.nStar;
 }
 
 int main(void)
@@ -156,6 +161,22 @@ int main(void)
     CHECK(ConfigLoadFile("unit_config_NO_SUCH.dat", err, sizeof(err)) == 0);
     CHECK(err[0] != '\0');
 
-    printf("PASS unit_config: house/node/lilith/arabic/center/sidereal switches\n");
+    /* ---- 9. -U fixed-star enable (A4): bare -U enables, -U<sub> sorts ---- */
+    int st0 = us.fAllStar, ns0 = us.nStar;
+    CHECK(ConfigApply("-U", err, sizeof(err)) == 1);
+    CHECK(us.fAllStar == 1);                    /* real-star computation on */
+    restore(base);
+    CHECK(ConfigApply("-Uz", err, sizeof(err)) == 1);
+    CHECK(us.fAllStar == 1);
+    CHECK(us.nStar == 'z');                     /* zodiac sort mode */
+    restore(base);
+    CHECK(ConfigApply("-Ub", err, sizeof(err)) == 1);
+    CHECK(us.fAllStar == 1);
+    CHECK(us.nStar == 'b');                     /* brightness sort mode */
+    restore(base);
+    CHECK(us.fAllStar == st0 && us.nStar == ns0); /* restore() reverts both */
+    restore(base);
+
+    printf("PASS unit_config: house/node/lilith/arabic/center/sidereal/allstar switches\n");
     return 0;
 }

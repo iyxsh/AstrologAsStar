@@ -5318,12 +5318,21 @@ std::wstring GetChartMachineText(const ChartInput& chartInput)
 		int i = s_goldenIdx[k];
 
 		if (s_isPlaceholder(i)) {
-			/* Constant default row for an ignored star slot (original
-			 * behaviour: longitude 0, speed 1 rad/day in degrees,
-			 * distance 999). */
 			wchar_t nm3[8];
 			swprintf(nm3, 8, L"%3d", i);
-			EmitMachineRow(out, nm3, 0.0, 0.0, 57.295779513, 999.0);
+			if (us.fAllStar) {
+				/* A4: -U 启用时输出 ComputeStars 计算的真实恒星位置
+				 * (golden -U 同样填这些槽位: speed=恒星固有进动速度, dist=999)。 */
+				double rT = cp0.longitude[i];
+				double lat = cp0.latitude[i];
+				double speed = Rad2Deg(cp0.vel_longitude[i]);
+				EmitMachineRow(out, nm3, rT, lat, speed, 999.0);
+			} else {
+				/* Constant default row for an ignored star slot (original
+				 * behaviour: longitude 0, speed 1 rad/day in degrees,
+				 * distance 999). */
+				EmitMachineRow(out, nm3, 0.0, 0.0, 57.295779513, 999.0);
+			}
 			continue;
 		}
 

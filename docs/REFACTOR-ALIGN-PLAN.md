@@ -132,7 +132,7 @@ GetChartAspectRelation / GetChartResult`。
 | A1 | 本命盘主链 | ✅ | ✅（基本一致） | 低 | 金样校准微差 |
 | A2 | 宫位系统接线 | 16 系全 | 枚举 16，**实际 3 系错映射**（EqualMC/Whole/Null→整宫） | 高 | 修正 SwissHouse 映射 + 3D 宫复测 |
 | A3 | 南北交点/莉莉丝 | 真交点 + 真莉莉丝远地点 | 已与原版对齐（2026-09-05 实证） | 完成 | SE 路由 + `-Yn`/`-YL` 已接，实证见 P1 清单 |
-| A4 | 小行星/天王星族/恒星 | 全量可开关 | SE 映射全但默认全屏蔽；恒星零调用 | 高 | 默认天体集开关配置化 + 恒星启用 + 数据文件策略 |
+| A4 | 小行星/天王星族/恒星 | 全量可开关 | 恒星 `-U` 已对齐（2026-09-05 实证 128/128 行 9 位零差）；小行星/天王星族开关仍缺 | 恒星子项完成；余天体集开关 | 恒星接入 ComputeStars + `-U`；小行星/天王星族对象开关 = 天体集配置化（A4 子项 2） |
 | A5 | 阿拉伯点 | 177 点按需 | 仅福点 1 个（CastChart 内嵌公式） | 高 | 移植 tArabicPart 177 点表 + 配置化 |
 | A6 | 相位集/容许度 | 18 型+平行/反平行+自定义表 | 18 型枚举在、默认 5 主、无自定义入口 | 中 | 配置化：相位集/容许度/格局 |
 | A7 | 格局识别 | ac 码 + 搜索 | DisplayGrands 在、无入口/无测 | 中 | 接 API + 金样 |
@@ -322,6 +322,25 @@ WinMain（L9780）调 FProcessCommandLine（L18191）→ FProcessSwitchesMain（
   一致（5.485724545）→ 路由与 swe 版本等价，无逻辑错。④ 顺带还原 `initEnv()` 曾强制 `eepp=1`(SWIEPH)
   的硬编码为原版 `eepp=-1`（golden 从不强制；实证本地缺表 fallback==显式 MOSEPH，无数值影响，
   .se1 存在时自动用表）。回归：ctest 3/3、金样 8/8 不破。遗留：`-YR` 对象开关启用属 A4 天体集范围。
+- [x] A4 恒星启用 `-U`（天体集子项 1）—— **2026-09-05 实证收尾**：① 语义定位——金样 40 行对象集中
+  16 个恒星占位槽（45/46/47/52/57/67/74/79/81/82/91/93/99/104/114/117）原版默认输出
+  `0 Ari 0, 0, 57.295779513 999`，仅 `-U` 填真实恒星；A4 = 把原「零调用」的 `ComputeStars`
+  （fixed_stars.cpp，读内嵌 75 星 J2000 赤经赤纬表，sefstars.txt 存在则 swe_fixstar 覆盖）接入主链。
+  ② 接线——`settings.h`：**US 结构体末尾**新增 `bool fAllStar`（★勿插中部：US 静态聚合初始化
+  `US us={…}` 按成员序对位，插入早段会使后续 `1.0`(double nHarmonic) 错位落到 `int objOnAsc`
+  触发 `-Wnarrowing`，重构教训已录）；`config.cpp`：`case 'U'` 置 `us.fAllStar=1`，`-Uz/n/b/l/p`
+  同时记 `us.nStar`（排序模式）；`chart.cpp`：`CastChart` 在 `ComputeWithSwissEphemeris(is.T)` 后调
+  `ComputeStars(us.fSidereal ? 0.0 : -Off)` —— **SD 必须传 `-Off` 而非 0**（初版传 0 致 16 星黄经
+  整体偏移 -24.16°：`#define rEpoch2000 (-24.736467)` 常量外还需 tropical 岁差项 SD=+ayanamsa
+  抵消常量并施加 J2000→盘面剩余岁差，与原版 golden astrolog.cpp:20783 调用**逐字一致**）；
+  `astrolog.cpp`：`GetChartMachineText` 占位槽按 `us.fAllStar` 分流——置位输出
+  `cp0.longitude/latitude/vel_longitude` 真实值（速度 0.000037909=岁差速率，距离仍 999），默认
+  保持占位（金样不破）。③ **交叉对拍**：golden runner `--o0 -U` × 8 盘（1900/1958/1969/1988/
+  1999/2000/2020/2100，含南半球/夏令时/负时区/78N 高纬）= **16×8=128 恒星行逐字节 9 位一致**
+  （黄经/黄纬/速度/距离全同）；行星仅既有末位噪声，福点/宫头距离跳过（engine gap，verify_cli
+  容差内）。④ unit_config 新增 `-U`/`-Uz`/`-Ub` 断言（fAllStar 置位 + nStar 排序 + restore
+  回滚）；ctest 3/3 + 金样 8/8 不破。遗留：小行星/天王星族(11-15/34-42)对象级开关 = A4 子项 2
+  「天体集开关配置化」，与 A5 同批或后置。
 - [ ] A6 相位集/容许度配置化 + A7 格局识别入口。
 - [ ] 金样：本命盘 × 宫位系(16) × 天体集 × 容许度矩阵。
 - 验收：本命盘数值与金样逐项一致。

@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "../../include/core/ephemeris.h"
+#include "../../include/core/fixed_stars.h"
 #include "../../include/data/signs.h"
 
 extern CI ciCore;
@@ -251,6 +252,15 @@ double CastChart(bool fDate)
 		}
 		SetEphemerisPath();
 		ComputeWithSwissEphemeris(is.T);
+		/* A4: 恒星（若 -U 启用，接入 ComputeStars 填充 cp0.longitude[starLo..starHi]）
+		 * 依赖 is.rObliquity/is.rSid/Longit/Latit/oMC 此时均已就绪。
+		 * SD 参数与原版 golden 逐字对齐：ComputeStars(us.fSidereal ? 0.0 : -Off)，
+		 * 其中 Off = -ayanamsa（tropical 模式下 SD=+ayanamsa 抵消 rEpoch2000 常量并
+		 * 施加 J2000→盘面日期的剩余岁差）。曾误传 0.0 导致恒星黄经整体偏移 -24.16°。 */
+		if (us.fAllStar)
+		{
+			ComputeStars(us.fSidereal ? 0.0 : -Off);
+		}
 		// 南交点
 		cp0.longitude[oSoNode] = Mod(cp0.longitude[oNoNode] + 180.0);
 		cp0.vel_longitude[oSoNode] = cp0.vel_longitude[oNoNode];

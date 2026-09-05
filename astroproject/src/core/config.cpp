@@ -177,6 +177,18 @@ int ConfigProcessTokens(const char* const* argv, int argc,
 			break;
 		}
 
+		/* ---- -U 恒星显示（A4：补齐默认占位槽位的真实恒星计算） ---- */
+		case 'U': {
+			us.fAllStar = 1;
+			if (ch2 == 'z')      us.nStar = 'z';
+			else if (ch2 == 'n') us.nStar = 'n';
+			else if (ch2 == 'b') us.nStar = 'b';
+			else if (ch2 == 'l') us.nStar = 'l';
+			else if (ch2 == 'p') us.nStar = 'p';
+			/* 其余 -U 子开关：保持 fAllStar=1，排序留默认 */
+			break;
+		}
+
 		/* ---- 其余字母（图表类型/输入/输出等）：CLI 自管或未实现 → no-op ---- */
 		default:
 			break;
