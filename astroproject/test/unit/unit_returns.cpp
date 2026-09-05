@@ -77,10 +77,36 @@ int main(void)
     CHECK(j2027 - j2026 > 355.0 && j2027 - j2026 < 375.0);
     CHECK(j2033 - j2026 > 7.0 * 355.0 && j2033 - j2026 < 7.0 * 375.0);
 
+    /* 3) 月亮返照（A9-1）：2026 年逐月，月内 1~2 次；身份恒等 + 双月返存在性 */
+    double natalMoon = lon_of(text, L"/YF Moo ");
+    CHECK(natalMoon > -1e8);
+    double mo[2];
+    int total = 0, doubles = 0, worstBad = 0;
+    for (int mm = 1; mm <= 12; mm++) {
+        int n = LunarReturnJulians(natalMoon, 2026, mm, mo, 2);
+        if (n < 1 || n > 2) worstBad++;
+        if (n == 2) doubles++;
+        total += n;
+        for (int q = 0; q < n; q++) {
+            double circ = fmod(fabs(MoonEclipticLon(mo[q]) - natalMoon), 360.0);
+            if (circ > 180.0) circ = 360.0 - circ;
+            if (circ > 1e-6) worstBad++;
+        }
+    }
+    CHECK(worstBad == 0);
+    CHECK(total >= 12 && total <= 15);          /* 每年月亮返照 ~13.37 次 */
+    CHECK(doubles >= 1);                        /* 双月返（IsDoubleReturn 场景）存在 */
+    fprintf(stderr, "  lunar 2026: total=%d doublesMonths=%d perMonth=[", total, doubles);
+    for (int mm = 1; mm <= 12; mm++) {
+        int n = LunarReturnJulians(natalMoon, 2026, mm, mo, 2);
+        fprintf(stderr, "%d%s", n, mm == 12 ? "" : ",");
+    }
+    fprintf(stderr, "]\n");
+
     if (g_fail) {
         fprintf(stderr, "FAIL unit_returns\n");
         return 1;
     }
-    fprintf(stderr, "PASS unit_returns: solar-return moment self-consistent (Sun identity + yearly spacing)\n");
+    fprintf(stderr, "PASS unit_returns: solar & lunar return moments self-consistent (identity + spacing + double-return)\n");
     return 0;
 }

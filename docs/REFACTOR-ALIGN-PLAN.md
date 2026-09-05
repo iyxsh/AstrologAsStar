@@ -413,6 +413,15 @@ WinMain（L9780）调 FProcessCommandLine（L18191）→ FProcessSwitchesMain（
   SunErr≈2e-10°、逐年 ~365d；pymeeus 独立交叉 Sun≈natal 差 0.00074°（独立模型系统差）。
 - 边界：本模块只解时刻（UT JD），返照盘 cast（ChartInput civil 装配 + golden 分段插值
   粒度语义）留 A9-1（月亮返照/双月返同批）。
+
+**A9-1 月亮返照 + 双月返 2026-09-05 落地**（同模块扩展）：
+- `MoonEclipticLon(jd)`（swe SE_MOON 同路径）+ `LunarReturnJulians(natalMoonLon,y,m,out,max)`
+  —— 目标日历月内全部月亮返照时刻（0.25d 扫描 unwrapped 穿越 + 二分；月内 1~2 次）。
+- 双月返 = 月内返回 2 个（golden IsDoubleReturn 场景，无需另存 ciLunarReturn0）。
+- unit_returns：2026 逐月身份恒等全过（Moon==本命 ≤1e-6）；全年 total=13 次、
+  7 月双返 1 例；ctest 11/11。
+- 边界仍存：返照盘 civil cast + 与 golden ChartTransitSearch 分段粒度的对照（本地无该
+  内核，采用天文定义高精度解算，文档已声明）。
 - [ ] A15 日月食表入口。
 - 验收：与金样一致（覆盖代表日期 ±100 年）。
 

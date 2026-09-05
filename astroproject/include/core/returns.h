@@ -21,4 +21,12 @@ double SolarReturnJulian(double natalSunLonDeg, int targetYear);
 /* 引擎同路径太阳视黄经（deg，0..360），供身份恒等校验。jdUt 为 UT JD。 */
 double SunEclipticLon(double jdUt);
 
+/* P2/A9-1：引擎同路径月亮视黄经（deg，0..360）。 */
+double MoonEclipticLon(double jdUt);
+
+/* 目标日历月内全部月亮返照时刻（UT JD，升序，<= max 个；返回个数）。
+ * 一个月内月亮可回归 1~2 次（27.3d 周期）→ 返回 2 个即 golden IsDoubleReturn 场景。 */
+int LunarReturnJulians(double natalMoonLonDeg, int year, int month,
+	double* outJd, int max);
+
 #endif // RETURNS_H

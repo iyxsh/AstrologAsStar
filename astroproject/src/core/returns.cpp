@@ -10,7 +10,7 @@ static void EnsureSwe(void)
 	if (!done) { SetEphemerisPath(); done = 1; }
 }
 
-static double SunLonAt(double jdUt)
+static double BodyEclLon(int seBody, double jdUt)
 {
 	double x[6];
 	char serr[AS_MAXCH];
@@ -19,13 +19,23 @@ static double SunLonAt(double jdUt)
 	/* 与主链 CalculatePlanetSE（eepp=-1 默认）一致：不设 eph flag → swe 自动
 	 * 回退（无 .se1 时 Moshier）；失败再显式 Moshier。 */
 	int flag = SEFLG_SPEED;
-	if (swe_calc(jde, SE_SUN, flag, x, serr) < 0)
+	if (swe_calc(jde, seBody, flag, x, serr) < 0)
 	{
 		flag = SEFLG_MOSEPH | SEFLG_SPEED;
-		if (swe_calc(jde, SE_SUN, flag, x, serr) < 0)
+		if (swe_calc(jde, seBody, flag, x, serr) < 0)
 			return NAN;
 	}
 	return x[0];
+}
+
+static double SunLonAt(double jdUt)
+{
+	return BodyEclLon(SE_SUN, jdUt);
+}
+
+double MoonEclipticLon(double jdUt)
+{
+	return BodyEclLon(SE_MOON, jdUt);
 }
 
 double SunEclipticLon(double jdUt)
@@ -95,4 +105,65 @@ double SolarReturnJulian(double natalSunLonDeg, int targetYear)
 			lo = jd;
 	}
 	return (lo + hi) / 2.0;
+}
+
+/* 目标日历月内的月亮返照（raw 穿越 natal；0.25d 扫描 + 二分）。
+ * 月亮黄经 mod 360 单调增（27.3d/圈），月内可穿越 1~2 次。 */
+int LunarReturnJulians(double natalMoonLonDeg, int year, int month,
+	double* outJd, int max)
+{
+	double jdA, jdB, raw, prevRaw, u, uPrev, prevJd, jd, limit, lo, hi;
+	int y2, m2, M, count = 0, greg;
+
+	if (!(natalMoonLonDeg >= 0.0 && natalMoonLonDeg < 360.0) || year < 1
+		|| month < 1 || month > 12 || max < 1)
+		return 0;
+
+	greg = (year > 1582) || (year == 1582 && month >= 10) ? SE_GREG_CAL : SE_JUL_CAL;
+	jdA = swe_julday(year, month, 1, 0.0, greg);
+	y2 = year; m2 = month + 1;
+	if (m2 == 13) { m2 = 1; y2++; }
+	jdB = swe_julday(y2, m2, 1, 0.0, greg);
+
+	prevRaw = BodyEclLon(SE_MOON, jdA);
+	if (isnan(prevRaw)) return 0;
+	u = prevRaw;                       /* unwrapped 起点 */
+	M = (int)floor((u - natalMoonLonDeg) / 360.0);
+	prevJd = jdA;
+	uPrev = u;
+
+	for (double j = 0.25; j <= (jdB - jdA) + 1e-9; j += 0.25)
+	{
+		jd = jdA + j;
+		if (jd > jdB) jd = jdB;
+		raw = BodyEclLon(SE_MOON, jd);
+		if (isnan(raw)) { prevJd = jd; continue; }
+		double dd = raw - prevRaw;
+		if (dd > 180.0) dd -= 360.0;
+		if (dd < -180.0) dd += 360.0;
+		u = uPrev + dd;
+		prevRaw = raw;
+
+		/* 穿越 target+360*(M+1) 的次数 */
+		while (u >= natalMoonLonDeg + 360.0 * (M + 1) && count < max)
+		{
+			limit = natalMoonLonDeg + 360.0 * (M + 1);
+			/* 括号 [prevJd, jd]（≤0.25d，raw 连续单调穿越 natal） */
+			lo = prevJd; hi = jd;
+			for (int it = 0; it < 60; it++)
+			{
+				double mid = (lo + hi) / 2.0;
+				if (BodyEclLon(SE_MOON, mid) >= natalMoonLonDeg)
+					hi = mid;
+				else
+					lo = mid;
+			}
+			outJd[count++] = (lo + hi) / 2.0;
+			M++;
+			(void)limit;
+		}
+		prevJd = jd;
+		uPrev = u;
+	}
+	return count;
 }
