@@ -409,12 +409,15 @@ A10（关系盘：合盘/组合盘/中点）。
 **A8-0 侦察结论（2026-09-05 实测）**：
 - 触发链 golden 侧 = `-r p`（`us.nRel=rcProgress`，`-rp0`→solarArc=1 / `-rp1`→solarArc=2），
   双日期经 ciCore/ciTwin 交换后读入（golden astrolog.cpp:23345-23372 / ~23000-23190 关系解析区）。
+- **CLI 格式定论（决定性）**：golden `case 'r'` 消费 **2 个 token = 两个「chart 保存文件」路径**
+  （`FInputData(A2U(argv[2]))`→ciTwin(目标)、`FInputData(argv[1])`→ciCore(本命)，i=2）；
+  `case 'y'`（-yp）= SetHereAndNow 作目标 + 单文件 = 推进到"现在"（不可复现，弃）。
+  → **golden 金样前置 = astrolog chart 保存文件文法（FInputData 解析格式）**，非日期 token；
+  无此文法则无法产出可复现次限金样。
 - 本地侧整链已在（astrolog.cpp:3726-3755：JDp←ciMain + fProgressUS + ignore3 交换 + CastChart，
-  与 golden:20644 同源）→ **A8 实现侧基本就绪，缺的是「输入格式 + 金样」两端**。
-- 金样难点：golden runner 双日期关系命令格式未探明（`--0o` + 两次 `-qb` ± `-r p` 均无输出；
-  golden_main 可能仅支持单 -q 组 / 关系盘走 -os 文本通道）→ **下一专turn 先读 golden
-  关系盘 CLI 解析（~23000-23190）定输入格式，勿盲试**。若 @0203 不可达则降级为 -os 文本对拍
-  （与 P1.7 轴3 文本通道同批）。
+  与 golden:20644 同源）→ **A8 实现侧基本就绪**；金样可行性依赖 FInputData/save-file 文法研究
+  （~数百行，独立专turn），或降级独立 oracle（pymeeus 已装）对拍本地推进输出（需先建本地
+  双日期 API 通道）。
 **A6 余项前置核查（2026-09-05）**：本地**无** `rAspOrb/rObjOrb/rAspInf` 数组（引擎容差为内联
 `rOrb` 逻辑）→ `-Ao/-Am` 自定义容差表需先移植 golden 容差基础设施，非小改；与 -Aa（改
 rAspAngle，常量表可直接改但会破坏既有镜像，慎重）一起归"需专项"。
