@@ -388,6 +388,31 @@ WinMain（L9780）调 FProcessCommandLine（L18191）→ FProcessSwitchesMain（
 - [x] 金样矩阵（轴1 宫位系已固化）—— 48 份 `test/golden/*.hs<NN>.golden.txt`（bj/syd/la × hs00..15，原版 `--o0 -c <hs>`）入 CI；verify_cli 样本 16→64，逐字段 9 位零差（A2 实证固化，golden_diff 9.2s）。轴2 天体集 = 现有 8 份默认 + 8 份 `-U` 金样。轴3 容许度 = 需相位文本通道（待接）。
 - 验收：本命盘数值与金样逐项一致。
 
+#### 轴3 容许度金样矩阵 —— 侦察纪要 + 实施设计（2026-09-05 晚间，待开工）
+
+**目标**：把「相位表（含容许度）在自定义 orb 下与原版逐行一致」固化进金样矩阵。
+**原版锚点格式（console 变体 `-os ... -a`，已实测捕获）**：
+```
+                                                    Orb           Power
+  1:          Moon (Aqu) Sex  (Ari) Mars         |  1°19' + |     23.70 |
+```
+- 行 token：`<rank>: <obj1>(<sign1>) <ASP> <sign2>(<obj2>) | <orb°'> <+/−> | <power> |`
+  （末尾有 ` |`）；obj 含派生点（Asc/MC/Part Fortune/NoNode 等）；按 power 降序。
+- **字形变体**：对象旁符号用 `(Can)` 或 `[Lib]` 两种括号——疑似 dignity/宫位相关标记，
+  非数值核心；行数值锚点只取 rank/obj1/asp/obj2/orb(min)/app(±)/power，忽略字形。
+- **已测开关行为**（bj 1958-07-04 12:01 西正 cmd）：默认 25 行；`-Ao 4`/`-Ao 10` → 99 行、
+  `-Ao 1` → 25 行（`-Ao` 疑似 orb **倍率**，语义待定论）；`-c 0` 内容突变（配对全变
+  `<Ari>` 0°00' 系，行数仍 25）——需复现；`-U` 加恒星 → 39 行；`-Ad 0` 无影响。
+- **本地差距**：lib 已有 `ChartAspect()`（astrolog.cpp:2886）/`OutStrChartAspect()`(4637)/
+  config `case 'a'`，但 **CLI 无相位输出通道**（`--text` 仅 @0203 位置行，`-a` 被透传后
+  无处落盘）→ 轴3 前置 = 给 CLI 加相位表输出（仿 --grands：`-a` 置位时在 @0203 后追加
+  相位行；`--aspects` opt-in 更干净）。
+- **实施建议（切片）**：① CLI 相位通道 + 归一化提取（rank/obj/asp/orb/app/power 行）+
+  本引擎输出与原版 diff 对齐（处理 dignity 字形差异、-c0 突变、排序稳定性）；② 新增
+  轴3 金样 = 2 盘 × 3 orb 档（默认/`-Ao 4`/`-Ao 1`）≈ 6 份 + verify 纳入 ctest；③ `-Ao`
+  倍率语义先对原版定论再固化。预估为独立专项（数小时级），**未开工**。
+
+
 ### P2 · 动态盘第一梯队（核心业务盘型）
 - [ ] relation.cpp：CastRelation 全分支正式化；`ChartType` API 参数（行运/次限/
   太阳弧/月亮弧/合盘/组合盘/中点/映点/移置）。

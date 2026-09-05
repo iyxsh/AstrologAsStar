@@ -3,7 +3,8 @@
 // Mirrors a subset of the original Astrolog command-line switches:
 //   -qb M D Y T dst zon lon lat   natal chart
 //                                  (lon: west positive / east negative;
-//                                   zon: east positive / west negative)
+//                                   zon: west positive / east negative too —
+//                                   UT = local + zon − dst, e.g. 北京 zon=-8)
 //   --json | --text               output format (default: --text = @0203)
 //   -n <name> -l <location>       chart name / location
 //   -o <file> | --o0 <file>       write output to file instead of stdout
@@ -119,7 +120,7 @@ int main(int argc, char* argv[])
 				printf("    -h <center> -P <n>|-Pz|-Pn|-Pf|-P0 -Yn -YL -Yc -Yd -Yt -YC -YH\n");
 				printf("    -RA/-RE <asp>.. -Ao/-Am/-Aa/-Ad <idx> <val> -U[znblp]\n");
 				printf("  A7/A8 opt-in: --grands | --progto M D Y T (次限)\n");
-				printf("  lon: west positive / east negative ; zon: east positive / west negative\n");
+				printf("  lon/zon: west positive / east negative（zon 同西正，北京 -8）\n");
 				return 0;
 			}
 		} else if ((a[0] == '-' || a[0] == '=' || a[0] == '_' || a[0] == ':') && a.size() >= 2) {
