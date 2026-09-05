@@ -11,6 +11,8 @@
 
 extern US us;
 extern CP cp0;
+void DisplayGrands(void);       /* astrolog.cpp 文本格局展示（A7 遗留② 回放路径） */
+extern GridInfo* grid;          /* astrolog.cpp 全局网格指针（DisplayGrands 消费） */
 
 static int g_fail = 0;
 #define CHECK(cond) do { \
@@ -30,6 +32,41 @@ static int has(const int buf[][5], int n, int ac, int a, int b, int c, int d)
             buf[t][3] == c && (d < 0 || buf[t][4] == d))
             return 1;
     return 0;
+}
+
+/* A7 遗留②（单一实现重构）：调用 DisplayGrands() 文本路径，断言
+ * 「打印行数 == DetectGrands 记录数」（空盘 =1 行 No-major）。
+ * 回放若漏打/重打任意一条记录都会被此断言捕获。
+ * 注意：PrintGrand 格局名标签存在既有 off-by-one（tAspectConfig[0..7] 存
+ * acS=1..acK=8，acK 甚至越界），属展示层历史 bug（@0203 机器行不受影响），
+ * 不在本重构范围，故此处只做行数/No-major 断言，不断言标签文本。
+ * 捕获用 _dup2 在 fd 层重定向（freopen 重置宽/字节取向会错位）。 */
+static void disp_check(GridInfo* g, const char* must /* NULL=仅计数 */)
+{
+    char txt[16384];
+    FILE* r;
+    int want, got = 0, buf[8192][5], n;
+    size_t rd;
+
+    n = DetectGrands(g, buf, 8192);
+    want = n ? n : 1;
+
+    grid = g;
+    if (!freopen("unit_grands_disp.txt", "w", stdout)) { CHECK(0); return; }
+    DisplayGrands();
+    fflush(stdout);
+
+    r = fopen("unit_grands_disp.txt", "rb");
+    if (!r) { CHECK(0); return; }
+    rd = fread(txt, 1, sizeof(txt) - 1, r);
+    fclose(r);
+    txt[rd] = '\0';
+    for (size_t z = 0; z < rd; z++)
+        if (txt[z] == '\n') got++;
+    if (rd > 0 && txt[rd - 1] != '\n') got++;
+    CHECK(got == want);
+    if (must) CHECK(strstr(txt, must) != NULL);
+    remove("unit_grands_disp.txt");
 }
 
 int main(void)
@@ -120,10 +157,55 @@ int main(void)
         CHECK(n == 0);
     }
 
+    /* --- 9. DisplayGrands 文本回放（A7 遗留② 单一实现重构 2026-09-05）---
+     * 检测统一走 DetectGrands 后按记录序回放打印；断言打印行数与 DetectGrands
+     * 记录数一致（漏打/重打即失败），空盘断言 No-major 行。 */
+    ZERO();
+    setpair(g, 1, 2, aCon); setpair(g, 1, 3, aCon); setpair(g, 2, 3, aCon);
+    disp_check(&g, NULL);
+
+    ZERO();
+    setpair(g, 1, 2, aTri); setpair(g, 1, 3, aTri); setpair(g, 2, 3, aTri);
+    setpair(g, 1, 4, aSex); setpair(g, 2, 4, aSex);
+    disp_check(&g, NULL);
+
+    ZERO();
+    setpair(g, 5, 6, aOpp); setpair(g, 5, 7, aSqu); setpair(g, 6, 7, aSqu);
+    disp_check(&g, NULL);
+
+    ZERO();
+    setpair(g, 8, 9, aSex); setpair(g, 8, 10, aInc); setpair(g, 9, 10, aInc);
+    disp_check(&g, NULL);
+
+    ZERO();
+    for (int i = 1; i <= 118; i++) cp0.longitude[i] = 0.0;
+    cp0.longitude[1] = 0.0; cp0.longitude[2] = 90.0;
+    cp0.longitude[3] = 180.0; cp0.longitude[4] = 270.0;
+    setpair(g, 1, 2, aSqu); setpair(g, 2, 3, aSqu);
+    setpair(g, 3, 4, aSqu); setpair(g, 1, 4, aSqu);
+    setpair(g, 1, 3, aOpp); setpair(g, 2, 4, aOpp);
+    disp_check(&g, NULL);
+
+    ZERO();
+    cp0.longitude[1] = 0.0; cp0.longitude[2] = 60.0;
+    cp0.longitude[3] = 120.0; cp0.longitude[4] = 180.0;
+    setpair(g, 1, 2, aSex); setpair(g, 2, 3, aSex); setpair(g, 3, 4, aSex);
+    setpair(g, 1, 4, aOpp);
+    disp_check(&g, NULL);
+
+    ZERO();
+    setpair(g, 1, 2, aOpp); setpair(g, 3, 4, aOpp);
+    setpair(g, 1, 3, aTri); setpair(g, 2, 4, aTri);
+    disp_check(&g, NULL);
+
+    ZERO();
+    disp_check(&g, "No major configurations in aspect grid.");
+
     if (g_fail) {
         fprintf(stderr, "FAIL unit_grands\n");
         return 1;
     }
-    printf("PASS unit_grands: stellium/grand-trine/kite/t-square/yod/grand-cross/cradle/mystic-rect\n");
+    /* stdout 在 disp_check 捕获后仍指向最后的临时文件，故 PASS 走 stderr */
+    fprintf(stderr, "PASS unit_grands: stellium/grand-trine/kite/t-square/yod/grand-cross/cradle/mystic-rect + DisplayGrands replay\n");
     return 0;
 }

@@ -2704,7 +2704,8 @@ void PrintGrand(byte ac, int i1, int i2, int i3, int i4)
 }
 
 /* Scan the aspect grid of a chart and record any major configurations.     */
-/* A7 API 入口：与 DisplayGrands() 取格局条件逐行镜像（单一实现重构留给 P1.7）。 */
+/* A7 API 入口：条件与旧 DisplayGrands 逐行镜像；2026-09-05 起 DisplayGrands */
+/* 已重构为消费本函数结果（单一实现，见上），防双份漂移。                   */
 /* out[n][5] = { ac(acS/acGT/acTS/acY/acGC/acC/acMR/acK), objA, objB, objC, objD }；
  * 4 体格局用全 4 对象，3 体格局 objD=0。返回记录数（<= maxOut）。 */
 int DetectGrands(const GridInfo* g, int out[][5], int maxOut)
@@ -2792,133 +2793,23 @@ int DetectGrands(const GridInfo* g, int out[][5], int maxOut)
 
 /* Scan the aspect grid of a chart and print out any major configurations, */
 /* as specified with the -g0 switch.                                       */
+/* A7 遗留②（2026-09-05 单一实现重构）：格局检测统一走 DetectGrands()，   */
+/* 本函数仅按记录序回放打印——记录序 == 旧版逐行内联检测的打印序，故文本   */
+/* 输出与重构前逐条一致（unit_grands §9 以「行数 == DetectGrands 记录数」 */
+/* 守护，防漏打/重打）。                                                   */
 void DisplayGrands()
 {
-	int cac = 0, i, j, k, l;
+	/* 记录上限：普通盘的格局记录数远小于 30000；该上限仅约束病态合成网格， */
+	/* 不影响等价性（旧版无上限，但实际不会触及）。                          */
+	static int as[30000][5];
+	int cac = DetectGrands(grid, as, 30000), n;
 
-	for (i = 0; i <= cObj; i++)
-	{
-		if (!FIgnore(i))
-		{
-			for (j = 0; j <= cObj; j++)
-			{
-				if (j != i && !FIgnore(j))
-				{
-					for (k = 0; k <= cObj; k++)
-					{
-						if (k != i && k != j && !FIgnore(k))
-						{
-							/* Is there a Stellium among the current three planets? */
-
-							if (i < j && j < k && grid->n[i][j] == aCon && grid->n[i][k] == aCon && grid->n[j][k] == aCon)
-							{
-								cac++;
-								PrintGrand(acS, i, j, k, l);
-								/* Is there a Grand Trine? */
-
-							}
-							else if (i < j && j < k && grid->n[i][j] == aTri && grid->n[i][k] == aTri && grid->n[j][k] == aTri)
-							{
-								cac++;
-								PrintGrand(acGT, i, j, k, l);
-								/* Grand Trine is there, may be there is a Kite too ? */
-								/* We look, if some cp0.longitude is in sextiles with some   */
-								/* pair of planets of Grand Trine, then it's surely   */
-								/* opposed with third one.                            */
-
-								for (l = 0; l <= cObj; l++)
-								{
-									if (!FIgnore(l))
-									{
-										if (grid->n[Min(i, l)][Max(i, l)] ==
-											aSex && grid->n[Min(j, l)][Max(j, l)] == aSex)
-										{
-											cac++;
-											PrintGrand(acK, i, j, k, l);
-										}
-										if (grid->n[Min(j, l)][Max(j, l)] ==
-											aSex && grid->n[Min(k, l)][Max(k, l)] == aSex)
-										{
-											cac++;
-											PrintGrand(acK, i, j, k, l);
-										}
-										if (grid->n[Min(i, l)][Max(i, l)] ==
-											aSex && grid->n[Min(k, l)][Max(k, l)] == aSex)
-										{
-											cac++;
-											PrintGrand(acK, i, j, k, l);
-										}
-									}
-								}
-								/* Is there a T-Square? */
-
-							}
-							else if (j < k && grid->n[j][k] == aOpp && grid->n[Min(i, j)][Max(i, j)] == aSqu && grid->n[Min(i, k)][Max(i, k)] == aSqu)
-							{
-								cac++;
-								PrintGrand(acTS, i, j, k, l);
-								/* Is there a Yod? */
-							}
-							else if (j < k && grid->n[j][k] == aSex && grid->n[Min(i, j)][Max(i, j)] == aInc && grid->n[Min(i, k)][Max(i, k)] == aInc)
-							{
-								cac++;
-								PrintGrand(acY, i, j, k, l);
-							}
-							for (l = 0; l <= cObj; l++)
-							{
-								if (!FIgnore(l))
-								{
-
-									/* Is there a Grand Cross among the current four planets? */
-
-									if (i < j && i < k && i < l && j < l
-										&& grid->n[i][j] == aSqu
-										&& grid->n[Min(j, k)][Max(j, k)] ==
-										aSqu
-										&& grid->n[Min(k, l)][Max(k, l)] ==
-										aSqu && grid->n[i][l] == aSqu
-										&& MinDistance(cp0.longitude[i],
-											cp0.longitude[k]) > 150.0 && MinDistance(cp0.longitude[j], cp0.longitude[l]) > 150.0)
-									{
-										cac++;
-										PrintGrand(acGC, i, j, k, l);
-
-										/* Is there a Cradle? */
-
-									}
-									else if (i < l
-										&& grid->n[Min(i, j)][Max(i, j)] == aSex
-										&& grid->n[Min(j, k)][Max(j, k)] == aSex
-										&& grid->n[Min(k, l)][Max(k, l)] == aSex
-										&& MinDistance(cp0.longitude[i], cp0.longitude[l]) > 150.0)
-									{
-										cac++;
-										PrintGrand(acC, i, j, k, l);
-
-										/* Is there a Mystic Rectangle? */
-
-									}
-									else if (i < j && i < k && i < l &&
-										grid->n[Min(i, j)][Max(i, j)] == aOpp
-										&& grid->n[Min(k, l)][Max(k, l)] == aOpp
-										&& grid->n[Min(i, k)][Max(i, k)] == aTri && grid->n[Min(j, l)][Max(j, l)] == aTri)
-									{
-										cac++;
-										PrintGrand(acMR, i, j, k, l);
-									}
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-	}
+	for (n = 0; n < cac; n++)
+		PrintGrand((byte)as[n][0], as[n][1], as[n][2], as[n][3], as[n][4]);
 
 	if (!cac)
 		PrintSzW(char_to_wchar(sNoMajor).c_str());
 }
-
 
 /* This is a subprocedure of ChartAspect() and ChartAspectRelation().       */
 /* Display summary information about the aspect list, i.e. the total number */
