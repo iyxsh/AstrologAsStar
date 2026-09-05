@@ -20,6 +20,11 @@ extern int cSign;
 extern double Longit;
 extern double Latit;
 
+/* P2/A8-2：太阳/月亮弧方向模式（0=关 / 1=naive 度/年 / 2=太阳弧 / 4=月亮弧）。
+ * 用独立 int（非 us.fSolarArc bool）承载 2/4——不改 US 结构体布局（聚合初始化
+ * 按成员序对位，动 bool 大小会整体错位，历次教训）。 */
+int gSolarArc = 0;
+
 int rgObjEso1[90] = {sSag,
 	sLeo, sVir, sAri, sGem, sSco, sAqu, sCap, sLib, sCan, sPis,
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -169,8 +174,9 @@ double ProcessInput(bool fDate)
 	if (fDate)
 	{
 		is.JD = (double)MdyToJulian(ciCore.mon, ciCore.day, ciCore.yea);
-		if (!us.fProgressUS || us.fSolarArc)
+		if (!us.fProgressUS || us.fSolarArc || gSolarArc)
 		{
+			/* 方向（太阳/月亮弧）先按本命 T 出 natal 位置，之后统一加弧差移位。 */
 			is.T = (is.JD + ciCore.tim / 24.0 - 2415020.5) / 36525.0;
 		}
 		else
@@ -230,6 +236,7 @@ double CastChart(bool fDate)
 	CI ci;
 	double Off = 0.0, j;
 	double  ep1 = 0.0;
+	double SunDirPos = 0.0, MoonDirPos = 0.0;   /* P2/A8-2 太阳/月亮弧 dir 位置 */
 	int i;
 	is.rSid = 0.0;
 	computeRiseSet();
@@ -243,6 +250,28 @@ double CastChart(bool fDate)
 	}
 	else
 	{
+		/* P2/A8-2：太阳弧(2)/月亮弧(4) 预计算 —— 先求 Sun/Moon 于**推进**历元的
+		 * dir 位置（镜像 golden CastChart ~20647：fSolarArc 清零 → ProcessInput
+		 * 出推进 T，仅算 Sun/Moon），随后主流程按本命 T 计算后统一加弧差。 */
+		if (us.fProgressUS && (gSolarArc == 2 || gSolarArc == 4))
+		{
+			int arcsav = gSolarArc;
+			CI ciArc = ciCore;
+			byte igS[NUMBER_OBJECTS];
+			gSolarArc = 0;
+			memcpy(igS, ignore1, sizeof(igS));
+			for (int ii = 0; ii <= cObj; ii++)
+				ignore1[ii] = 1;
+			ignore1[oSun] = ignore1[oMoo] = 0;   /* 只放行 Sun/Moon */
+			ProcessInput(fDate);                 /* fProgressUS && !gSolarArc → 推进 T */
+			SetEphemerisPath();
+			ComputeWithSwissEphemeris(is.T);
+			SunDirPos = cp0.longitude[oSun];
+			MoonDirPos = cp0.longitude[oMoo];
+			ciCore = ciArc;
+			gSolarArc = arcsav;
+			memcpy(ignore1, igS, sizeof(igS));
+		}
 		Off = ProcessInput(fDate);
 		SwissHouse(is.T, ciCore.lon, ciCore.lat * rDegRad, us.nHouseSystem, &is.Asc, &is.MC, &is.RAa, &is.Vtx, &ep1, &is.OB, &Off);
 		hRevers = 0;
@@ -296,6 +325,25 @@ double CastChart(bool fDate)
 			cp0.longitude[oDes] = Mod(is.Asc + 180.0);
 			cp0.longitude[oNad] = Mod(is.MC + 180.0);
 		}
+	}
+	/* P2/A8-2：方向移位（镜像 golden CastChart ~20914；放 force 前——force 默认 0
+	 * 不覆盖；ComputeInHouses 在移位之后吃结果）。
+	 *   1 = naive 度/年平移（(JDp-JD(T)-0.5)/rProgDay）
+	 *   2 = 太阳弧：全体 += (推进Sun − 本命Sun)
+	 *   4 = 月亮弧：全体 += (推进Moon − 本命Moon)                          */
+	if (us.fProgressUS && gSolarArc)
+	{
+		double rDir;
+		if (gSolarArc == 1)
+			rDir = (is.JDp - JulianDayFromTime(is.T) - 0.5) / us.rProgDay;
+		else if (gSolarArc == 2)
+			rDir = SunDirPos - cp0.longitude[oSun];
+		else
+			rDir = MoonDirPos - cp0.longitude[oMoo];
+		for (i = 0; i <= cObj; i++)
+			cp0.longitude[i] = Mod(cp0.longitude[i] + rDir);
+		for (i = 1; i <= NUMBER_OF_SIGNS; i++)
+			cp0.cusp_pos[i] = Mod(cp0.cusp_pos[i] + rDir);
 	}
 	for (i = 0; i <= cObj; i++)
 	{

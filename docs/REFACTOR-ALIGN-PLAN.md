@@ -453,6 +453,18 @@ A10（关系盘：合盘/组合盘/中点）。
 镜像：ignore1=ignore2 行运选择集后 CastChart）——单盘行运数值 ≡ 目标时刻普通盘（宫位
 ignore 不影响 cp0 位置），故正确性由既有 64 金样直接继承；`unit_transit`（ctest）以
 「行运文本 == 目标盘文本 逐字节」断言锁定（bj-1958 / 2026 未来 / 78N 高纬 3 例）。
+
+**A8-2 太阳/月亮弧（solarArc 方向）2026-09-05 落地**（P2 最后一项真缺口，本地此前缺整段
+方向移位）：
+- chart.cpp CastChart 镜像 golden（预计算 ~20647 + 移位 ~20914）：新增全局 `gSolarArc`
+  （int 0/1/2/4——不用 us.fSolarArc bool 承载 2/4，避免动 US 结构体布局）；`gSolarArc`
+  2/4 时先以推进 T 单算 Sun/Moon（ignore 全屏蔽仅放行）得 dir 位置，再本命 T 主计算后
+  全体（longitude + cusp_pos）+= 弧差（1=naive(JDp−JD−0.5)/rProgDay、2=推进Sun−本命Sun、
+  4=推进Moon−本命Moon）。
+- API `GetSolarArcMachineText(natal,M,D,Y,T,mode,dst,zon)`（与次限同链 fProgressUS+JDp）。
+- `unit_solararc`（ctest）：构造恒等**全 0 误差**——mode2 Sun==次限 Sun、mode4 Moon==次限
+  Moon、均匀移位（Mar−Sun 相对差不变）、delta0（目标==本命）≈本命。
+- ctest 10/10、金样 64 不破。
 **A6 余项前置核查（2026-09-05）**：本地**无** `rAspOrb/rObjOrb/rAspInf` 数组（引擎容差为内联
 `rOrb` 逻辑）→ `-Ao/-Am` 自定义容差表需先移植 golden 容差基础设施，非小改；与 -Aa（改
 rAspAngle，常量表可直接改但会破坏既有镜像，慎重）一起归"需专项"。

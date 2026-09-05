@@ -51,6 +51,7 @@ https://passion-astrologue.com/regle-30-degres-astuce-interpretation/
 */
 
 #include "astrolog.h"
+#include "../../include/core/chart.h"   /* CastChart / gSolarArc（P2/A8-2） */
 
 #define _CRT_SECURE_NO_DEPRECATE
 #ifndef _WIN32_WINNT
@@ -5381,6 +5382,25 @@ std::wstring GetTransitMachineText(const ChartInput& target)
 		ignore1[i] = ignore2[i];        /* rcTransit 行运选择集 */
 	CastChart(1);
 	memcpy(ignore1, igT, sizeof(igT));
+	return BuildMachineText();
+}
+
+/* P2/A8-2：太阳/月亮弧方向盘机器文本。mode=1 naive 度/年、2 太阳弧、4 月亮弧。
+ * fProgressUS + is.JDp + rProgDay 与次限同链；gSolarArc 驱动 CastChart 预计算
+ * （Sun/Moon dir）与尾部统一弧差移位（本命 T + 全体 += 弧差）。 */
+std::wstring GetSolarArcMachineText(const ChartInput& natal,
+	int tgtMon, int tgtDay, int tgtYea, const char* tgtTim, int mode,
+	double tgtDst, double tgtZon)
+{
+	SetupChartQuiet(natal);
+	us.fProgressUS = TRUE;
+	us.rProgDay = 365.24219;
+	gSolarArc = mode;
+	is.JDp = MdytszToJulian(tgtMon, tgtDay, tgtYea, RParseSz(tgtTim, pmTim),
+		tgtDst, tgtZon);
+	CastChart(1);
+	gSolarArc = 0;
+	us.fProgressUS = FALSE;
 	return BuildMachineText();
 }
 

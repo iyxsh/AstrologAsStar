@@ -95,5 +95,9 @@ ASTROLOG32_API std::wstring GetProgressedMachineText(const ChartInput& natal,
 	int tgtMon, int tgtDay, int tgtYea, const char* tgtTim, double tgtDst, double tgtZon);
 /* P2/A8-1 — 行运盘机器文本（rcTransit 镜像，单盘数值 ≡ 目标时刻普通盘）。 */
 ASTROLOG32_API std::wstring GetTransitMachineText(const ChartInput& target);
+/* P2/A8-2 — 太阳/月亮弧方向机器文本（mode 1=naive 度/年, 2=太阳弧, 4=月亮弧）。 */
+ASTROLOG32_API std::wstring GetSolarArcMachineText(const ChartInput& natal,
+	int tgtMon, int tgtDay, int tgtYea, const char* tgtTim, int mode,
+	double tgtDst, double tgtZon);
 
 #endif // ASTROLOG_LIB_H
