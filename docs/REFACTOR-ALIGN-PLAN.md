@@ -459,14 +459,13 @@ PrintLunarEclipse` → `solar_eclipse()/lunar_eclipse()` 对齐）：
 「本地→UTC」方向（传 −zon 才是 UTC→本地）。
 ⚠️ 存量修正进展（2026-09-05 晚间）：`unit_midpoint/composite/synastry/progress/solararc/
 returns/transit` 已全部改为**西正写法**（北京 zon=-8、纽约 +5、极区 -1；断言均为内部
-一致性，翻转后 ctest 15/15 不破，commit `git log --oneline` 最新一条）。**仅剩 `test/golden`
-64 份金样与其 cmd 行**仍为东正写法（北京 zon=8）——它们是原版引擎同输入的一致性锚点，
-golden_diff 不受影响，但 cmd 的北京样例实际落在 UT≈20:01（非北京正午）。
-**重生成金样需先构建原版 console 变体**（宿主 VS2026 已装于
-`C:\Program Files\Microsoft Visual Studio\18\Community`；GUI exe
-`A32_V3_51_Proj\int\main\astrolog32.exe` 实测 `-o` 不落盘——WinMain 消息循环不触发
-Action，无法批处理，与 §7 风险记录一致；原版源码 astrolog.cpp:9780 即 WinMain，需改
-console 入口才能批处理出盘）。此专项未启动，另立任务。
+一致性，翻转后 ctest 15/15 不破）。**test/golden 64 份 + 8 份 grands.json 也已全部重生成**
+（commit `00e6d90`，2026-09-05）：用原版 console 变体 `E:\data\astrolog_golden\run\
+astrolog32-golden.exe`（mingw 构建，§5.1 记录在案）以新 cmd 重出 @0203 主体；dst 语义经
+3 组恒等校验、NY/LA 标准正午 Sun≈MC（<0.8°）独立确认；verify_cli 64/64、verify_grands
+8/8、ctest 15/15。golden 现为**天文正确时刻**（北京样例即北京正午）。工具链规范源
+（`E:\data\astrolog_golden\gen_goldens.py` 场景与 `oracle_check.py` ut_epoch）已同步。
+金样 cmd 约定 owner = 本段 + `test/golden/README.md`。
 
 #### P2 启动规划（设计稿 v0，2026-09-05；待确认后实施）
 **目标与顺序**：A8（单盘动态 = 行运/次限/太阳弧/月亮弧，value 最高）→ A9（日月返）→
