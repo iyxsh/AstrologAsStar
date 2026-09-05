@@ -66,7 +66,7 @@ int main(void)
     SetSilent(true);
     initEnv();
 
-    ChartInput nat = mkci(1958, 7, 4, "12:01", "0", "8", "-116:23", "39:54");
+    ChartInput nat = mkci(1958, 7, 4, "12:01", "0", "-8", "-116:23", "39:54");
 
     /* 1) delta=0 恒等：推进到本命自身 == 本命机器文本（9 位逐字节） */
     std::wstring natalText = GetChartMachineText(nat);

@@ -64,7 +64,7 @@ int main(void)
 {
     SetSilent(true);
     initEnv();
-    ChartInput nat = mkci(1958, 7, 4, "12:01", "0", "8", "-116:23", "39:54");
+    ChartInput nat = mkci(1958, 7, 4, "12:01", "0", "-8", "-116:23", "39:54");
 
     std::wstring natText = GetChartMachineText(nat);
     std::wstring prog = GetProgressedMachineText(nat, 9, 5, 2026, "12:01", nat.dst, nat.zon);

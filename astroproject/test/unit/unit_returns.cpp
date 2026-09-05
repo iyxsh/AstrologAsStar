@@ -46,7 +46,7 @@ int main(void)
     nat.yea = 1958; nat.mon = 7; nat.day = 4;
     nat.tim = RParseSz("12:01", pmTim);
     nat.dst = RParseSz("0", pmDst);
-    nat.zon = RParseSz("8", pmZon);
+    nat.zon = RParseSz("-8", pmZon);
     nat.lon = RParseSz("-116:23", pmLon);
     nat.lat = RParseSz("39:54", pmLat);
     wcsncpy(nat.nam, L"bj", 255);

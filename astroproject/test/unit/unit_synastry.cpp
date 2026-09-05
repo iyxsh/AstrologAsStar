@@ -118,8 +118,8 @@ int main(void)
     initEnv();
 
     /* 北京 1958（既有金样盘）与 纽约 1985：异半球/异时区/异年代 */
-    ChartInput A = mkci(1958, 7, 4, "12:01", "0", "8", "-116:23", "39:54");
-    ChartInput B = mkci(1985, 1, 15, "9:30", "0", "-5", "74:00", "40:43");
+    ChartInput A = mkci(1958, 7, 4, "12:01", "0", "-8", "-116:23", "39:54");
+    ChartInput B = mkci(1985, 1, 15, "9:30", "0", "+5", "74:00", "40:43");
 
     std::wstring gAB = GetSynastryGridMachineText(A, B);
     std::wstring gBA = GetSynastryGridMachineText(B, A);
