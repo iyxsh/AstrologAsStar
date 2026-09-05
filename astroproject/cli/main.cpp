@@ -117,6 +117,8 @@ int main(int argc, char* argv[])
 				printf("                 [-n name] [-l location] [-o file] [--cfg file]\n");
 				printf("  engine switches (P1.1): -c <house> -s [-sr|-sh|-sd|-sz] -sm <mode>\n");
 				printf("    -h <center> -P <n>|-Pz|-Pn|-Pf|-P0 -Yn -YL -Yc -Yd -Yt -YC -YH\n");
+				printf("    -RA/-RE <asp>.. -Ao/-Am/-Aa/-Ad <idx> <val> -U[znblp]\n");
+				printf("  A7/A8 opt-in: --grands | --progto M D Y T (次限)\n");
 				printf("  lon: west positive / east negative ; zon: east positive / west negative\n");
 				return 0;
 			}

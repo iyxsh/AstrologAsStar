@@ -24,6 +24,8 @@ extern unsigned char oscLilith;   /* astrolog.cpp byte oscLilith */
 extern byte ignoreA[];            /* aspects.cpp（aspects.h 已 extern） */
 extern double rAspOrb[];          /* utils.cpp 相位容差表 */
 extern double rObjOrb[];          /* utils.cpp 对象容差表 */
+extern double rAspAngle[];        /* aspects.cpp 相位角度表（-Aa） */
+extern double rObjAdd[];          /* utils.cpp 对象容差增量表（-Ad） */
 
 #define CHECK(cond) do { \
     if (!(cond)) { \
@@ -42,6 +44,8 @@ struct Snap {
     byte iA[cAspect + 1];
     double aspOrb[cAspect + 1];
     double objOrb[42 + 1];   /* cLastMoving=42（planet.h 枚举） */
+    double aspAngle[cAspect + 1];
+    double objAdd[42 + 1];
 };
 static Snap snap(void)
 {
@@ -59,6 +63,8 @@ static Snap snap(void)
     memcpy(s.iA, ignoreA, sizeof(s.iA));
     memcpy(s.aspOrb, rAspOrb, sizeof(s.aspOrb));
     memcpy(s.objOrb, rObjOrb, sizeof(s.objOrb));
+    memcpy(s.aspAngle, rAspAngle, sizeof(s.aspAngle));
+    memcpy(s.objAdd, rObjAdd, sizeof(s.objAdd));
     return s;
 }
 static void restore(const Snap& s)
@@ -76,6 +82,8 @@ static void restore(const Snap& s)
     memcpy(ignoreA, s.iA, sizeof(s.iA));
     memcpy(rAspOrb, s.aspOrb, sizeof(s.aspOrb));
     memcpy(rObjOrb, s.objOrb, sizeof(s.objOrb));
+    memcpy(rAspAngle, s.aspAngle, sizeof(s.aspAngle));
+    memcpy(rObjAdd, s.objAdd, sizeof(s.objAdd));
 }
 
 int main(void)
@@ -239,6 +247,17 @@ int main(void)
         restore(base);
         const char* aoShort[] = { "-Ao", "6" };           /* 缺数值 → 报错 */
         CHECK(ConfigProcessTokens(aoShort, 2, err, sizeof(err)) == 0);
+        restore(base);
+        const char* aa3[] = { "-Aa", "3", "135" };        /* 第 3 相（四分）角度改 135° */
+        CHECK(ConfigProcessTokens(aa3, 3, err, sizeof(err)) == 1);
+        CHECK(rAspAngle[3] == 135.0);
+        restore(base);
+        const char* aaBad[] = { "-Aa", "3", "400" };      /* 角度越界 → 报错 */
+        CHECK(ConfigProcessTokens(aaBad, 3, err, sizeof(err)) == 0);
+        restore(base);
+        const char* ad2[] = { "-Ad", "2", "1.5" };        /* Moon 容差增量 1.5° */
+        CHECK(ConfigProcessTokens(ad2, 3, err, sizeof(err)) == 1);
+        CHECK(rObjAdd[2] == 1.5);
         restore(base);
         const char* anNoop[] = { "-An", "6", "Foo" };     /* 未实现子开关 no-op */
         CHECK(ConfigProcessTokens(anNoop, 3, err, sizeof(err)) == 1);

@@ -25,6 +25,8 @@ extern byte oscLilith; /* astrolog.cpp:374 */
 extern byte PolarMCflip;/* astrolog.cpp:373 */
 extern double rAspOrb[];   /* utils.cpp 相位容差表（默认同原版 {7,7,7,7,6,3,…}） */
 extern double rObjOrb[];   /* utils.cpp 对象容差表 */
+extern double rAspAngle[]; /* aspects.cpp 相位角度表（-Aa 自定义） */
+extern double rObjAdd[];   /* utils.cpp 对象容差增量表（-Ad 自定义） */
 
 /* 原版开关机常量（astrolog.cpp:290-291） */
 #define FIRST_SIDEREAL_MODE SE_SIDM_FAGAN_BRADLEY /* 必须恒为 0 */
@@ -166,21 +168,37 @@ int ConfigProcessTokens(const char* const* argv, int argc,
 		/* ---- -A 族 相位自定义（A6 余项；镜像原版 -Ao/-Am）：
 		 *    -Ao <asp> <deg> 设相位容差（负数=旧版语义→忽略该相）；-Am <obj> <deg> 对象容差 ---- */
 		case 'A': {
-			if (ch2 != 'o' && ch2 != 'm') break;    /* -An/-AA/-Aa 等未实现：安全 no-op */
-			const char* swName = (ch2 == 'o') ? "Ao" : "Am";
-			if (i + 2 >= argc) { SetErr(errtxt, errsz, "-Ao/-Am need index and degrees", swName, NULL); return 0; }
+			/* -Ao <asp> <deg> 相位容差 / -Am <obj> <deg> 对象容差 /
+			 * -Aa <asp> <deg> 相位角度 / -Ad <obj> <deg> 对象容差增量
+			 * （镜像原版 case 'A' 子开关：o/m/d → 对应表，default(含 a) → rAspAngle）。
+			 * -An/-AA 等未实现：安全 no-op。 */
+			if (ch2 != 'o' && ch2 != 'm' && ch2 != 'a' && ch2 != 'd') break;
+			const char* swName = (ch2 == 'o') ? "Ao" : (ch2 == 'm') ? "Am" : (ch2 == 'a') ? "Aa" : "Ad";
+			if (i + 2 >= argc) { SetErr(errtxt, errsz, "-Ao/-Am/-Aa/-Ad need index and degrees", swName, NULL); return 0; }
 			const char* aIdx = argv[i + 1];
 			const char* aVal = argv[i + 2];
 			int idx = atoi(aIdx);
 			double val = atof(aVal);
-			if (ch2 == 'o') {
+			switch (ch2) {
+			case 'o':
 				if (idx < 1 || idx > cAspect) { SetErr(errtxt, errsz, NULL, "Ao", aIdx); return 0; }
 				if (val < 0.0) { val = 0.0; ignoreA[idx] = 1; }   /* 原版兼容：负 orb → 忽略该相 */
 				rAspOrb[idx] = val;
 				UpdateAspectCount();
-			} else {
+				break;
+			case 'm':
 				if (idx < 1 || idx > cLastMoving) { SetErr(errtxt, errsz, NULL, "Am", aIdx); return 0; }
 				rObjOrb[idx] = val;
+				break;
+			case 'a':
+				if (idx < 1 || idx > cAspect) { SetErr(errtxt, errsz, NULL, "Aa", aIdx); return 0; }
+				if (val < -360.0 || val > 360.0) { SetErr(errtxt, errsz, "Aa angle out of range", aVal, NULL); return 0; }
+				rAspAngle[idx] = val;
+				break;
+			case 'd':
+				if (idx < 1 || idx > cLastMoving) { SetErr(errtxt, errsz, NULL, "Ad", aIdx); return 0; }
+				rObjAdd[idx] = val;
+				break;
 			}
 			i += 2;
 			break;

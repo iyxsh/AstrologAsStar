@@ -12,7 +12,8 @@ extern int cSign;
 extern bool UsePDsInChart;
 extern bool IsPDsChartWithoutTable;
 
-const double rAspAngle[cAspect + 1] = { 0,
+/* 相位角度表（索引=相位码 1..18）。非 const：config 层 -Aa 自定义角度（A6 余项）。 */
+double rAspAngle[cAspect + 1] = { 0,
 	0.0, 180.0, 90.0, 120.0, 60.0, 150.0, 30.0, 45.0, 135.0, 72.0, 144.0,
 	36.0, 360.0 / 7.0, 40.0, 80.0, 720.0 / 7.0, 1080.0 / 7.0, 160.0
 };
