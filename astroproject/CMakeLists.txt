@@ -261,6 +261,14 @@ if(WIN32 AND MSVC)
 endif()
 add_test(NAME unit_returns COMMAND astrolog32_unit_returns)
 
+# P2/A10-1 — 合成盘单测（恒等自反 + 中点公式 + 宫头 180 校正 + 全局泄漏回归）
+add_executable(astrolog32_unit_composite test/unit/unit_composite.cpp)
+target_link_libraries(astrolog32_unit_composite astrolog32)
+if(WIN32 AND MSVC)
+    target_compile_definitions(astrolog32_unit_composite PRIVATE _CRT_SECURE_NO_WARNINGS)
+endif()
+add_test(NAME unit_composite COMMAND astrolog32_unit_composite)
+
 # 金样对拍：运行 astrolog32-cli → 与 test/golden/*.golden.txt 逐字段 diff
 # （需要 Python3 解释器；未找到时跳过注册，可手动跑 test/verify_cli.py）
 find_package(Python3 COMPONENTS Interpreter)

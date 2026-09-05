@@ -101,5 +101,15 @@ ASTROLOG32_API std::wstring GetSolarArcMachineText(const ChartInput& natal,
 	double tgtDst, double tgtZon);
 /* P2/A9 — 太阳返照盘机器文本（引擎空间解算 civil 时刻后 cast；地点/时区沿用本命）。 */
 ASTROLOG32_API std::wstring GetSolarReturnMachineText(const ChartInput& natal, int year);
+/* P2/A10-1 — 合成盘（Composite）机器文本/@0203 与 JSON。
+ * 双 ChartInput（a=盘1, b=盘2）经 SetChartData 同款 ciTwin 通道注入后镜像原版
+ * CastRelation rcComposite 分支（astrolog.cpp:3765-3800）：全体 longitude/latitude/
+ * vel/cusp 取两盘 50:50 中点（Ratio()，跨 180° 补 Mod(+360*ratio)），cusp 互补对/
+ * ASC 与宫头 >90° 差补 180 校正，宫位按合成宫头落宫。中点=两独立本命盘算术中点，
+ * 数值正确性由 unit_composite 恒等断言锁定（A/B==A 恒等 + 全对象中点公式）。 */
+ASTROLOG32_API std::wstring GetCompositeMachineText(const ChartInput& chartA,
+	const ChartInput& chartB);
+ASTROLOG32_API std::string GetCompositeChartJSON(const ChartInput& chartA,
+	const ChartInput& chartB);
 
 #endif // ASTROLOG_LIB_H

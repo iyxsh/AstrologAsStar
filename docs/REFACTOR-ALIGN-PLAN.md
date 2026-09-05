@@ -536,6 +536,20 @@ A10 验证走 oracle：
 3. **A10-3 Synastry 关系网格**（最低优先）：跨盘相位网格文本通道需先定网格文本格式/标题
    （OutChartAspectRelation 现为 GUI 调试串）——单独定界。
 
+**A10-1 合成盘 Composite 2026-09-05 落地**（A10 分片①，采用方案 = 复用 CastRelation 而非复制分支）：
+- 新 API（astrolog_lib.h + astrolog.cpp）：`GetCompositeMachineText(a,b)`（@0203 文本）与
+  `GetCompositeChartJSON(a,b)`（十进制 JSON）；共享装配核心 `CastCompositeChart`（static）：
+  两次 SetupChartQuiet（借 ChartInput→CI 转换，盘2 转存 ciMain 后切回盘1 主盘）→
+  `us.nRel=rcComposite` + `us.nRatio1=nRatio2=1`（50:50，不依赖全局初值）→ ciTwin/ciTran/
+  ciNatal2=twin → 调 CastRelation() 原函数（内部 cast cp1/cp2 + 中点装配 + ComputeInHouses）
+  → 出口备份还原 us.nRel/ciTwin/ciTran/ciNatal2/ignore1..3（API 全局自洽）。
+- GetChartJSON 重构：JSON 写行抽 `BuildChartJSON()` 单源（GetChartJSON 与新 API 共用防双份）。
+- `unit_composite`（ctest，no gtest）：①恒等自反 composite(A,A)==chart(A) 逐字节（中点自反
+  ⇒ 方向性错误全破）②中点公式 40 对象 JSON 通道（行星/Node/Fortune 严格 midpoint 1e-5、
+  宫头允许 180 校正、占位星恒 0）——A=北京1958 / B=纽约1985 异半球跨 0° 组合自然覆盖
+  ③泄漏回归 composite 后 chart(A) 仍逐字节不变 ④JSON 恒等。ctest 12/12、金样 64 不破。
+  测试陷阱：断言差须走 wrap180 域（norm360 会把负小差翻成 359.9° 假失败）。
+
 **A6 余项前置核查（2026-09-05）**：本地**无** `rAspOrb/rObjOrb/rAspInf` 数组（引擎容差为内联
 `rOrb` 逻辑）→ `-Ao/-Am` 自定义容差表需先移植 golden 容差基础设施，非小改；与 -Aa（改
 rAspAngle，常量表可直接改但会破坏既有镜像，慎重）一起归"需专项"。

@@ -5499,11 +5499,48 @@ std::wstring GetSolarReturnMachineText(const ChartInput& natal, int year)
 	return BuildMachineText();
 }
 
-std::string GetChartJSON(const ChartInput& chartInput)
+/* P2/A10-1 合成盘装配核心：双 ChartInput 经 ciTwin 通道注入后镜像原版 CastRelation
+ * rcComposite 分支（astrolog.cpp:3765-3800）。约定：入口/出口全局状态一致
+ * （us.nRel/ciTwin/ciTran/ciNatal2/ignore1..3 备份还原，hRevers/cp3/fCP3 由
+ * CastRelation 内部自洽）；返回后 cp0=合成盘（行星/宫头已装配、house_no 已按
+ * 合成宫头落宫）。 */
+static void CastCompositeChart(const ChartInput& chartA, const ChartInput& chartB)
 {
-	SetupChartQuiet(chartInput);
-	CastChart(1);
+	int saveNRel = us.nRel;
+	CI saveTwin = ciTwin, saveTran = ciTran, saveNatal2 = ciNatal2;
+	byte saveIg1[NUMBER_OBJECTS], saveIg2[NUMBER_OBJECTS], saveIg3[NUMBER_OBJECTS];
+	memcpy(saveIg1, ignore1, NUMBER_OBJECTS);
+	memcpy(saveIg2, ignore2, NUMBER_OBJECTS);
+	memcpy(saveIg3, ignore3, NUMBER_OBJECTS);
 
+	/* 两次 SetupChartQuiet：借其 ChartInput→CI 转换（含 nam/loc 与默认时区）。
+	 * 先转存盘2 的 CI，第二次调用后 ciCore=盘1 即主盘。 */
+	SetupChartQuiet(chartB);
+	CI twin = ciMain;
+	SetupChartQuiet(chartA);
+	us.nRel = rcComposite;
+	us.nRatio1 = 1; us.nRatio2 = 1;   /* 50:50（golden -rc 默认权重） */
+	ciTwin = twin; ciTran = twin; ciNatal2 = twin;
+
+	CastRelation();   /* cast 盘1→cp1 → ciCore=ciTwin cast 盘2→cp2 → 恢复 → 中点装配 */
+
+	us.nRel = saveNRel;
+	ciTwin = saveTwin; ciTran = saveTran; ciNatal2 = saveNatal2;
+	memcpy(ignore1, saveIg1, NUMBER_OBJECTS);
+	memcpy(ignore2, saveIg2, NUMBER_OBJECTS);
+	memcpy(ignore3, saveIg3, NUMBER_OBJECTS);
+}
+
+/* P2/A10-1 — 合成盘 @0203 机器文本（BuildMachineText 单源写行器）。 */
+std::wstring GetCompositeMachineText(const ChartInput& chartA, const ChartInput& chartB)
+{
+	CastCompositeChart(chartA, chartB);
+	return BuildMachineText();
+}
+
+/* Machine-JSON writer（读当前 cp0；GetChartJSON / GetCompositeChartJSON 共用）。 */
+static std::string BuildChartJSON()
+{
 	std::string s;
 	s += "{\"app\":\"";
 	s += s_w2u(szAppNameW);
@@ -5548,4 +5585,18 @@ std::string GetChartJSON(const ChartInput& chartInput)
 	}
 	s += "}}";
 	return s;
+}
+
+std::string GetChartJSON(const ChartInput& chartInput)
+{
+	SetupChartQuiet(chartInput);
+	CastChart(1);
+	return BuildChartJSON();
+}
+
+/* P2/A10-1 — 合成盘 JSON（十进制数值通道；unit_composite 与上层集成共用）。 */
+std::string GetCompositeChartJSON(const ChartInput& chartA, const ChartInput& chartB)
+{
+	CastCompositeChart(chartA, chartB);
+	return BuildChartJSON();
 }
