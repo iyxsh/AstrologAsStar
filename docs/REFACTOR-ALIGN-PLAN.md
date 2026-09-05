@@ -365,8 +365,8 @@ WinMain（L9780）调 FProcessCommandLine（L18191）→ FProcessSwitchesMain（
   越界报错、非数字停消费、无数字 no-op）；`UpdateAspectCount()` 按启动公式重算
   `nAsp = cAspect − 屏蔽数`。默认 ignoreA 仍屏蔽 6..18 → nAsp 默认 5 不变（金样 16/16、
   ctest 5/5 回归通过）。unit_config 新增 -RE 6（nAsp=6）/ -RA 3（nAsp=4）/ 越界报错 /
-  无参 no-op / -Rq no-op 断言。遗留：自定义相位名/角度/容差表（-Aa/-Ao/-Am）与 A7
-  格局识别 API 入口（DisplayGrands 已存在、无入口/无测）。
+  无参 no-op / -Rq no-op 断言。遗留：自定义相位名/角度/容差表（-Aa/-Ao/-Am）；A7 格局
+  API 已独立落地（见下条）。
 - [x] A7 格局识别 API 入口（DetectGrands）—— **2026-09-05 落地**：`DetectGrands(const GridInfo*,
   int out[][5], int maxOut)` 记录 8 类格局 {ac, 对象…}（acS 合群/ acGT 大三角/ acK 风筝 /
   acTS T三角 / acY 上帝手指 / acGC 大十字 / acC 摇篮 / acMR 神秘矩形），条件与
@@ -376,7 +376,7 @@ WinMain（L9780）调 FProcessCommandLine（L18191）→ FProcessSwitchesMain（
   遗留：① 真盘格局计数与 golden 文本 listing 对拍（需文本通道）；② DisplayGrands 与
   DetectGrands 单一实现重构（防双份漂移，归 P1.7）；③ A6 余项自定义相位名/角度/容差表
   （-Aa/-Ao/-Am，原版 GUI/文本资源域）。
-- [ ] 金样：本命盘 × 宫位系(16) × 天体集 × 容许度矩阵。
+- [x] 金样矩阵（轴1 宫位系已固化）—— 48 份 `test/golden/*.hs<NN>.golden.txt`（bj/syd/la × hs00..15，原版 `--o0 -c <hs>`）入 CI；verify_cli 样本 16→64，逐字段 9 位零差（A2 实证固化，golden_diff 9.2s）。轴2 天体集 = 现有 8 份默认 + 8 份 `-U` 金样。轴3 容许度 = 需相位文本通道（待接）。
 - 验收：本命盘数值与金样逐项一致。
 
 ### P2 · 动态盘第一梯队（核心业务盘型）
@@ -385,6 +385,28 @@ WinMain（L9780）调 FProcessCommandLine（L18191）→ FProcessSwitchesMain（
 - [ ] returns.cpp：日月返（含双月返 IsDoubleReturn 逻辑）。
 - [ ] A15 日月食表入口。
 - 验收：与金样一致（覆盖代表日期 ±100 年）。
+
+#### P2 启动规划（设计稿 v0，2026-09-05；待确认后实施）
+**目标与顺序**：A8（单盘动态 = 行运/次限/太阳弧/月亮弧，value 最高）→ A9（日月返）→
+A10（关系盘：合盘/组合盘/中点）。
+**A8 现状核查（2026-09-05 实测，勿轻信"全缺"）**：本地 `ProcessInput`（chart.cpp ~160-200）**已镜像**
+次限推进公式 `is.T = JD+tim+(JDp−JD−tim)/rProgDay`（与 golden astrolog.cpp:50576 逐行同源）；
+`astrolog.cpp:1325/1542/1600` 与 `progressions.cpp:41` 已有 `fProgressUS` 分支；`settings.h` 含
+`fProgressUS/fSolarArc/rProgDay/fTransit`。**真缺口**：① `fProgressUS` 置位入口与 `is.JDp`
+目标日期计算未核（golden CastChart ~20644-20690 推运分支，含 solarArc=2/4 先算 Sun/Moon 方向点）；
+② CLI 无动态日期参数（`-t`/推进目标日期）透传；③ 动态盘 @0203/文本金样零覆盖。
+**设计三切片（每切片独立可测可提交）**：
+1. **切片 A8-1 次限 + 太阳弧主链**：移植 golden CastChart 推运分支（is.JDp = 本命 + 日/年
+   推进，MdytszToJulian）；`-pd`（rProgDay）驱动。**验收**：若动态盘仍走 @0203 机器行通道
+   则与 P1 同法金样对拍；否则先定文本通道（P1.7 轴3 前置，见 A7 遗留②）。
+2. **切片 A8-2 行运 + 行运影响**：`ChartTransitSearch/Influence` 移植；`-t` 日期参数 +
+   transit 标志接线 CLI。
+3. **切片 A8-3 月亮弧 / 泛太阳弧 变体**：solarArc 2/4 双算点逻辑移植 + 相位引擎复用。
+**验收**：每切片 golden runner `--0o`（含动态日期参数）9 位对拍 + 默认金样回归 +
+  单元断言；**runner 内存约束**：builder 镜像链复用，不加并发（n8n concurrent=1 铁律）。
+**前置依赖**：CLI 日期参数已支持 -qb（单盘）；动态盘需新增目标日期参数解析（
+  原版 `-qy/-qm/-qd/-qt` 之外的 -t/推进日）→ P1.1 config 层扩展或 CLI 直传。
+
 
 ### P3 · 第二梯队（时间主星族）
 - [ ] 法达 Firdaria、Profection、Decennial、黄道释放 ZodRel、行星时段、
