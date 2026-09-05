@@ -406,6 +406,19 @@ A10（关系盘：合盘/组合盘/中点）。
   单元断言；**runner 内存约束**：builder 镜像链复用，不加并发（n8n concurrent=1 铁律）。
 **前置依赖**：CLI 日期参数已支持 -qb（单盘）；动态盘需新增目标日期参数解析（
   原版 `-qy/-qm/-qd/-qt` 之外的 -t/推进日）→ P1.1 config 层扩展或 CLI 直传。
+**A8-0 侦察结论（2026-09-05 实测）**：
+- 触发链 golden 侧 = `-r p`（`us.nRel=rcProgress`，`-rp0`→solarArc=1 / `-rp1`→solarArc=2），
+  双日期经 ciCore/ciTwin 交换后读入（golden astrolog.cpp:23345-23372 / ~23000-23190 关系解析区）。
+- 本地侧整链已在（astrolog.cpp:3726-3755：JDp←ciMain + fProgressUS + ignore3 交换 + CastChart，
+  与 golden:20644 同源）→ **A8 实现侧基本就绪，缺的是「输入格式 + 金样」两端**。
+- 金样难点：golden runner 双日期关系命令格式未探明（`--0o` + 两次 `-qb` ± `-r p` 均无输出；
+  golden_main 可能仅支持单 -q 组 / 关系盘走 -os 文本通道）→ **下一专turn 先读 golden
+  关系盘 CLI 解析（~23000-23190）定输入格式，勿盲试**。若 @0203 不可达则降级为 -os 文本对拍
+  （与 P1.7 轴3 文本通道同批）。
+**A6 余项前置核查（2026-09-05）**：本地**无** `rAspOrb/rObjOrb/rAspInf` 数组（引擎容差为内联
+`rOrb` 逻辑）→ `-Ao/-Am` 自定义容差表需先移植 golden 容差基础设施，非小改；与 -Aa（改
+rAspAngle，常量表可直接改但会破坏既有镜像，慎重）一起归"需专项"。
+
 
 
 ### P3 · 第二梯队（时间主星族）
