@@ -119,5 +119,17 @@ ASTROLOG32_API std::wstring GetMidpointMachineText(const ChartInput& chartA,
 	const ChartInput& chartB);
 ASTROLOG32_API std::string GetMidpointChartJSON(const ChartInput& chartA,
 	const ChartInput& chartB);
+/* P2/A10-3 — 关系网格（Synastry grid）机器文本/@0403 与 JSON。
+ * 双 ChartInput（a=盘1=A, b=盘2=B）复用 A10-1/2 双盘通道，us.nRel=rcDual 让 CastRelation
+ * 把两盘分别 cast 入 cp1(=A)/cp2(=B)，再 FCreateGridRelation(FALSE) 把全局 grid 填为
+ * 「盘A×盘B 交叉相位」（grid->n[i][j]=aspect，i=cp2=B, j=cp1=A）。机器文本每行：
+ *   <objA_idx> <asp_abbr> <objB_idx> <lonA> <lonB> <orb_deg> <exact_deg>
+ * 对象序号沿用引擎 numbering（0=Earth,1=Sun,2=Moon,...见 s_szObjShortNameEnglish），asp 取
+ * tAspectAbbrev（Con/Opp/Squ/Tri/Sex/...）。忽略集同步 ignore2=ignore3=ignore1，使网格只用
+ * 单一对象集（默认不纳入恒星）。正确性由 unit_synastry 对称/角度自洽/泄漏 断言锁定。 */
+ASTROLOG32_API std::wstring GetSynastryGridMachineText(const ChartInput& chartA,
+	const ChartInput& chartB);
+ASTROLOG32_API std::string GetSynastryGridJSON(const ChartInput& chartA,
+	const ChartInput& chartB);
 
 #endif // ASTROLOG_LIB_H

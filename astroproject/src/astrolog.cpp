@@ -5645,3 +5645,136 @@ std::string GetMidpointChartJSON(const ChartInput& chartA, const ChartInput& cha
 	CastMidpointChart(chartA, chartB);
 	return BuildChartJSON();
 }
+
+/* ============================================================================
+ * P2/A10-3 — 关系网格（Synastry grid）
+ * 双 ChartInput（a=盘1=A, b=盘2=B）复用 A10-1/2 双盘通道；us.nRel=rcDual 让
+ * CastRelation 把两盘分别 cast 入 cp1(=A)/cp2(=B)，随后 FCreateGridRelation(FALSE)
+ * 把全局 grid 填为「盘A×盘B 交叉相位」（grid->n[i][j]=aspect，i=cp2=B, j=cp1=A）。
+ * 机器文本每行：<objA> <asp> <objB> <lonA> <lonB> <orb_deg> <exact_deg>，对象序号
+ * 沿用引擎 numbering（0=Earth,1=Sun,2=Moon,...见 s_szObjShortNameEnglish），asp 取
+ * tAspectAbbrev（Con/Opp/Squ/Tri/Sex/...）。忽略集同步 ignore2=ignore3=ignore1，使
+ * FCreateGridRelation 的 UNION 语义退化为单一对象集（默认不纳入恒星）。
+ * 正确性由 unit_synastry 对称/角度自洽/泄漏 断言锁定。
+ * ==========================================================================*/
+extern double rAspAngle[];   /* aspects.cpp 相位角度表（Con=0,Opp=180,Squ=90,...） */
+
+static std::wstring g_synNameA, g_synLocA, g_synNameB, g_synLocB;
+
+static void CastSynastryGrid(const ChartInput& chartA, const ChartInput& chartB)
+{
+	int saveNRel = us.nRel;
+	CI saveTwin = ciTwin, saveTran = ciTran, saveNatal2 = ciNatal2;
+	byte saveIg1[NUMBER_OBJECTS], saveIg2[NUMBER_OBJECTS], saveIg3[NUMBER_OBJECTS];
+	memcpy(saveIg1, ignore1, NUMBER_OBJECTS);
+	memcpy(saveIg2, ignore2, NUMBER_OBJECTS);
+	memcpy(saveIg3, ignore3, NUMBER_OBJECTS);
+
+	/* 记录两盘身份（输入 ChartInput 直接持有 nam/loc；cp2.nam 在返回前已非盘B） */
+	g_synNameA = chartA.nam; g_synLocA = chartA.loc;
+	g_synNameB = chartB.nam; g_synLocB = chartB.loc;
+
+	/* 同步三套忽略集为 ignore1，使网格只用单一对象集（默认不纳入恒星） */
+	memcpy(ignore2, ignore1, NUMBER_OBJECTS);
+	memcpy(ignore3, ignore1, NUMBER_OBJECTS);
+
+	/* 两次 SetupChartQuiet：借 ChartInput→CI 转换；先转存盘2，第二次后 ciCore=盘1 即主盘 */
+	SetupChartQuiet(chartB);
+	CI twin = ciMain;
+	SetupChartQuiet(chartA);
+	us.nRel = rcDual;
+	ciTwin = twin; ciTran = twin; ciNatal2 = twin;
+
+	CastRelation();             /* cp1=盘A, cp2=盘B 双盘 cast（combine 改 cp0，网格只读 grid） */
+	FCreateGridRelation(FALSE);  /* grid->n[i][j]=aspect(i=cp2=B, j=cp1=A) */
+
+	/* 还原全局（cp1/cp2/grid 不还原——供 BuildSynastryGrid* 读出） */
+	us.nRel = saveNRel;
+	ciTwin = saveTwin; ciTran = saveTran; ciNatal2 = saveNatal2;
+	memcpy(ignore1, saveIg1, NUMBER_OBJECTS);
+	memcpy(ignore2, saveIg2, NUMBER_OBJECTS);
+	memcpy(ignore3, saveIg3, NUMBER_OBJECTS);
+}
+
+/* P2/A10-3 — 关系网格机器文本（@0403）。逐格读出 grid（i=cp2=B, j=cp1=A）。 */
+static std::wstring BuildSynastryGridText()
+{
+	std::wstring out;
+	wchar_t sz[512];
+	swprintf(sz, 512, L"@0403 SynastryGrid  ; cross-aspects chartA(cp1) x chartB(cp2)\n");
+	out += sz;
+	swprintf(sz, 512, L"/za \"%ls\" \"%ls\"\n", g_synNameA.c_str(), g_synLocA.c_str());
+	out += sz;
+	swprintf(sz, 512, L"/zb \"%ls\" \"%ls\"\n", g_synNameB.c_str(), g_synLocB.c_str());
+	out += sz;
+	swprintf(sz, 512, L"# objA asp objB lonA lonB orb exact\n");
+	out += sz;
+
+	for (int i = 0; i <= cObj; i++)          /* i = cp2 = 盘B */
+	{
+		for (int j = 0; j <= cObj; j++)      /* j = cp1 = 盘A */
+		{
+			int k = grid->n[i][j];
+			if (k == 0) continue;
+			double orb = (double)grid->v[i][j] / 60.0;   /* 弧分→度，带符号 */
+			double exact = rAspAngle[k];
+			swprintf(sz, 512, L"%d %ls %d %.6f %.6f %.6f %.6f\n",
+				j, char_to_wchar(tAspectAbbrev[k]).c_str(), i,
+				cp1.longitude[j], cp2.longitude[i], orb, exact);
+			out += sz;
+		}
+	}
+	return out;
+}
+
+/* P2/A10-3 — 关系网格 JSON（十进制数值通道；unit_synastry 与上层集成共用）。 */
+static std::string BuildSynastryGridJSON()
+{
+	std::string s;
+	s += "{\"app\":\"";
+	s += s_w2u(szAppNameW);
+	s += "\",\"chartA\":{\"name\":\"";
+	s += s_w2u(g_synNameA.c_str());
+	s += "\",\"loc\":\"";
+	s += s_w2u(g_synLocA.c_str());
+	s += "\"},\"chartB\":{\"name\":\"";
+	s += s_w2u(g_synNameB.c_str());
+	s += "\",\"loc\":\"";
+	s += s_w2u(g_synLocB.c_str());
+	s += "\",\"aspects\":[";
+	bool first = true;
+	for (int i = 0; i <= cObj; i++)
+	{
+		for (int j = 0; j <= cObj; j++)
+		{
+			int k = grid->n[i][j];
+			if (k == 0) continue;
+			double orb = (double)grid->v[i][j] / 60.0;
+			double exact = rAspAngle[k];
+			if (!first) s += ",";
+			first = false;
+			char buf[256];
+			snprintf(buf, sizeof(buf),
+				"{\"objA\":%d,\"asp\":\"%s\",\"objB\":%d,\"lonA\":%.9f,\"lonB\":%.9f,\"orb\":%.9f,\"exact\":%.9f}",
+				j, tAspectAbbrev[k], i,
+				cp1.longitude[j], cp2.longitude[i], orb, exact);
+			s += buf;
+		}
+	}
+	s += "]}";
+	return s;
+}
+
+/* P2/A10-3 — 关系网格机器文本（@0403）。 */
+std::wstring GetSynastryGridMachineText(const ChartInput& chartA, const ChartInput& chartB)
+{
+	CastSynastryGrid(chartA, chartB);
+	return BuildSynastryGridText();
+}
+
+/* P2/A10-3 — 关系网格 JSON（十进制数值通道）。 */
+std::string GetSynastryGridJSON(const ChartInput& chartA, const ChartInput& chartB)
+{
+	CastSynastryGrid(chartA, chartB);
+	return BuildSynastryGridJSON();
+}

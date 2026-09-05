@@ -277,6 +277,14 @@ if(WIN32 AND MSVC)
 endif()
 add_test(NAME unit_midpoint COMMAND astrolog32_unit_midpoint)
 
+# P2/A10-3 — 关系网格单测（对称 A↔B + 角度自洽 + asp 合法 token + 全局泄漏 + JSON 一致）
+add_executable(astrolog32_unit_synastry test/unit/unit_synastry.cpp)
+target_link_libraries(astrolog32_unit_synastry astrolog32)
+if(WIN32 AND MSVC)
+    target_compile_definitions(astrolog32_unit_synastry PRIVATE _CRT_SECURE_NO_WARNINGS)
+endif()
+add_test(NAME unit_synastry COMMAND astrolog32_unit_synastry)
+
 # 金样对拍：运行 astrolog32-cli → 与 test/golden/*.golden.txt 逐字段 diff
 # （需要 Python3 解释器；未找到时跳过注册，可手动跑 test/verify_cli.py）
 find_package(Python3 COMPONENTS Interpreter)
