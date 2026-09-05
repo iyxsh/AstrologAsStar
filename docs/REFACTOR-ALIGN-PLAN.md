@@ -501,6 +501,41 @@ ignore 不影响 cp0 位置），故正确性由既有 64 金样直接继承；`
 - `unit_solararc`（ctest）：构造恒等**全 0 误差**——mode2 Sun==次限 Sun、mode4 Moon==次限
   Moon、均匀移位（Mar−Sun 相对差不变）、delta0（目标==本命）≈本命。
 - ctest 10/10、金样 64 不破。
+
+#### A10 关系盘侦察定界（2026-09-05，实测；修正 A10 表格行"缺数值核心"旧判）
+**实现侧整链已在本地**（推翻此前"composite/midpoint 分支无入口、缺双盘装配核心"判断）：
+- `CastRelation()`（astrolog.cpp:3502-3848，346 行）已完整移植 golden 关系装配：内部先
+  `CastChart` 得 cp1（第一盘）→ `ciCore=ciTwin` 再 cast 得 cp2（第二盘）→ `ciCore=ciMain`
+  恢复 → `ratio=us.nRatio1/(nRatio1+nRatio2)`（默认 0.5）→ 分支装配：
+  * `rcComposite`（3765-3800）：cp0.longitude/latitude/vel 与 cusp_pos 全体 `Ratio()` 中点，
+    跨 180° 补 `Mod(+360*ratio)`，cusp 互补对 >90° 补 180、ASC 对 >90° 补 180
+  * `rcMidpoint`：时间地点中点（is.T/lon/lat/zon/dst 的 ratio）+ JulianToMdy 回写 + recast
+  * `nRel<=rcSynastry`（rcDual/rcNone/rcSynastry）：`cp0.cusp_pos=cp1.cusp_pos`（落宫=盘1宫头）
+- **双盘注入通道 = `SetChartData(ChartMode=2, input)`**（astrolog.cpp:4868，case 2 →
+  ciTwin/ciTran/ciNatal2，4939）；ChartInput 字段齐（mon/day/yea/tim/dst/zon/lon/lat/alt/nam/loc）。
+- @0203 写行器 `BuildMachineText()`（astrolog.cpp:5293）单源读 cp0/is/us——合成盘只是 cp0
+  数值不同，**机器文本通道天然可用**（A8 已抽单源防双份）。
+- 已导出旧 API `GetChartAspectRelation()`（4998）= CastRelation + 落宫文本 +
+  `FCreateGridRelation(FALSE)` 跨盘相位网格，返回拼接宽字符串、绑定"本命+第二盘"单入口，
+  非 @0203 机器行 → 不作 P2 新 API 复用。
+**真缺口（A10 待办）**：无**双 ChartInput 关系盘 MachineText API**；CastRelation 强耦合
+显示层全局（isSolarReturn/isLunarReturn/IsAgeHarmAndNatal/hRevers/fCP3+cp3/ignore1..3/
+fAnti/f12parts2…），直接复用有全局泄漏风险 → rcComposite/rcMidpoint 纯 cp0 装配段宜
+提取镜像，且须在 API 层做全局保存/恢复（沿用 A8 API 的 SetupChartQuiet 静音 + 状态还原约定）。
+**金样路线**：对 A8 已关（golden_main 关系路径 SEGV(139)/解析错(3)，FInputData 无样本端）。
+A10 验证走 oracle：
+- 合成盘中点本质 = 两盘独立位置的算术中点 → 两次独立本命 CastChart 取 la/lb，断言
+  `cp0.longitude[i] == Mod(la[i] + wrap180(lb[i]-la[i])*0.5)` 全对象（强自校验，无漂移面）；
+  跨 180 分支、cusp 180 校正构造反例单测；pymeeus 对拍 Sun 中点弧秒级。
+**分片设计（拟，待确认）**：
+1. **A10-1 合成盘 Composite** `GetCompositeMachineText(a,b)`：SetupChartQuiet(a) cast 存 cp1 →
+   注入 ciTwin=b cast 存 cp2 → 镜像 rcComposite 装配段 → 恢复全局 → BuildMachineText。
+   单测 unit_composite（中点恒等全对象 + 跨180反例 + cusp 校正）；回归 64 金样不破。
+2. **A10-2 时空中点 Midpoint** `GetMidpointMachineText(a,b)`：双时刻双地点 ratio + recast
+   （语义=两盘时空折中盘，API 双 ChartInput 天然携带）。
+3. **A10-3 Synastry 关系网格**（最低优先）：跨盘相位网格文本通道需先定网格文本格式/标题
+   （OutChartAspectRelation 现为 GUI 调试串）——单独定界。
+
 **A6 余项前置核查（2026-09-05）**：本地**无** `rAspOrb/rObjOrb/rAspInf` 数组（引擎容差为内联
 `rOrb` 逻辑）→ `-Ao/-Am` 自定义容差表需先移植 golden 容差基础设施，非小改；与 -Aa（改
 rAspAngle，常量表可直接改但会破坏既有镜像，慎重）一起归"需专项"。
