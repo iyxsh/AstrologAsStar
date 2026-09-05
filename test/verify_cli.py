@@ -6,6 +6,14 @@ Runs the CLI with the same `-qb` arguments recorded in each golden sample
 (test/golden/*.golden.txt) and compares the emitted @0203 machine text
 field-by-field against the golden.
 
+Samples come in two flavours:
+  * `*.golden.txt`    — default object set (16 fixed-star slots are placeholders)
+  * `*.U.golden.txt`  — same charts run with `-U` (real fixed stars, A4);
+                        the `# cmd:` line carries `-U`, so the harness runs
+                        the CLI with it and the 16 star rows (names 45..117)
+                        are compared strictly (they are byte-identical to the
+                        original-astrolog oracle across all 8 charts).
+
 Comparison policy (documented engine gaps are tolerated, everything else is
 strict):
   * header lines (@0203..., /zi...)        — exact
