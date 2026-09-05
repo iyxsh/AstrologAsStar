@@ -111,5 +111,13 @@ ASTROLOG32_API std::wstring GetCompositeMachineText(const ChartInput& chartA,
 	const ChartInput& chartB);
 ASTROLOG32_API std::string GetCompositeChartJSON(const ChartInput& chartA,
 	const ChartInput& chartB);
+/* P2/A10-2 — 时空中点（Midpoint / -rm）机器文本/@0203 与 JSON。
+ * 双 ChartInput（a=盘1, b=盘2）复用 A10-1 双盘通道，us.nRel=rcMidpoint：时空中点 =
+ * 两盘时刻与地理坐标各取 50:50 中点（跨 180° 经度补 Mod(+360*ratio)）后按中点时空
+ * 重新 cast（金样路线同 A8/A10 已关，验证走自反/对称/数值锚定）。 */
+ASTROLOG32_API std::wstring GetMidpointMachineText(const ChartInput& chartA,
+	const ChartInput& chartB);
+ASTROLOG32_API std::string GetMidpointChartJSON(const ChartInput& chartA,
+	const ChartInput& chartB);
 
 #endif // ASTROLOG_LIB_H

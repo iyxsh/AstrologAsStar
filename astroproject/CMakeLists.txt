@@ -269,6 +269,14 @@ if(WIN32 AND MSVC)
 endif()
 add_test(NAME unit_composite COMMAND astrolog32_unit_composite)
 
+# P2/A10-2 — 时空中点单测（自反==本命 + 对称 A↔B + 时空中点 Oracle + 全局泄漏回归）
+add_executable(astrolog32_unit_midpoint test/unit/unit_midpoint.cpp)
+target_link_libraries(astrolog32_unit_midpoint astrolog32)
+if(WIN32 AND MSVC)
+    target_compile_definitions(astrolog32_unit_midpoint PRIVATE _CRT_SECURE_NO_WARNINGS)
+endif()
+add_test(NAME unit_midpoint COMMAND astrolog32_unit_midpoint)
+
 # 金样对拍：运行 astrolog32-cli → 与 test/golden/*.golden.txt 逐字段 diff
 # （需要 Python3 解释器；未找到时跳过注册，可手动跑 test/verify_cli.py）
 find_package(Python3 COMPONENTS Interpreter)

@@ -532,7 +532,7 @@ A10 验证走 oracle：
    注入 ciTwin=b cast 存 cp2 → 镜像 rcComposite 装配段 → 恢复全局 → BuildMachineText。
    单测 unit_composite（中点恒等全对象 + 跨180反例 + cusp 校正）；回归 64 金样不破。
 2. **A10-2 时空中点 Midpoint** `GetMidpointMachineText(a,b)`：双时刻双地点 ratio + recast
-   （语义=两盘时空折中盘，API 双 ChartInput 天然携带）。
+   （语义=两盘时空折中盘，API 双 ChartInput 天然携带）。**2026-09-05 已落地**（见下）。
 3. **A10-3 Synastry 关系网格**（最低优先）：跨盘相位网格文本通道需先定网格文本格式/标题
    （OutChartAspectRelation 现为 GUI 调试串）——单独定界。
 
@@ -549,6 +549,24 @@ A10 验证走 oracle：
   宫头允许 180 校正、占位星恒 0）——A=北京1958 / B=纽约1985 异半球跨 0° 组合自然覆盖
   ③泄漏回归 composite 后 chart(A) 仍逐字节不变 ④JSON 恒等。ctest 12/12、金样 64 不破。
   测试陷阱：断言差须走 wrap180 域（norm360 会把负小差翻成 359.9° 假失败）。
+
+**A10-2 时空中点 Midpoint 2026-09-05 落地**（A10 分片②，复用 A10-1 双盘通道）：
+- 新 API（astrolog_lib.h + astrolog.cpp）：`GetMidpointMachineText(a,b)`（@0203 文本）与
+  `GetMidpointChartJSON(a,b)`（十进制 JSON）；共享装配核心 `CastMidpointChart`（static）：
+  与 `CastCompositeChart` 同构，仅 `us.nRel=rcMidpoint` + `us.nRatio1=nRatio2=1`（50:50 时空中点，
+  不依赖全局初值）→ 两次 SetupChartQuiet 借 ChartInput→CI 转换（盘2 转存 ciMain 后切回盘1 主盘）
+  → 调 `CastRelation()` 原函数（rcMidpoint 分支：is.T=Ratio(t1,t2,ratio) + 经纬/时区中点
+  + 跨 180° 经度补 Mod(+360*ratio) → 按中点时空 recast）→ 出口备份还原
+  us.nRel/ciTwin/ciTran/ciNatal2/ignore1..3（API 全局自洽）。
+- `unit_midpoint`（ctest，no gtest）：①恒等自反 midpoint(A,A)==chart(A) 逐字节
+  ②对称 midpoint(A,B)==midpoint(B,A) 逐字节（时空中点对称，破方向性 bug）③JSON 恒等
+  ④时空中点数值锚定：同日同地 A2=12:00/B2=18:00 → 中点盘 == 同地 15:00 普通盘（引擎自身
+  chart 作 oracle，40 对象 1e-6 内）⑤泄漏回归 midpoint 后 chart(A) 仍逐字节 ⑥良构性 40 对象 ∈[0,360)。
+  ctest 全绿（10 unit + golden_diff），金样 64 不破。
+- 验证模式：A8/A10 金样路线对关系盘已关（golden_main 关系路径 SEGV）；A10-2 正确性由
+  「自反恒等 + 对称 + 时空中点 Oracle（同地邻时中点 == 普通盘）」三重锁定。
+- 剩余 A10-3 Synastry 关系网格（最低优先）：跨盘相位网格文本通道需先定网格文本格式/标题
+  （OutChartAspectRelation 现为 GUI 调试串）——单独定界。
 
 **A6 余项前置核查（2026-09-05）**：本地**无** `rAspOrb/rObjOrb/rAspInf` 数组（引擎容差为内联
 `rOrb` 逻辑）→ `-Ao/-Am` 自定义容差表需先移植 golden 容差基础设施，非小改；与 -Aa（改

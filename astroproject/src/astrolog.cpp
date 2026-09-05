@@ -5600,3 +5600,48 @@ std::string GetCompositeChartJSON(const ChartInput& chartA, const ChartInput& ch
 	CastCompositeChart(chartA, chartB);
 	return BuildChartJSON();
 }
+
+/* P2/A10-2 时空中点装配核心：与 CastCompositeChart 同构，仅 nRel=rcMidpoint。
+ * CastRelation rcMidpoint 分支（astrolog.cpp:3800-3835）按 ciMain/ciTwin 求时空中点
+ * （is.T=Ratio(t1,t2,ratio) + 经纬/时区中点，跨 180° 经度补 Mod(+360*ratio)）后
+ * 按中点时空 recast。全局保存/恢复同 A10-1（us.nRel/ciTwin/ciTran/ciNatal2/ignore1..3）。 */
+static void CastMidpointChart(const ChartInput& chartA, const ChartInput& chartB)
+{
+	int saveNRel = us.nRel;
+	CI saveTwin = ciTwin, saveTran = ciTran, saveNatal2 = ciNatal2;
+	byte saveIg1[NUMBER_OBJECTS], saveIg2[NUMBER_OBJECTS], saveIg3[NUMBER_OBJECTS];
+	memcpy(saveIg1, ignore1, NUMBER_OBJECTS);
+	memcpy(saveIg2, ignore2, NUMBER_OBJECTS);
+	memcpy(saveIg3, ignore3, NUMBER_OBJECTS);
+
+	/* 两次 SetupChartQuiet：借其 ChartInput→CI 转换。先转存盘2 的 CI，第二次调用后
+	 * ciCore=盘1 即主盘，ciMain/ciTwin 在 CastRelation 内即 chartA/chartB（与 A10-1 一致）。 */
+	SetupChartQuiet(chartB);
+	CI twin = ciMain;
+	SetupChartQuiet(chartA);
+	us.nRel = rcMidpoint;
+	us.nRatio1 = 1; us.nRatio2 = 1;   /* 50:50 时空中点（golden -rm 默认权重） */
+	ciTwin = twin; ciTran = twin; ciNatal2 = twin;
+
+	CastRelation();   /* 内部取 t1/t2 中点 + 经纬中点 → recast 中点盘入 cp0 */
+
+	us.nRel = saveNRel;
+	ciTwin = saveTwin; ciTran = saveTran; ciNatal2 = saveNatal2;
+	memcpy(ignore1, saveIg1, NUMBER_OBJECTS);
+	memcpy(ignore2, saveIg2, NUMBER_OBJECTS);
+	memcpy(ignore3, saveIg3, NUMBER_OBJECTS);
+}
+
+/* P2/A10-2 — 时空中点 @0203 机器文本（BuildMachineText 单源写行器）。 */
+std::wstring GetMidpointMachineText(const ChartInput& chartA, const ChartInput& chartB)
+{
+	CastMidpointChart(chartA, chartB);
+	return BuildMachineText();
+}
+
+/* P2/A10-2 — 时空中点 JSON（十进制数值通道；unit_midpoint 与上层集成共用）。 */
+std::string GetMidpointChartJSON(const ChartInput& chartA, const ChartInput& chartB)
+{
+	CastMidpointChart(chartA, chartB);
+	return BuildChartJSON();
+}
