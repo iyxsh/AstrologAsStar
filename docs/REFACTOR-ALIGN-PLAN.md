@@ -133,7 +133,7 @@ GetChartAspectRelation / GetChartResult`。
 | A2 | 宫位系统接线 | 16 系全 | 枚举 16，**实际 3 系错映射**（EqualMC/Whole/Null→整宫） | 高 | 修正 SwissHouse 映射 + 3D 宫复测 |
 | A3 | 南北交点/莉莉丝 | 真交点 + 真莉莉丝远地点 | 已与原版对齐（2026-09-05 实证） | 完成 | SE 路由 + `-Yn`/`-YL` 已接，实证见 P1 清单 |
 | A4 | 小行星/天王星族/恒星 | 全量可开关 | 恒星 `-U` 已对齐（2026-09-05 实证 128/128 行 9 位零差）；小行星/天王星族开关仍缺 | 恒星子项完成；余天体集开关 | 恒星接入 ComputeStars + `-U`；小行星/天王星族对象开关 = 天体集配置化（A4 子项 2） |
-| A5 | 阿拉伯点 | 177 点按需 | 仅福点 1 个（CastChart 内嵌公式） | 高 | 移植 tArabicPart 177 点表 + 配置化 |
+| A5 | 阿拉伯点 | 177 点按需 | 177 点表+引擎已落地（2026-09-05 实证 354/354 oracle 零差）；仅剩输出/展示路径 | 低（余展示接线） | 移植 tArabicPart 177 点表 + 引擎已毕；`-P` listing 展示路径待接 |
 | A6 | 相位集/容许度 | 18 型+平行/反平行+自定义表 | 18 型枚举在、默认 5 主、无自定义入口 | 中 | 配置化：相位集/容许度/格局 |
 | A7 | 格局识别 | ac 码 + 搜索 | DisplayGrands 在、无入口/无测 | 中 | 接 API + 金样 |
 | A8 | 行运/次限/太阳弧 | Action/CastChart 标志真算法 | **假桩**（=本命重算） | 极高 | P2 重写（ProcessInput 已有 fProgressUS 骨架） |
@@ -341,6 +341,24 @@ WinMain（L9780）调 FProcessCommandLine（L18191）→ FProcessSwitchesMain（
   容差内）。④ unit_config 新增 `-U`/`-Uz`/`-Ub` 断言（fAllStar 置位 + nStar 排序 + restore
   回滚）；ctest 3/3 + 金样 8/8 不破。遗留：小行星/天王星族(11-15/34-42)对象级开关 = A4 子项 2
   「天体集开关配置化」，与 A5 同批或后置。
+- [x] A5 阿拉伯点 177 表 + 引擎（P1.5 首步）—— **2026-09-05 落地**：① 数据——
+  `src/core/arabic_parts_data.inc` 177 行 {form,name} 逐字转录自原版 `ai[cPart]`（原版
+  `#ifdef ARABIC` 恒开；form=11 字符公式 DSL = 3 组 [mod][obj10][obj1]，name 即原版
+  tArabicPart 语言表内容），表头化入 `include/models/arabic_parts.h`（`cPart=177` 归口，
+  astrolog.cpp/config.cpp 本地宏留 `#ifndef` 兼容）。② 引擎——`src/core/arabic_parts.cpp`
+  `ComputeArabicParts(rPart[177])` 数值核心逐行对齐原版 `DisplayArabic()` 取位段（golden
+  A32_V3_51 astrolog.cpp:33295）：修饰符 h 宫头 / r 宫头星座守护星 / j 宫头+10° / H 落宫宫头 /
+  R 落宫星座守护星 / D 所落星座守护星 / '0'-'3' 常量度数 / ' ' 普通对象或 F(福点)/S(精神点)
+  前序递归；`rCur = rBit1−rBit2`；`form[9]=='F'` 福点族日夜翻转（条件同 CastChart 内联）；
+  `rPart[i]=Mod(rCur+rBit0)`；屏蔽对象/引用未算前序点 → 槽保持 -360 哨兵。依赖
+  cp0.cusp_pos/house_no、rules、ignore1、isDayBirth（CastChart 后就绪）。
+  ③ **验证**——`test/unit/unit_arabic.cpp`：bj/la 两盘 apFor=0 == CastChart 内联
+  cp0.longitude[oFor]（bj golden 锚点 226.637503635117° 零差）+ apSpi==Asc±(Sun−Moon) +
+  全量 ∈[0,360)；`test/verify_arabic.py` python 独立重解公式 DSL 与引擎逐点对拍
+  **354/354 ≤1.5e-11°**（含 H/R 落宫、F/S 递归、常量度数与日夜翻转；python 端曾因
+  0°Ari 环绕宫未线性化误判落宫，已修）。ctest 5/5（新增 unit_arabic + arabic_oracle）。
+  遗留：阿拉伯点**输出/展示路径**（原版为文本 listing，由 `-P` 起 us.nArabic 触发，
+  非 @0203 机器行）+ `-Pz/n/f` 排序接线 → 与 A6 相位集或 P1.7 矩阵同批。
 - [ ] A6 相位集/容许度配置化 + A7 格局识别入口。
 - [ ] 金样：本命盘 × 宫位系(16) × 天体集 × 容许度矩阵。
 - 验收：本命盘数值与金样逐项一致。

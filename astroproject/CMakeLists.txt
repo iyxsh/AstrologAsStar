@@ -213,6 +213,14 @@ if(WIN32 AND MSVC)
 endif()
 add_test(NAME unit_config COMMAND astrolog32_unit_config)
 
+# P1.5/A5 — 阿拉伯点 177 引擎单测（福点/精神点 == CastChart 内联 + golden 锚点）
+add_executable(astrolog32_unit_arabic test/unit/unit_arabic.cpp)
+target_link_libraries(astrolog32_unit_arabic astrolog32)
+if(WIN32 AND MSVC)
+    target_compile_definitions(astrolog32_unit_arabic PRIVATE _CRT_SECURE_NO_WARNINGS)
+endif()
+add_test(NAME unit_arabic COMMAND astrolog32_unit_arabic)
+
 # 金样对拍：运行 astrolog32-cli → 与 test/golden/*.golden.txt 逐字段 diff
 # （需要 Python3 解释器；未找到时跳过注册，可手动跑 test/verify_cli.py）
 find_package(Python3 COMPONENTS Interpreter)
@@ -221,6 +229,12 @@ if(Python3_Interpreter_FOUND)
         COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/../test/verify_cli.py
             $<TARGET_FILE:astrolog32-cli>)
+    # P1.5/A5 — 阿拉伯点二次 oracle：python 独立解码公式 DSL → 与引擎逐点对拍
+    add_test(NAME arabic_oracle
+        COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/../test/verify_arabic.py
+            $<TARGET_FILE:astrolog32-cli>
+            $<TARGET_FILE:astrolog32_unit_arabic>)
 endif()
 
 # 安装规则
