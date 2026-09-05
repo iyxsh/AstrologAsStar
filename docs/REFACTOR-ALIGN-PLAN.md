@@ -586,6 +586,10 @@ A10 验证走 oracle：
   B=纽约1985 实测 22 条交叉相位。
 - 验证模式：网格正确性由「对称 + 角度自洽 + asp 合法 + JSON 一致」四重锁定（金样路线对关系盘已关）。
 - **A10 全分片完成**（A10-1 Composite / A10-2 Midpoint / A10-3 Synastry grid 均落地，三端已推）。
+- **CI 触发记录（2026-09-05）**：三端推送 `cdf10b6..9ac9846` 后，GitLab 自动建流水线 **#46**
+  （A10-2 源码，sha `cdf10b6`）与 **#47**（A10-3，sha `9ac9846`），证明 `workflow:rules` 新增的
+  `changes` 过滤**未误杀源码推送**（纯文档提交才 `when: never`）。runner `concurrent=1`，
+  25 job 串行，单条流水线耗时高于 12.5min 基线属预期。
 
 **A6 余项前置核查（2026-09-05）**：本地**无** `rAspOrb/rObjOrb/rAspInf` 数组（引擎容差为内联
 `rOrb` 逻辑）→ `-Ao/-Am` 自定义容差表需先移植 golden 容差基础设施，非小改；与 -Aa（改
