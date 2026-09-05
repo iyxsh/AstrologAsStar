@@ -22,6 +22,8 @@
 extern US us;
 extern unsigned char oscLilith;   /* astrolog.cpp byte oscLilith */
 extern byte ignoreA[];            /* aspects.cpp（aspects.h 已 extern） */
+extern double rAspOrb[];          /* utils.cpp 相位容差表 */
+extern double rObjOrb[];          /* utils.cpp 对象容差表 */
 
 #define CHECK(cond) do { \
     if (!(cond)) { \
@@ -38,6 +40,8 @@ struct Snap {
     int allStar, nStar;
     int nAsp;
     byte iA[cAspect + 1];
+    double aspOrb[cAspect + 1];
+    double objOrb[42 + 1];   /* cLastMoving=42（planet.h 枚举） */
 };
 static Snap snap(void)
 {
@@ -53,6 +57,8 @@ static Snap snap(void)
     s.nStar = us.nStar;
     s.nAsp = us.nAsp;
     memcpy(s.iA, ignoreA, sizeof(s.iA));
+    memcpy(s.aspOrb, rAspOrb, sizeof(s.aspOrb));
+    memcpy(s.objOrb, rObjOrb, sizeof(s.objOrb));
     return s;
 }
 static void restore(const Snap& s)
@@ -68,6 +74,8 @@ static void restore(const Snap& s)
     us.nStar = s.nStar;
     us.nAsp = s.nAsp;
     memcpy(ignoreA, s.iA, sizeof(s.iA));
+    memcpy(rAspOrb, s.aspOrb, sizeof(s.aspOrb));
+    memcpy(rObjOrb, s.objOrb, sizeof(s.objOrb));
 }
 
 int main(void)
@@ -211,6 +219,32 @@ int main(void)
         restore(base);
     }
 
-    printf("PASS unit_config: house/node/lilith/arabic/center/sidereal/allstar/aspect switches\n");
+    /* ---- 11. -Ao/-Am custom orbs (A6 余项) ---- */
+    {
+        const char* ao6[] = { "-Ao", "6", "9.5" };        /* 第 6 相容差 9.5° */
+        CHECK(ConfigProcessTokens(ao6, 3, err, sizeof(err)) == 1);
+        CHECK(rAspOrb[6] == 9.5);
+        restore(base);
+        const char* am2[] = { "-Am", "2", "4.25" };       /* Moon 对象容差 4.25° */
+        CHECK(ConfigProcessTokens(am2, 3, err, sizeof(err)) == 1);
+        CHECK(rObjOrb[2] == 4.25);
+        restore(base);
+        const char* aoNeg[] = { "-Ao", "3", "-1" };       /* 负 orb → 旧版语义：忽略该相 */
+        CHECK(ConfigProcessTokens(aoNeg, 3, err, sizeof(err)) == 1);
+        CHECK(ignoreA[3] == 1 && rAspOrb[3] == 0.0);
+        restore(base);
+        const char* aoBad[] = { "-Ao", "99", "1" };       /* 越界 → 报错 */
+        CHECK(ConfigProcessTokens(aoBad, 3, err, sizeof(err)) == 0);
+        CHECK(err[0] != '\0');
+        restore(base);
+        const char* aoShort[] = { "-Ao", "6" };           /* 缺数值 → 报错 */
+        CHECK(ConfigProcessTokens(aoShort, 2, err, sizeof(err)) == 0);
+        restore(base);
+        const char* anNoop[] = { "-An", "6", "Foo" };     /* 未实现子开关 no-op */
+        CHECK(ConfigProcessTokens(anNoop, 3, err, sizeof(err)) == 1);
+        restore(base);
+    }
+
+    printf("PASS unit_config: house/node/lilith/arabic/center/sidereal/allstar/aspect/orb switches\n");
     return 0;
 }

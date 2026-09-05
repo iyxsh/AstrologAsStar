@@ -23,6 +23,8 @@
 extern US us;          /* settings.h 未必导出 extern，此处显式声明 */
 extern byte oscLilith; /* astrolog.cpp:374 */
 extern byte PolarMCflip;/* astrolog.cpp:373 */
+extern double rAspOrb[];   /* utils.cpp 相位容差表（默认同原版 {7,7,7,7,6,3,…}） */
+extern double rObjOrb[];   /* utils.cpp 对象容差表 */
 
 /* 原版开关机常量（astrolog.cpp:290-291） */
 #define FIRST_SIDEREAL_MODE SE_SIDM_FAGAN_BRADLEY /* 必须恒为 0 */
@@ -158,6 +160,29 @@ int ConfigProcessTokens(const char* const* argv, int argc,
 				SwitchF(us.nArabic);
 			}
 			if (ch2 == '0') SwitchF(us.fArabicFlip);
+			break;
+		}
+
+		/* ---- -A 族 相位自定义（A6 余项；镜像原版 -Ao/-Am）：
+		 *    -Ao <asp> <deg> 设相位容差（负数=旧版语义→忽略该相）；-Am <obj> <deg> 对象容差 ---- */
+		case 'A': {
+			if (ch2 != 'o' && ch2 != 'm') break;    /* -An/-AA/-Aa 等未实现：安全 no-op */
+			const char* swName = (ch2 == 'o') ? "Ao" : "Am";
+			if (i + 2 >= argc) { SetErr(errtxt, errsz, "-Ao/-Am need index and degrees", swName, NULL); return 0; }
+			const char* aIdx = argv[i + 1];
+			const char* aVal = argv[i + 2];
+			int idx = atoi(aIdx);
+			double val = atof(aVal);
+			if (ch2 == 'o') {
+				if (idx < 1 || idx > cAspect) { SetErr(errtxt, errsz, NULL, "Ao", aIdx); return 0; }
+				if (val < 0.0) { val = 0.0; ignoreA[idx] = 1; }   /* 原版兼容：负 orb → 忽略该相 */
+				rAspOrb[idx] = val;
+				UpdateAspectCount();
+			} else {
+				if (idx < 1 || idx > cLastMoving) { SetErr(errtxt, errsz, NULL, "Am", aIdx); return 0; }
+				rObjOrb[idx] = val;
+			}
+			i += 2;
 			break;
 		}
 
