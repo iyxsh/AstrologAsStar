@@ -134,7 +134,7 @@ GetChartAspectRelation / GetChartResult`。
 | A3 | 南北交点/莉莉丝 | 真交点 + 真莉莉丝远地点 | 已与原版对齐（2026-09-05 实证） | 完成 | SE 路由 + `-Yn`/`-YL` 已接，实证见 P1 清单 |
 | A4 | 小行星/天王星族/恒星 | 全量可开关 | 恒星 `-U` 已对齐（2026-09-05 实证 128/128 行 9 位零差）；小行星/天王星族开关仍缺 | 恒星子项完成；余天体集开关 | 恒星接入 ComputeStars + `-U`；小行星/天王星族对象开关 = 天体集配置化（A4 子项 2） |
 | A5 | 阿拉伯点 | 177 点按需 | 177 点表+引擎已落地（2026-09-05 实证 354/354 oracle 零差）；仅剩输出/展示路径 | 低（余展示接线） | 移植 tArabicPart 177 点表 + 引擎已毕；`-P` listing 展示路径待接 |
-| A6 | 相位集/容许度 | 18 型+平行/反平行+自定义表 | 18 型枚举在、默认 5 主；`-RA/-RE` 屏蔽/启用已接（2026-09-05）；自定义相位名/角度/容差表待接 | 中 | 相位屏蔽配置化已毕；格局识别 API 入口 + 自定义表后续 |
+| A6 | 相位集/容许度 | 18 型+平行/反平行+自定义表 | 18 型枚举在、默认 5 主；`-RA/-RE` 屏蔽/启用、`-Ao/-Am` 容差自定义均已接（2026-09-05）；`-Aa` 角度/`-An/-AA` 命名待接 | 中 | 屏蔽 + 容差配置化已毕；格局 API 已接；`-Aa` 需 rAspAngle 去 const、命名属语言资源域 |
 | A7 | 格局识别 | ac 码 + 搜索 | `DetectGrands` API 已接 + 合成网格单测 8/8（2026-09-05）；DisplayGrands 文本路径未重构 | 中 | 格局检测 API 入口已加；真盘金样计数对拍 + DisplayGrands 单一实现重构归 P1.7 |
 | A8 | 行运/次限/太阳弧 | Action/CastChart 标志真算法 | **假桩**（=本命重算） | 极高 | P2 重写（ProcessInput 已有 fProgressUS 骨架） |
 | A9 | 日月返 | DoReturn | ❌ | 极高 | P2 移植 |
@@ -365,7 +365,8 @@ WinMain（L9780）调 FProcessCommandLine（L18191）→ FProcessSwitchesMain（
   越界报错、非数字停消费、无数字 no-op）；`UpdateAspectCount()` 按启动公式重算
   `nAsp = cAspect − 屏蔽数`。默认 ignoreA 仍屏蔽 6..18 → nAsp 默认 5 不变（金样 16/16、
   ctest 5/5 回归通过）。unit_config 新增 -RE 6（nAsp=6）/ -RA 3（nAsp=4）/ 越界报错 /
-  无参 no-op / -Rq no-op 断言。遗留：自定义相位名/角度/容差表（-Aa/-Ao/-Am）；A7 格局
+  无参 no-op / -Rq no-op 断言。`-Ao/-Am` 容差自定义已补（492b975，见 A6 行）。遗留：
+  自定义相位**角度/命名**（-Aa 需 rAspAngle 去 const；-An/-AA 属语言资源域）。A7 格局
   API 已独立落地（见下条）。
 - [x] A7 格局识别 API 入口（DetectGrands）—— **2026-09-05 落地**：`DetectGrands(const GridInfo*,
   int out[][5], int maxOut)` 记录 8 类格局 {ac, 对象…}（acS 合群/ acGT 大三角/ acK 风筝 /
@@ -374,8 +375,8 @@ WinMain（L9780）调 FProcessCommandLine（L18191）→ FProcessSwitchesMain（
   Kite 依原版对 GT 三成员的两两六分探测会重复记录）。`unit_grands`：合成网格 8/8 检出 +
   空网格 0（含 GC/Cradle 的 MinDistance 位置约束）。ctest 6/6 全绿、金样 16/16 不破。
   遗留：① 真盘格局计数与 golden 文本 listing 对拍（需文本通道）；② DisplayGrands 与
-  DetectGrands 单一实现重构（防双份漂移，归 P1.7）；③ A6 余项自定义相位名/角度/容差表
-  （-Aa/-Ao/-Am，原版 GUI/文本资源域）。
+  DetectGrands 单一实现重构（防双份漂移，归 P1.7）；③ A6 余项 `-Ao/-Am` 容差已落地（492b975）；
+  `-Aa` 需 rAspAngle 去 const、`-An/-AA` 命名属语言资源域。
 - [x] 金样矩阵（轴1 宫位系已固化）—— 48 份 `test/golden/*.hs<NN>.golden.txt`（bj/syd/la × hs00..15，原版 `--o0 -c <hs>`）入 CI；verify_cli 样本 16→64，逐字段 9 位零差（A2 实证固化，golden_diff 9.2s）。轴2 天体集 = 现有 8 份默认 + 8 份 `-U` 金样。轴3 容许度 = 需相位文本通道（待接）。
 - 验收：本命盘数值与金样逐项一致。
 
