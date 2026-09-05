@@ -419,6 +419,13 @@ A10（关系盘：合盘/组合盘/中点）。
   与 golden:20644 同源）→ **A8 实现侧基本就绪**；金样可行性依赖 FInputData/save-file 文法研究
   （~数百行，独立专turn），或降级独立 oracle（pymeeus 已装）对拍本地推进输出（需先建本地
   双日期 API 通道）。
+- **FInputData 专turn定论（2026-09-05）**：golden_main（console 金样变体）**关系路径不可用**——
+  `-rp nul set` 直接 SEGV(139)、`-r p` 解析错(3)（golden_main 只按单本命盘最小化实现）。
+  FInputData 文法已通读：`.hor`=外来导入（带 2 字符前导标记的数字 token，无写出端/样本）、
+  `.dat`=`@` 开头逐行开关文件（可含 `-qb` 行）、另有 `nul/set/now` 虚拟文件。
+  **结论：golden runner 无法产出可复现次限 @0203 → golden 金样路线对 A8 关闭。**
+  两条替代：① 独立 oracle（pymeeus 等，0.1~0.5° 容差；需先建本地双日期 API 通道，推荐）；
+  ② 改造 golden_main 补关系初始化后重编 mingw32（涉 oracle 纯度，不推荐，除非要 9 位级）。
 **A6 余项前置核查（2026-09-05）**：本地**无** `rAspOrb/rObjOrb/rAspInf` 数组（引擎容差为内联
 `rOrb` 逻辑）→ `-Ao/-Am` 自定义容差表需先移植 golden 容差基础设施，非小改；与 -Aa（改
 rAspAngle，常量表可直接改但会破坏既有镜像，慎重）一起归"需专项"。
