@@ -457,10 +457,16 @@ PrintLunarEclipse` → `solar_eclipse()/lunar_eclipse()` 对齐）：
 真值 101.71°；传 `+8` → 12 Can 19.06 = 102.32° ≈ UT 20:01 值。**东八区须传 -8**（东经须传
 负经度，如北京 `-116:23`）。由此：本地时 = UT − zon，`swe_utc_time_zone(…, +zon)` 即
 「本地→UTC」方向（传 −zon 才是 UTC→本地）。
-⚠️ 遗留不一致：`test/unit/unit_midpoint|composite|synastry|returns` 与 `test/golden` 的
-cmd 行对北京仍传 `zon=8`（东正写法），与西正约定相反 → 其出盘绝对时刻偏 16h；因这些用例
-只校验自反/对称/恒等等**内部一致性**故未暴露。**新增用例一律用 zon=-8 表示东八区**，
-存量用例与金样 cmd 待专项统一（涉及重生成金样，非小改）。
+⚠️ 存量修正进展（2026-09-05 晚间）：`unit_midpoint/composite/synastry/progress/solararc/
+returns/transit` 已全部改为**西正写法**（北京 zon=-8、纽约 +5、极区 -1；断言均为内部
+一致性，翻转后 ctest 15/15 不破，commit `git log --oneline` 最新一条）。**仅剩 `test/golden`
+64 份金样与其 cmd 行**仍为东正写法（北京 zon=8）——它们是原版引擎同输入的一致性锚点，
+golden_diff 不受影响，但 cmd 的北京样例实际落在 UT≈20:01（非北京正午）。
+**重生成金样需先构建原版 console 变体**（宿主 VS2026 已装于
+`C:\Program Files\Microsoft Visual Studio\18\Community`；GUI exe
+`A32_V3_51_Proj\int\main\astrolog32.exe` 实测 `-o` 不落盘——WinMain 消息循环不触发
+Action，无法批处理，与 §7 风险记录一致；原版源码 astrolog.cpp:9780 即 WinMain，需改
+console 入口才能批处理出盘）。此专项未启动，另立任务。
 
 #### P2 启动规划（设计稿 v0，2026-09-05；待确认后实施）
 **目标与顺序**：A8（单盘动态 = 行运/次限/太阳弧/月亮弧，value 最高）→ A9（日月返）→
