@@ -16,10 +16,12 @@
 #include <cstdlib>
 #include <cstring>
 #include "../../include/core/config.h"
+#include "../../include/core/aspects.h"   /* cAspect/ignoreA (A6 -RA/-RE) */
 #include "../../include/models/settings.h"
 
 extern US us;
 extern unsigned char oscLilith;   /* astrolog.cpp byte oscLilith */
+extern byte ignoreA[];            /* aspects.cpp（aspects.h 已 extern） */
 
 #define CHECK(cond) do { \
     if (!(cond)) { \
@@ -34,6 +36,8 @@ struct Snap {
     double siderealCorrection;
     int trueNode, lilith, sidereal;
     int allStar, nStar;
+    int nAsp;
+    byte iA[cAspect + 1];
 };
 static Snap snap(void)
 {
@@ -47,6 +51,8 @@ static Snap snap(void)
     s.sidereal = us.fSidereal;
     s.allStar = us.fAllStar;
     s.nStar = us.nStar;
+    s.nAsp = us.nAsp;
+    memcpy(s.iA, ignoreA, sizeof(s.iA));
     return s;
 }
 static void restore(const Snap& s)
@@ -60,6 +66,8 @@ static void restore(const Snap& s)
     us.fSidereal = s.sidereal;
     us.fAllStar = s.allStar;
     us.nStar = s.nStar;
+    us.nAsp = s.nAsp;
+    memcpy(ignoreA, s.iA, sizeof(s.iA));
 }
 
 int main(void)
@@ -177,6 +185,32 @@ int main(void)
     CHECK(us.fAllStar == st0 && us.nStar == ns0); /* restore() reverts both */
     restore(base);
 
-    printf("PASS unit_config: house/node/lilith/arabic/center/sidereal/allstar switches\n");
+    /* ---- 10. -RE/-RA aspect enable/restrict (A6) ---- */
+    {
+        /* 默认 ignoreA 屏蔽 6..18（前序用例均 restore，此处为初始默认态）；
+         * UpdateAspectCount 为绝对重算：nAsp = 18 − 被屏蔽数。 */
+        const char* re6[] = { "-RE", "6" };          /* 启用第 6 相（150°）：屏蔽剩 12 → nAsp=6 */
+        CHECK(ConfigProcessTokens(re6, 2, err, sizeof(err)) == 1);
+        CHECK(ignoreA[6] == 0);
+        CHECK(us.nAsp == 6);
+        restore(base);
+        const char* ra3[] = { "-RA", "3" };          /* 屏蔽第 3 相（90°）：屏蔽 14 → nAsp=4 */
+        CHECK(ConfigProcessTokens(ra3, 2, err, sizeof(err)) == 1);
+        CHECK(ignoreA[3] == 1);
+        CHECK(us.nAsp == 4);
+        restore(base);
+        const char* raBad[] = { "-RA", "99" };       /* 越界 → 报错 */
+        CHECK(ConfigProcessTokens(raBad, 2, err, sizeof(err)) == 0);
+        CHECK(err[0] != '\0');
+        restore(base);
+        const char* reNoArg[] = { "-RE" };           /* 无数字 → 成功 no-op（原版语义） */
+        CHECK(ConfigProcessTokens(reNoArg, 1, err, sizeof(err)) == 1);
+        restore(base);
+        /* 非 -RA/-RE 的 -R* 保持 no-op 不报错 */
+        CHECK(ConfigApply("-Rq", err, sizeof(err)) == 1);
+        restore(base);
+    }
+
+    printf("PASS unit_config: house/node/lilith/arabic/center/sidereal/allstar/aspect switches\n");
     return 0;
 }

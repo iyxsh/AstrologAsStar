@@ -20,9 +20,19 @@ const double rAspAngle[cAspect + 1] = { 0,
 /* Restriction of objects when progressing, as specified with -YRP switch.  */
 /* For comparison charts only, else normal ignore1 used.						*/
 /* Restriction of aspects as specified with -YRA switch. */
-const byte ignoreA[cAspect + 1] = { 0,
+/* 相位屏蔽表（-RA/-RE 可改写；默认屏蔽 6..18 → us.nAsp 默认 5）。
+ * 非 const：config 层 -RA/-RE 会修改后重算 nAsp。 */
+byte ignoreA[cAspect + 1] = { 0,
 	0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 };
+/* 相位数量重算（与 initEnv 启动公式一致：nAsp = cAspect − 被屏蔽数） */
+void UpdateAspectCount(void)
+{
+	int i;
+	for (us.nAsp = cAspect, i = 1; i <= cAspect; i++)
+		if (ignoreA[i])
+			us.nAsp--;
+}
 /* This is Astrolog's memory allocation routine, returning a pointer given  */
 /* a size, and if the allocation fails prints a warning, including the user */
 /* passed as parameter.														*/

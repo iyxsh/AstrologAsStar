@@ -134,7 +134,7 @@ GetChartAspectRelation / GetChartResult`。
 | A3 | 南北交点/莉莉丝 | 真交点 + 真莉莉丝远地点 | 已与原版对齐（2026-09-05 实证） | 完成 | SE 路由 + `-Yn`/`-YL` 已接，实证见 P1 清单 |
 | A4 | 小行星/天王星族/恒星 | 全量可开关 | 恒星 `-U` 已对齐（2026-09-05 实证 128/128 行 9 位零差）；小行星/天王星族开关仍缺 | 恒星子项完成；余天体集开关 | 恒星接入 ComputeStars + `-U`；小行星/天王星族对象开关 = 天体集配置化（A4 子项 2） |
 | A5 | 阿拉伯点 | 177 点按需 | 177 点表+引擎已落地（2026-09-05 实证 354/354 oracle 零差）；仅剩输出/展示路径 | 低（余展示接线） | 移植 tArabicPart 177 点表 + 引擎已毕；`-P` listing 展示路径待接 |
-| A6 | 相位集/容许度 | 18 型+平行/反平行+自定义表 | 18 型枚举在、默认 5 主、无自定义入口 | 中 | 配置化：相位集/容许度/格局 |
+| A6 | 相位集/容许度 | 18 型+平行/反平行+自定义表 | 18 型枚举在、默认 5 主；`-RA/-RE` 屏蔽/启用已接（2026-09-05）；自定义相位名/角度/容差表待接 | 中 | 相位屏蔽配置化已毕；格局识别 API 入口 + 自定义表后续 |
 | A7 | 格局识别 | ac 码 + 搜索 | DisplayGrands 在、无入口/无测 | 中 | 接 API + 金样 |
 | A8 | 行运/次限/太阳弧 | Action/CastChart 标志真算法 | **假桩**（=本命重算） | 极高 | P2 重写（ProcessInput 已有 fProgressUS 骨架） |
 | A9 | 日月返 | DoReturn | ❌ | 极高 | P2 移植 |
@@ -359,7 +359,15 @@ WinMain（L9780）调 FProcessCommandLine（L18191）→ FProcessSwitchesMain（
   0°Ari 环绕宫未线性化误判落宫，已修）。ctest 5/5（新增 unit_arabic + arabic_oracle）。
   遗留：阿拉伯点**输出/展示路径**（原版为文本 listing，由 `-P` 起 us.nArabic 触发，
   非 @0203 机器行）+ `-Pz/n/f` 排序接线 → 与 A6 相位集或 P1.7 矩阵同批。
-- [ ] A6 相位集/容许度配置化 + A7 格局识别入口。
+- [x] A6 相位屏蔽配置化（A7 格局 API 前置）—— **2026-09-05 落地**：`ignoreA[]` 由 const
+  改可写（aspects.cpp/ aspects.h），config 层新增 `-RA <asp>…`（屏蔽 ignoreA=1）/
+  `-RE <asp>…`（启用 ignoreA=0），镜像原版 astrolog.cpp:22779/22799 语义（pmAspect 数值、
+  越界报错、非数字停消费、无数字 no-op）；`UpdateAspectCount()` 按启动公式重算
+  `nAsp = cAspect − 屏蔽数`。默认 ignoreA 仍屏蔽 6..18 → nAsp 默认 5 不变（金样 16/16、
+  ctest 5/5 回归通过）。unit_config 新增 -RE 6（nAsp=6）/ -RA 3（nAsp=4）/ 越界报错 /
+  无参 no-op / -Rq no-op 断言。遗留：自定义相位名/角度/容差表（-Aa/-Ao/-Am）与 A7
+  格局识别 API 入口（DisplayGrands 已存在、无入口/无测）。
+- [ ] A7 格局识别 API 入口（DisplayGrands 接线/无测）+ A6 余项（自定义相位名/角度/容差表）。
 - [ ] 金样：本命盘 × 宫位系(16) × 天体集 × 容许度矩阵。
 - 验收：本命盘数值与金样逐项一致。
 

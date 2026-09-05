@@ -1,6 +1,7 @@
 #include "../../include/core/config.h"
 #include "../../include/core/planet.h"    /* oVesta/uranLo/oMoo 等对象常量 */
 #include "../../include/core/houses.h"    /* NUMBER_OF_HOUSE_SYSTEMS 枚举 */
+#include "../../include/core/aspects.h"   /* cAspect/ignoreA/UpdateAspectCount (A6) */
 #include "../../include/models/settings.h"
 #include "../../include/utils/utils.h"
 #include "../../swe/swisseph/swephexp.h"
@@ -186,6 +187,26 @@ int ConfigProcessTokens(const char* const* argv, int argc,
 			else if (ch2 == 'l') us.nStar = 'l';
 			else if (ch2 == 'p') us.nStar = 'p';
 			/* 其余 -U 子开关：保持 fAllStar=1，排序留默认 */
+			break;
+		}
+
+		/* ---- -RA/-RE 相位屏蔽（A6，镜像原版 -RA/-RE 语义）：
+		 *    -RA <asp>…  屏蔽（ignoreA=1）；-RE <asp>…  启用（ignoreA=0）；
+		 *    随后按启动公式重算 us.nAsp。数字外 token 停止消费。 ---- */
+		case 'R': {
+			int fRestrict;
+			if (ch2 == 'A')      fRestrict = 1;
+			else if (ch2 == 'E') fRestrict = 0;
+			else break;                          /* 其余 -R 子开关未实现：安全 no-op */
+			while (i + 1 < argc) {
+				const char* a = argv[i + 1];
+				if (!a || !isdigit((unsigned char)a[0])) break;
+				int asp = atoi(a);
+				if (asp < 1 || asp > cAspect) { SetErr(errtxt, errsz, NULL, ch2 == 'A' ? "RA" : "RE", a); return 0; }
+				ignoreA[asp] = fRestrict ? 1 : 0;
+				i++;
+			}
+			UpdateAspectCount();
 			break;
 		}
 

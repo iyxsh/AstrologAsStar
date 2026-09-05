@@ -42,11 +42,12 @@ typedef enum
 
 extern GridInfo *grid;
 extern US us;
-extern const byte ignoreA[];
+extern byte ignoreA[];      /* 相位屏蔽表（-RA/-RE 可改写；默认 6..18 屏蔽） */
 extern IS is;
 
 // 函数声明
 void *allocate(long length, char *user);
+void UpdateAspectCount(void);   /* 相位数量重算：nAsp = cAspect − 被屏蔽数（A6） */
 bool FCreateGridA(bool fFlip);
 bool FCreateGrid(bool fFlip);
 void ComputeAspects(void);
