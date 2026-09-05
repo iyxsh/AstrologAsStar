@@ -428,8 +428,39 @@ WinMain（L9780）调 FProcessCommandLine（L18191）→ FProcessSwitchesMain（
   JulianToMdy(mon,day,yea)、swe_revjul(year,mon,day,hour[0-24])。
 - 边界：golden 经 ChartTransitSearch 分段插值取返照（本地无该内核）；本实现按天文定义
   + 引擎空间高精度解算（civil 分钟级），语义一致、精度更高，文档已声明。
-- [ ] A15 日月食表入口。
+- [x] A15 日月食表入口（2026-09-05 落地，commit 见 git log）。
 - 验收：与金样一致（覆盖代表日期 ±100 年）。
+
+**A15 日月食表 2026-09-05 落地**（`core/eclipses.cpp`，golden `PrintSolarEclipse/
+PrintLunarEclipse` → `solar_eclipse()/lunar_eclipse()` 对齐）：
+- 语义：以**本命盘年份**为窗口（Jan 1 00:00 UT 起）循环 `swe_sol/lun_eclipse_when_glob`
+  求下一次食的极大时刻，**越年即止**（UT 年 > 盘年 break），上限 10 次；时刻按盘时区转
+  本地时（`swe_utc_time_zone`）。原版推进 `t_ut += direction`（direction 初值 0，依赖 swe
+  自行前移）；本地显式 `t = tret[0] + 0.5`（同类食间隔 ≥29d，保证前移且不漏食）。
+- 新 API：`GetSolarEclipseTableText/GetLunarEclipseTableText/…JSON`；机器文本 **@0503**
+  （日食）/ **@0504**（月食），每行
+  `<year> <mon> <day> <hour> <min> <type> <jd_ut> <mag> <lon> <lat>`；
+  type 取英文稳定 token（Total/Annular/AnnularTotal/Partial/Penumbral/NonCentral，
+  由 SE_ECL_* 位标志映射，ANNULAR_TOTAL 优先判——hybrid 同时置 ANNULAR|TOTAL）。
+  lon/lat = 极大点地理坐标（`swe_sol_eclipse_where`；月食恒 0），mag = 食分
+  （月食 = umbral magnitude）。星历档位与主链一致：缺 .se1 回退 Moshier。
+- `unit_eclipse` 五重断言：①头标记 ②条数窗口（日 2~5 / 月 2~3）+ jd 严格升序
+  ③**极大时刻极值自洽**：日食处日月经度距角为局部极小、月食为局部极大（±0.05d 对比）
+  ④2026 已知食锚定 ⑤JSON 条数一致 + 全局泄漏回归。ctest 12/12 + golden 64 不破。
+- 实测（北京 2026，东八区）：日食 2/17 20:11 环食、8/13 01:45 全食；
+  月食 3/3 19:33 全影、8/28 12:12 偏食（UT 12:11 / 17:46 / 11:33 / 04:13 + 8h）——
+  与 NASA 食表一致。
+
+**★ 时区/经度符号约定（2026-09-05 实测定论，跨模块通用）**：本仓 `zon` 与 `lon` **同为
+「西正」**——`MdytszToJulian = MdyToJulian + (tim + zon − dst)/24`，即 **UT = local + zon**。
+实测锚点：北京 1958-07-04 12:01 传 `zon=-8` → Sun 11 Can 40.93 = **101.68°** ≈ 地方正午
+真值 101.71°；传 `+8` → 12 Can 19.06 = 102.32° ≈ UT 20:01 值。**东八区须传 -8**（东经须传
+负经度，如北京 `-116:23`）。由此：本地时 = UT − zon，`swe_utc_time_zone(…, +zon)` 即
+「本地→UTC」方向（传 −zon 才是 UTC→本地）。
+⚠️ 遗留不一致：`test/unit/unit_midpoint|composite|synastry|returns` 与 `test/golden` 的
+cmd 行对北京仍传 `zon=8`（东正写法），与西正约定相反 → 其出盘绝对时刻偏 16h；因这些用例
+只校验自反/对称/恒等等**内部一致性**故未暴露。**新增用例一律用 zon=-8 表示东八区**，
+存量用例与金样 cmd 待专项统一（涉及重生成金样，非小改）。
 
 #### P2 启动规划（设计稿 v0，2026-09-05；待确认后实施）
 **目标与顺序**：A8（单盘动态 = 行运/次限/太阳弧/月亮弧，value 最高）→ A9（日月返）→
